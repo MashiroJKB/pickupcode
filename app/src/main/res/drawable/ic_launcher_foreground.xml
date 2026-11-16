@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Minimalist Express Box & Barcode Icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,36 L54,25 L76,36 L76,72 L54,83 L32,72 Z"
+        android:fillAlpha="0.22" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M32,38 L54,27 L76,38 L76,70 L54,81 L32,70 Z M32,38 L54,49 L76,38 M54,49 L54,81 M43,32.5 L65,43.5" />
+</vector>
