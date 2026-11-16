@@ -77,6 +77,25 @@ data class PickupItemEntity(
         const val SOURCE_SMS = "SMS"
         const val SOURCE_MANUAL = "MANUAL"
 
+        private val NUMBER_TOKEN_REGEX = Regex("""\d+""")
+
+        /**
+         * 同一快递房内取件码按货架号、层号、包裹序号从小到大自然排序
+         */
+        val NaturalCodeComparator: Comparator<PickupItemEntity> = Comparator { a, b ->
+            val numsA = NUMBER_TOKEN_REGEX.findAll(a.code).map { it.value.toLongOrNull() ?: 0L }.toList()
+            val numsB = NUMBER_TOKEN_REGEX.findAll(b.code).map { it.value.toLongOrNull() ?: 0L }.toList()
+            val minSize = minOf(numsA.size, numsB.size)
+            for (i in 0 until minSize) {
+                val cmp = numsA[i].compareTo(numsB[i])
+                if (cmp != 0) return@Comparator cmp
+            }
+            if (numsA.size != numsB.size) {
+                return@Comparator numsA.size.compareTo(numsB.size)
+            }
+            a.code.compareTo(b.code, ignoreCase = true)
+        }
+
         fun stationCircleSymbolFor(number: Int): String = when (number) {
             in 1..20 -> (0x2460 + number - 1).toChar().toString() // ① ~ ⑳
             else -> "？"

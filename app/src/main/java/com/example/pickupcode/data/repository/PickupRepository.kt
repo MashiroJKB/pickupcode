@@ -297,7 +297,7 @@ class PickupRepository(
     suspend fun updateStationNumber(itemId: Long, stationNumber: Int) = withContext(Dispatchers.IO) {
         pickupDao.updateStationNumber(
             id = itemId,
-            stationNumber = stationNumber.coerceIn(0, 20),
+            stationNumber = stationNumber.coerceIn(0, 100),
             updatedAt = System.currentTimeMillis()
         )
     }
@@ -316,7 +316,7 @@ class PickupRepository(
         pickupDao.insert(
             PickupItemEntity(
                 code = cleanCode,
-                stationNumber = stationNumber.coerceIn(0, 20),
+                stationNumber = stationNumber.coerceIn(0, 100),
                 stationRawName = if (stationNumber > 0) "${stationNumber}号快递房" else "",
                 expressCompany = "",
                 productName = productName.trim(),

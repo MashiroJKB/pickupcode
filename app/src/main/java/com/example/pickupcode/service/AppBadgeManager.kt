@@ -1,14 +1,19 @@
 package com.example.pickupcode.service
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.example.pickupcode.MainActivity
 import com.example.pickupcode.R
 
@@ -21,7 +26,82 @@ object AppBadgeManager {
     private const val BADGE_CHANNEL_ID = "pickup_badge_channel"
     private const val BADGE_NOTIFICATION_ID = 10086
 
+    @Volatile
     private var lastAppliedCount: Int = -1
+
+    /**
+     * 确保桌面角标与通知渠道已在系统注册，使「应用通知管理」内完整显示通知与桌面图标角标开关
+     */
+    fun ensureNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        try {
+            val nm = context.applicationContext.getSystemService(Context.NOTIFICATION_SERVICE)
+                as? NotificationManager ?: return
+            val existing = nm.getNotificationChannel(BADGE_CHANNEL_ID)
+            if (existing == null) {
+                val channel = NotificationChannel(
+                    BADGE_CHANNEL_ID,
+                    "待取件桌面角标",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "用于在桌面图标角标同步待取快递数量"
+                    setShowBadge(true)
+                    enableVibration(false)
+                    setSound(null, null)
+                }
+                nm.createNotificationChannel(channel)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * 检测系统通知权限是否已授予（Android 13+ 同时校验 POST_NOTIFICATIONS 与系统通知总开关）
+     */
+    fun hasNotificationPermission(context: Context): Boolean {
+        val runtimeGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+        val systemEnabled = try {
+            NotificationManagerCompat.from(context).areNotificationsEnabled()
+        } catch (_: Exception) {
+            true
+        }
+        return runtimeGranted && systemEnabled
+    }
+
+    /**
+     * 一键打开当前应用的系统「通知管理 / 桌面角标」设置页
+     */
+    fun openNotificationAndBadgeSettings(context: Context) {
+        ensureNotificationChannel(context)
+        val appNotificationIntent = Intent().apply {
+            action = Settings.ACTION_APP_NOTIFICATION_SETTINGS
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(appNotificationIntent)
+            return
+        } catch (_: Exception) {
+        }
+
+        val appDetailsIntent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", context.packageName, null)
+        ).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(appDetailsIntent)
+        } catch (_: Exception) {
+        }
+    }
 
     fun updateBadgeCount(context: Context, pendingCount: Int, force: Boolean = false) {
         val count = pendingCount.coerceAtLeast(0)
@@ -29,6 +109,7 @@ object AppBadgeManager {
         lastAppliedCount = count
 
         val appContext = context.applicationContext
+        ensureNotificationChannel(appContext)
         updateHuaweiBadge(appContext, count)
         updateHonorBadge(appContext, count)
         updateVivoBadge(appContext, count)
@@ -116,22 +197,15 @@ object AppBadgeManager {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                 ?: return
 
+            ensureNotificationChannel(context)
+
             if (count <= 0) {
                 nm.cancel(BADGE_NOTIFICATION_ID)
                 return
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = NotificationChannel(
-                    BADGE_CHANNEL_ID,
-                    "待取件桌面角标",
-                    NotificationManager.IMPORTANCE_LOW
-                ).apply {
-                    setShowBadge(true)
-                    enableVibration(false)
-                    setSound(null, null)
-                }
-                nm.createNotificationChannel(channel)
+            if (!hasNotificationPermission(context)) {
+                return
             }
 
             val launchIntent = Intent(context, MainActivity::class.java).apply {

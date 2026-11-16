@@ -112,7 +112,12 @@ class SmsContentObserver(
         if (!hasPermission) return
 
         scope.launch {
-            repository.scanRecentSmsInbox(context = context, daysOverride = 1)
+            val added = repository.scanRecentSmsInbox(context = context, daysOverride = 1)
+            if (added > 0) {
+                val pendingCount = repository.allItemsFlow.first().count { !it.isPickedUp }
+                AppBadgeManager.updateBadgeCount(context, pendingCount, force = true)
+                PickupWidgetProvider.notifyWidgetDataChanged(context)
+            }
         }
     }
 }

@@ -97,4 +97,21 @@ class PickupMessageParserTest {
         assertEquals(1, results.size)
         assertEquals(1, results[0].stationNumber)
     }
+
+    @Test
+    fun `sorts pickup codes naturally by shelf and layer numbers`() {
+        val codes = listOf("100-1-1", "30-3-2", "2-1-5", "94-3-2", "1-4-10")
+        val items = codes.map {
+            com.example.pickupcode.data.local.PickupItemEntity(
+                code = it,
+                stationNumber = 1,
+                rawMessage = it
+            )
+        }
+        val sortedCodes = items
+            .sortedWith(com.example.pickupcode.data.local.PickupItemEntity.NaturalCodeComparator)
+            .map { it.code }
+
+        assertEquals(listOf("1-4-10", "2-1-5", "30-3-2", "94-3-2", "100-1-1"), sortedCodes)
+    }
 }

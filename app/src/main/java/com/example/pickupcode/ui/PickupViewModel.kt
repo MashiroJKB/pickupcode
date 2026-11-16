@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -23,6 +24,9 @@ class PickupViewModel(
     private val repository: PickupRepository,
     private val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
+
+    private val _isSettingsLoaded = MutableStateFlow(false)
+    val isSettingsLoaded: StateFlow<Boolean> = _isSettingsLoaded.asStateFlow()
 
     val itemsState: StateFlow<List<PickupItemEntity>> = repository.allItemsFlow
         .stateIn(
@@ -32,6 +36,7 @@ class PickupViewModel(
         )
 
     val settingsState: StateFlow<AppSettings> = repository.settingsFlow
+        .onEach { _isSettingsLoaded.value = true }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -160,8 +165,10 @@ class PickupViewModel(
     fun updateStationNumber(itemId: Long, stationNumber: Int) {
         viewModelScope.launch {
             repository.updateStationNumber(itemId, stationNumber)
-            val symbol = PickupItemEntity.stationCircleSymbolFor(stationNumber)
-            showCapsuleToast("已归入 $symbol ${stationNumber}号快递房")
+            val rule = settingsState.value.stationRules.firstOrNull { it.stationNumber == stationNumber }
+            val symbol = rule?.circleSymbol ?: PickupItemEntity.stationCircleSymbolFor(stationNumber)
+            val name = rule?.displayName ?: "${stationNumber}号快递房"
+            showCapsuleToast("已归入 $symbol $name")
         }
     }
 
@@ -202,6 +209,12 @@ class PickupViewModel(
     fun completeOnboarding() {
         viewModelScope.launch {
             settingsDataStore.setOnboardingCompleted(true)
+        }
+    }
+
+    fun markBadgePermissionPrompted() {
+        viewModelScope.launch {
+            settingsDataStore.setBadgePermissionPrompted(true)
         }
     }
 
@@ -271,9 +284,12 @@ class PickupViewModel(
 
     fun deleteStationRule(stationNumber: Int) {
         viewModelScope.launch {
+            val symbol = settingsState.value.stationRules
+                .firstOrNull { it.stationNumber == stationNumber }
+                ?.circleSymbol
+                ?: PickupItemEntity.stationCircleSymbolFor(stationNumber)
             settingsDataStore.removeStationRule(stationNumber)
             repository.reapplyStationRules()
-            val symbol = PickupItemEntity.stationCircleSymbolFor(stationNumber)
             showCapsuleToast("已删除 $symbol 快递房规则")
         }
     }
@@ -282,7 +298,10 @@ class PickupViewModel(
         viewModelScope.launch {
             settingsDataStore.addKeywordToStation(stationNumber, keyword)
             repository.reapplyStationRules()
-            val symbol = PickupItemEntity.stationCircleSymbolFor(stationNumber)
+            val symbol = settingsState.value.stationRules
+                .firstOrNull { it.stationNumber == stationNumber }
+                ?.circleSymbol
+                ?: PickupItemEntity.stationCircleSymbolFor(stationNumber)
             showCapsuleToast("已将「$keyword」添加至 $symbol")
         }
     }
@@ -310,9 +329,7 @@ class PickupViewModel(
                 keywords
             }
             settingsDataStore.updateStationRule(stationNumber, displayName, badgeNumber, mergedKeywords)
-            if (extra.isNotEmpty()) {
-                repository.reapplyStationRules()
-            }
+            repository.reapplyStationRules()
             showCapsuleToast("已保存规则修改")
         }
     }

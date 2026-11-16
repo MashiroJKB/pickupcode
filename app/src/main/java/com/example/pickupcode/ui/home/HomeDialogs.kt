@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -61,10 +62,13 @@ import com.example.pickupcode.ui.components.StationBadgeSymbol
 import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.AppleGreenDark
 import com.example.pickupcode.ui.theme.AppleGreenLight
+import com.example.pickupcode.ui.theme.AppleOrangeDark
+import com.example.pickupcode.ui.theme.AppleOrangeLight
 import com.example.pickupcode.ui.theme.AppleRedDark
 import com.example.pickupcode.ui.theme.AppleRedLight
 import com.example.pickupcode.ui.theme.PickupCodeMonospaceStyle
 import com.example.pickupcode.ui.theme.liquidGlass
+import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 import com.example.pickupcode.ui.theme.stationAccentColor
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -661,6 +665,162 @@ fun LongPressQuickActionDialog(
                     Text("删除", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
+        }
+    }
+}
+
+/**
+ * 5. 首次打开通知与桌面角标权限引导弹窗
+ */
+@Composable
+fun NotificationAndBadgePermissionDialog(
+    hasNotificationPermission: Boolean,
+    onDismiss: () -> Unit,
+    onRequestNotificationPermission: () -> Unit,
+    onOpenBadgeSettings: () -> Unit
+) {
+    val isDark = isSystemInDarkTheme()
+    val statusGreen = if (isDark) AppleGreenDark else AppleGreenLight
+    val statusAmber = if (isDark) AppleOrangeDark else AppleOrangeLight
+
+    SpringGlassDialog(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.NotificationsActive,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "开启通知与桌面角标",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "便于在桌面图标右上角实时显示待取件数量",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            PermissionGuideItemRow(
+                title = "系统通知权限",
+                subtitle = "用于向系统同步待取包裹数量状态",
+                statusText = if (hasNotificationPermission) "已开启" else "点击授权",
+                statusColor = if (hasNotificationPermission) statusGreen else statusAmber,
+                clickable = !hasNotificationPermission,
+                onClick = onRequestNotificationPermission
+            )
+
+            Spacer(modifier = Modifier.height(9.dp))
+
+            PermissionGuideItemRow(
+                title = "桌面图标角标权限",
+                subtitle = "OriginOS / 澎湃OS / ColorOS 等系统请在通知管理内开启「桌面图标角标」",
+                statusText = "去设置",
+                statusColor = MaterialTheme.colorScheme.primary,
+                clickable = true,
+                onClick = onOpenBadgeSettings
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text(if (hasNotificationPermission) "完成" else "暂不设置")
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Button(
+                    onClick = {
+                        if (!hasNotificationPermission) {
+                            onRequestNotificationPermission()
+                        } else {
+                            onOpenBadgeSettings()
+                            onDismiss()
+                        }
+                    },
+                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                ) {
+                    Text(
+                        text = if (!hasNotificationPermission) "开启通知权限" else "前往开启角标",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionGuideItemRow(
+    title: String,
+    subtitle: String,
+    statusText: String,
+    statusColor: Color,
+    clickable: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlassInnerCard(
+                cornerRadius = AppleCorners.InnerCard,
+                accentTint = statusColor
+            )
+            .then(if (clickable) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 11.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(AppleCorners.Pill))
+                .background(statusColor.copy(alpha = 0.16f))
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                color = statusColor
+            )
         }
     }
 }

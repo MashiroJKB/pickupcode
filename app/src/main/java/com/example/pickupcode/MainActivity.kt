@@ -37,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +58,7 @@ import com.example.pickupcode.ui.home.AddOrPastePickupDialog
 import com.example.pickupcode.ui.home.EditProductRemarkDialog
 import com.example.pickupcode.ui.home.HomeScreen
 import com.example.pickupcode.ui.home.LongPressQuickActionDialog
+import com.example.pickupcode.ui.home.NotificationAndBadgePermissionDialog
 import com.example.pickupcode.ui.home.RawMessageDetailDialog
 import com.example.pickupcode.ui.settings.SettingsScreen
 import com.example.pickupcode.ui.theme.AppleCorners
@@ -131,9 +133,11 @@ fun PickupMainApp(viewModel: PickupViewModel) {
 
     val items by viewModel.itemsState.collectAsState()
     val settings by viewModel.settingsState.collectAsState()
+    val isSettingsLoaded by viewModel.isSettingsLoaded.collectAsState()
     val selectedItemIds by viewModel.selectedItemIds.collectAsState()
     val undoableItemIds by viewModel.undoableItemIds.collectAsState()
     val capsuleToast by viewModel.capsuleToastMessage.collectAsState()
+    val latestItems by rememberUpdatedState(items)
 
     var showSettingsScreen by remember { mutableStateOf(false) }
     val homeListState = rememberLazyListState()
@@ -146,54 +150,130 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     var hasSmsPermission by remember {
         mutableStateOf(checkSmsPermission(context))
     }
+    var hasNotificationPermission by remember {
+        mutableStateOf(AppBadgeManager.hasNotificationPermission(context))
+    }
 
     // 弹窗控制状态
     var activeDetailItem by remember { mutableStateOf<PickupItemEntity?>(null) }
     var activeEditProductItem by remember { mutableStateOf<PickupItemEntity?>(null) }
     var activeLongPressItem by remember { mutableStateOf<PickupItemEntity?>(null) }
     var showAddOrPasteDialog by remember { mutableStateOf(false) }
+    var showNotificationBadgeDialog by remember { mutableStateOf(false) }
+    var awaitingBadgeDialogAfterStartupPrompt by remember { mutableStateOf(false) }
+    var hasTriggeredInitialPermissionFlow by remember { mutableStateOf(false) }
 
-    val smsPermissionLauncher = rememberLauncherForActivityResult(
+    val startupPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        val granted = result[Manifest.permission.READ_SMS] == true
-        hasSmsPermission = granted
+    ) { _ ->
+        val smsGranted = checkSmsPermission(context)
+        hasSmsPermission = smsGranted
+        hasNotificationPermission = AppBadgeManager.hasNotificationPermission(context)
         viewModel.completeOnboarding()
-        if (granted) {
+        if (smsGranted) {
             viewModel.scanRecentSmsOnAppOpen(context)
         }
-        AppBadgeManager.updateBadgeCount(context, items.count { !it.isPickedUp }, force = true)
+        AppBadgeManager.updateBadgeCount(context, latestItems.count { !it.isPickedUp }, force = true)
+        if (awaitingBadgeDialogAfterStartupPrompt) {
+            awaitingBadgeDialogAfterStartupPrompt = false
+            if (!settings.badgePermissionPrompted) {
+                showNotificationBadgeDialog = true
+            }
+        }
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        val grantedNow = AppBadgeManager.hasNotificationPermission(context)
+        hasNotificationPermission = grantedNow
+        AppBadgeManager.updateBadgeCount(context, latestItems.count { !it.isPickedUp }, force = true)
+        if (!grantedNow) {
+            AppBadgeManager.openNotificationAndBadgeSettings(context)
+        }
     }
 
     val requestSmsPermissions = {
         val perms = buildList {
             add(Manifest.permission.READ_SMS)
             add(Manifest.permission.RECEIVE_SMS)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
             }
         }.toTypedArray()
-        smsPermissionLauncher.launch(perms)
+        startupPermissionLauncher.launch(perms)
     }
 
-    // 首次打开且尚未授予短信权限时自动索取权限；后续已开启权限则直接进入待取件界面，不再弹窗
-    LaunchedEffect(Unit) {
-        if (!hasSmsPermission) {
-            requestSmsPermissions()
+    val requestNotificationPermission: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            viewModel.completeOnboarding()
+            AppBadgeManager.openNotificationAndBadgeSettings(context)
         }
     }
 
-    // 每次打开应用（冷启动与热启动）自动扫描最近 7 天短信并自动排除已取快递
+    // 首次打开：请求短信与通知权限（Android 13+），并在完成后弹出桌面角标权限引导弹窗
+    LaunchedEffect(isSettingsLoaded) {
+        if (!isSettingsLoaded || hasTriggeredInitialPermissionFlow) return@LaunchedEffect
+        hasTriggeredInitialPermissionFlow = true
+
+        val smsNow = checkSmsPermission(context)
+        val notifNow = AppBadgeManager.hasNotificationPermission(context)
+        hasSmsPermission = smsNow
+        hasNotificationPermission = notifNow
+
+        val startupPerms = buildList {
+            if (!smsNow) {
+                add(Manifest.permission.READ_SMS)
+                add(Manifest.permission.RECEIVE_SMS)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED &&
+                (!smsNow || !settings.badgePermissionPrompted)
+            ) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        if (startupPerms.isNotEmpty()) {
+            awaitingBadgeDialogAfterStartupPrompt = !settings.badgePermissionPrompted
+            startupPermissionLauncher.launch(startupPerms.toTypedArray())
+        } else {
+            viewModel.completeOnboarding()
+            if (!settings.badgePermissionPrompted) {
+                showNotificationBadgeDialog = true
+            }
+        }
+    }
+
+    // 每次打开应用（冷启动与热启动）刷新权限状态、自动扫描最近 7 天短信并同步桌面角标
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 val smsNow = checkSmsPermission(context)
                 hasSmsPermission = smsNow
+                hasNotificationPermission = AppBadgeManager.hasNotificationPermission(context)
                 if (smsNow) {
                     viewModel.scanRecentSmsOnAppOpen(context)
                 }
+                AppBadgeManager.updateBadgeCount(
+                    context,
+                    latestItems.count { !it.isPickedUp },
+                    force = true
+                )
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -283,8 +363,11 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         items = items,
                         settings = settings,
                         hasSmsPermission = hasSmsPermission,
+                        hasNotificationPermission = hasNotificationPermission,
                         onBack = { showSettingsScreen = false },
                         onRequestSmsPermission = requestSmsPermissions,
+                        onRequestNotificationPermission = requestNotificationPermission,
+                        onOpenBadgeSettings = { AppBadgeManager.openNotificationAndBadgeSettings(context) },
                         onToggleTaobaoBanner = viewModel::setShowTaobaoIdentityBanner,
                         onToggleCainiaoBanner = viewModel::setShowCainiaoIdentityBanner,
                         onTogglePinduoduoBanner = viewModel::setShowPinduoduoIdentityBanner,
@@ -382,6 +465,22 @@ fun PickupMainApp(viewModel: PickupViewModel) {
             onDismiss = { showAddOrPasteDialog = false },
             onPasteParse = viewModel::pasteAndParseSms,
             onManualAdd = viewModel::addManualPickupCode
+        )
+    }
+
+    // 5. 首次打开通知与桌面角标权限引导弹窗
+    if (showNotificationBadgeDialog) {
+        NotificationAndBadgePermissionDialog(
+            hasNotificationPermission = hasNotificationPermission,
+            onDismiss = {
+                showNotificationBadgeDialog = false
+                viewModel.markBadgePermissionPrompted()
+            },
+            onRequestNotificationPermission = requestNotificationPermission,
+            onOpenBadgeSettings = {
+                viewModel.markBadgePermissionPrompted()
+                AppBadgeManager.openNotificationAndBadgeSettings(context)
+            }
         )
     }
 }

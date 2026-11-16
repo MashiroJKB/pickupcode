@@ -63,25 +63,6 @@ data class StationGroupSection(
     val items: List<PickupItemEntity>
 )
 
-private val NUMBER_TOKEN_REGEX = Regex("""\d+""")
-
-/**
- * 同一个快递房内的取件码按照数字大小从小到大自然排序
- */
-private val NaturalPickupCodeComparator = Comparator<PickupItemEntity> { a, b ->
-    val numsA = NUMBER_TOKEN_REGEX.findAll(a.code).map { it.value.toLongOrNull() ?: 0L }.toList()
-    val numsB = NUMBER_TOKEN_REGEX.findAll(b.code).map { it.value.toLongOrNull() ?: 0L }.toList()
-    val minSize = minOf(numsA.size, numsB.size)
-    for (i in 0 until minSize) {
-        val cmp = numsA[i].compareTo(numsB[i])
-        if (cmp != 0) return@Comparator cmp
-    }
-    if (numsA.size != numsB.size) {
-        return@Comparator numsA.size.compareTo(numsB.size)
-    }
-    a.code.compareTo(b.code, ignoreCase = true)
-}
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
@@ -157,7 +138,7 @@ fun HomeScreen(
                     stationNumber = stationNum,
                     badgeNumber = badgeNumber,
                     displayName = displayName,
-                    items = groupItems.sortedWith(NaturalPickupCodeComparator)
+                    items = groupItems.sortedWith(PickupItemEntity.NaturalCodeComparator)
                 )
             }
             .sortedBy { section ->
@@ -333,7 +314,7 @@ private fun HomeTopHeader(
                 totalPending > 0 && activeStationCount > 0 ->
                     "当前 $totalPending 件待取 · 分布在 $activeStationCount 个快递房"
                 totalPending > 0 ->
-                    "当前 $totalPending 件待取 · 待归类快递房"
+                    "当前 $totalPending 件待取 · 待分类快递房"
                 else ->
                     "每次打开自动扫描最近 7 天取件短信"
             },

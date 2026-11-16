@@ -19,6 +19,7 @@
     <uses-permission android:name="com.sec.android.provider.badge.permission.WRITE" />
     <uses-permission android:name="com.oppo.launcher.permission.READ_SETTINGS" />
     <uses-permission android:name="com.oppo.launcher.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="com.oplus.notification.permission.BADGE_DIGITAL" />
     <uses-permission android:name="com.vivo.notification.permission.BADGE_ICON" />
 
     <!-- Android 11+ 包可见性声明：用于直接唤起淘宝/拼多多 DeepLink -->

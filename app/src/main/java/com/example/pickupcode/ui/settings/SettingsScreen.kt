@@ -40,9 +40,11 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Sms
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -111,8 +113,11 @@ fun SettingsScreen(
     items: List<PickupItemEntity>,
     settings: AppSettings,
     hasSmsPermission: Boolean,
+    hasNotificationPermission: Boolean,
     onBack: () -> Unit,
     onRequestSmsPermission: () -> Unit,
+    onRequestNotificationPermission: () -> Unit,
+    onOpenBadgeSettings: () -> Unit,
     onToggleTaobaoBanner: (Boolean) -> Unit,
     onToggleCainiaoBanner: (Boolean) -> Unit,
     onTogglePinduoduoBanner: (Boolean) -> Unit,
@@ -297,76 +302,40 @@ fun SettingsScreen(
             }
         }
 
-        // 2. 仅当未开启短信权限时展示授权卡片
+        // 2. 仅当未开启短信权限时展示短信授权卡片
         if (!hasSmsPermission) {
             item(key = "sms_permission_card") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .liquidGlass(cornerRadius = AppleCorners.OuterCard)
-                        .padding(18.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Sms,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(statusAmber)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "监听短信权限未开启",
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "授权后每次打开应用自动扫描最近 7 天取件短信",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                PermissionStatusCard(
+                    icon = Icons.Rounded.Sms,
+                    title = "监听短信权限未开启",
+                    subtitle = "授权后每次打开应用自动扫描最近 7 天取件短信",
+                    accentColor = statusAmber,
+                    buttonText = "开启权限",
+                    onClick = onRequestSmsPermission
+                )
+            }
+        }
 
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(AppleCorners.Pill))
-                                .background(statusAmber.copy(alpha = 0.16f))
-                                .border(0.8.dp, statusAmber.copy(alpha = 0.4f), RoundedCornerShape(AppleCorners.Pill))
-                                .clickable(onClick = onRequestSmsPermission)
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = "开启权限",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = statusAmber
-                            )
-                        }
-                    }
-                }
+        // 2.5 通知与桌面角标权限卡片
+        item(key = "notification_badge_card") {
+            if (!hasNotificationPermission) {
+                PermissionStatusCard(
+                    icon = Icons.Rounded.NotificationsActive,
+                    title = "通知与桌面角标权限未开启",
+                    subtitle = "开启通知并允许「桌面图标角标」，可在桌面实时显示待取件数",
+                    accentColor = statusAmber,
+                    buttonText = "开启通知",
+                    onClick = onRequestNotificationPermission
+                )
+            } else {
+                PermissionStatusCard(
+                    icon = Icons.Rounded.NotificationsActive,
+                    title = "桌面图标角标与通知已就绪",
+                    subtitle = "若桌面图标未显示角标数字，请在系统通知管理中开启「桌面图标角标」",
+                    accentColor = statusGreen,
+                    buttonText = "管理角标",
+                    onClick = onOpenBadgeSettings
+                )
             }
         }
 
@@ -663,7 +632,7 @@ fun SettingsScreen(
             }
         }
 
-        // 4. 身份码跳转链路卡片（淘宝身份码、菜鸟身份码、拼多多身份码三开关独立控制）
+        // 4. 身份码跳转链路卡片（淘宝身份码、菜鸟身份码、拼多多取件码三开关独立控制）
         item(key = "identity_code_switches_card") {
             Column(
                 modifier = Modifier
@@ -780,6 +749,84 @@ fun SettingsScreen(
             onRestoreItem = onRestorePickedUpItem,
             onDeleteItem = onDeletePickedUpItem
         )
+    }
+}
+
+@Composable
+private fun PermissionStatusCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    accentColor: Color,
+    buttonText: String,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(cornerRadius = AppleCorners.OuterCard)
+            .padding(18.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(accentColor)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(AppleCorners.Pill))
+                    .background(accentColor.copy(alpha = 0.16f))
+                    .border(0.8.dp, accentColor.copy(alpha = 0.4f), RoundedCornerShape(AppleCorners.Pill))
+                    .clickable(onClick = onClick)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = buttonText,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = accentColor
+                )
+            }
+        }
     }
 }
 

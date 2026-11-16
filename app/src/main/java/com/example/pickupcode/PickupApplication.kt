@@ -4,6 +4,7 @@ import android.app.Application
 import com.example.pickupcode.data.local.PickupDatabase
 import com.example.pickupcode.data.local.SettingsDataStore
 import com.example.pickupcode.data.repository.PickupRepository
+import com.example.pickupcode.service.AppBadgeManager
 import com.example.pickupcode.service.SmsContentObserver
 
 class PickupApplication : Application() {
@@ -27,6 +28,8 @@ class PickupApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 预先注册桌面角标通知通道，确保系统「应用通知管理」立即可见通知与角标开关
+        AppBadgeManager.ensureNotificationChannel(applicationContext)
         // 注册短信数据库 ContentObserver，配合 SMS_RECEIVED 广播实现秒级入库
         val observer = SmsContentObserver(applicationContext, repository)
         observer.register()

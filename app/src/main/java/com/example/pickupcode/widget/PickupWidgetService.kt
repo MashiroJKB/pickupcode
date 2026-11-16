@@ -30,21 +30,6 @@ private class PickupRemoteViewsFactory(
     )
 
     private var rows: List<WidgetDisplayRow> = emptyList()
-    private val numberRegex = Regex("""\d+""")
-
-    private val naturalCodeComparator = Comparator<PickupItemEntity> { a, b ->
-        val numsA = numberRegex.findAll(a.code).map { it.value.toLongOrNull() ?: 0L }.toList()
-        val numsB = numberRegex.findAll(b.code).map { it.value.toLongOrNull() ?: 0L }.toList()
-        val minSize = minOf(numsA.size, numsB.size)
-        for (i in 0 until minSize) {
-            val cmp = numsA[i].compareTo(numsB[i])
-            if (cmp != 0) return@Comparator cmp
-        }
-        if (numsA.size != numsB.size) {
-            return@Comparator numsA.size.compareTo(numsB.size)
-        }
-        a.code.compareTo(b.code, ignoreCase = true)
-    }
 
     override fun onCreate() {
         loadData()
@@ -82,7 +67,7 @@ private class PickupRemoteViewsFactory(
                         "？ 待分类"
                     }
 
-                    val sortedItems = groupItems.sortedWith(naturalCodeComparator)
+                    val sortedItems = groupItems.sortedWith(PickupItemEntity.NaturalCodeComparator)
                     for (item in sortedItems) {
                         result.add(
                             WidgetDisplayRow(
