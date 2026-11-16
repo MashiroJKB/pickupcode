@@ -6,12 +6,14 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -80,7 +82,22 @@ class MainActivity : ComponentActivity() {
         enableHighRefreshRate()
 
         setContent {
-            PickupCodeTheme {
+            val isDark = isSystemInDarkTheme()
+            DisposableEffect(isDark) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(
+                        android.graphics.Color.TRANSPARENT,
+                        android.graphics.Color.TRANSPARENT
+                    ) { isDark },
+                    navigationBarStyle = SystemBarStyle.auto(
+                        android.graphics.Color.TRANSPARENT,
+                        android.graphics.Color.TRANSPARENT
+                    ) { isDark }
+                )
+                onDispose {}
+            }
+
+            PickupCodeTheme(darkTheme = isDark) {
                 PickupMainApp(viewModel = viewModel)
             }
         }
@@ -274,6 +291,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                     latestItems.count { !it.isPickedUp },
                     force = true
                 )
+                PickupWidgetProvider.notifyWidgetDataChanged(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

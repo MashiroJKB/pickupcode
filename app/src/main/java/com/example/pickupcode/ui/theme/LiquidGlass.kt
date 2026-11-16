@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -150,66 +151,68 @@ fun LiquidGlassBackdrop(
     val isDark = isSystemInDarkTheme()
     val baseBg = if (isDark) Color(0xFF0B0D13) else Color(0xFFEEF2F9)
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(baseBg)
-            .drawWithCache {
-                val w = size.width
-                val h = size.height
+    key(isDark) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(baseBg)
+                .drawWithCache {
+                    val w = size.width
+                    val h = size.height
 
-                val c1 = Offset(w * 0.18f, h * 0.10f)
-                val r1 = w * 0.85f
-                val b1 = Brush.radialGradient(
-                    colors = listOf(
-                        if (isDark) Color(0x300A84FF) else Color(0x28007AFF),
-                        Color.Transparent
-                    ),
-                    center = c1,
-                    radius = r1
-                )
+                    val c1 = Offset(w * 0.18f, h * 0.10f)
+                    val r1 = w * 0.85f
+                    val b1 = Brush.radialGradient(
+                        colors = listOf(
+                            if (isDark) Color(0x300A84FF) else Color(0x28007AFF),
+                            Color.Transparent
+                        ),
+                        center = c1,
+                        radius = r1
+                    )
 
-                val c2 = Offset(w * 0.88f, h * 0.08f)
-                val r2 = w * 0.70f
-                val b2 = Brush.radialGradient(
-                    colors = listOf(
-                        if (isDark) Color(0x26FF6A00) else Color(0x20FF7A22),
-                        Color.Transparent
-                    ),
-                    center = c2,
-                    radius = r2
-                )
+                    val c2 = Offset(w * 0.88f, h * 0.08f)
+                    val r2 = w * 0.70f
+                    val b2 = Brush.radialGradient(
+                        colors = listOf(
+                            if (isDark) Color(0x26FF6A00) else Color(0x20FF7A22),
+                            Color.Transparent
+                        ),
+                        center = c2,
+                        radius = r2
+                    )
 
-                val c3 = Offset(w * 0.75f, h * 0.55f)
-                val r3 = w * 0.90f
-                val b3 = Brush.radialGradient(
-                    colors = listOf(
-                        if (isDark) Color(0x225E5CE6) else Color(0x1E30B0C7),
-                        Color.Transparent
-                    ),
-                    center = c3,
-                    radius = r3
-                )
+                    val c3 = Offset(w * 0.75f, h * 0.55f)
+                    val r3 = w * 0.90f
+                    val b3 = Brush.radialGradient(
+                        colors = listOf(
+                            if (isDark) Color(0x225E5CE6) else Color(0x1E30B0C7),
+                            Color.Transparent
+                        ),
+                        center = c3,
+                        radius = r3
+                    )
 
-                val c4 = Offset(w * 0.25f, h * 0.88f)
-                val r4 = w * 0.80f
-                val b4 = Brush.radialGradient(
-                    colors = listOf(
-                        if (isDark) Color(0x2030D158) else Color(0x1C34C759),
-                        Color.Transparent
-                    ),
-                    center = c4,
-                    radius = r4
-                )
+                    val c4 = Offset(w * 0.25f, h * 0.88f)
+                    val r4 = w * 0.80f
+                    val b4 = Brush.radialGradient(
+                        colors = listOf(
+                            if (isDark) Color(0x2030D158) else Color(0x1C34C759),
+                            Color.Transparent
+                        ),
+                        center = c4,
+                        radius = r4
+                    )
 
-                onDrawBehind {
-                    drawCircle(brush = b1, center = c1, radius = r1)
-                    drawCircle(brush = b2, center = c2, radius = r2)
-                    drawCircle(brush = b3, center = c3, radius = r3)
-                    drawCircle(brush = b4, center = c4, radius = r4)
+                    onDrawBehind {
+                        drawCircle(brush = b1, center = c1, radius = r1)
+                        drawCircle(brush = b2, center = c2, radius = r2)
+                        drawCircle(brush = b3, center = c3, radius = r3)
+                        drawCircle(brush = b4, center = c4, radius = r4)
+                    }
                 }
-            }
-    ) {
-        content()
+        ) {
+            content()
+        }
     }
 }
