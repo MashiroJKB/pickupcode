@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:padding="12dp">
 
-    <!-- 顶部栏：左侧标题与待取件数，右侧一键跳转淘宝/菜鸟/拼多多 -->
+    <!-- 顶部栏：左侧标题与待取件数，右侧淘宝/菜鸟/拼多多原生苹果圆角应用图标 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -37,49 +37,34 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-                android:text="0 件"
+                android:text="待取 0 件"
                 android:textColor="@color/widget_accent_blue"
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <TextView
+        <ImageView
             android:id="@+id/widget_btn_taobao"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/widget_btn_taobao"
-            android:paddingHorizontal="9dp"
-            android:paddingVertical="4dp"
-            android:text="淘宝"
-            android:textColor="#FFFFFFFF"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:contentDescription="淘宝身份码"
+            android:scaleType="fitXY" />
 
-        <TextView
+        <ImageView
             android:id="@+id/widget_btn_cainiao"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="5dp"
-            android:background="@drawable/widget_btn_cainiao"
-            android:paddingHorizontal="9dp"
-            android:paddingVertical="4dp"
-            android:text="菜鸟"
-            android:textColor="#FFFFFFFF"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="8dp"
+            android:contentDescription="菜鸟身份码"
+            android:scaleType="fitXY" />
 
-        <TextView
+        <ImageView
             android:id="@+id/widget_btn_pdd"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="5dp"
-            android:background="@drawable/widget_btn_pdd"
-            android:paddingHorizontal="9dp"
-            android:paddingVertical="4dp"
-            android:text="拼多多"
-            android:textColor="#FFFFFFFF"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="8dp"
+            android:contentDescription="拼多多取件码"
+            android:scaleType="fitXY" />
     </LinearLayout>
 
     <!-- 待取件滚动列表 -->

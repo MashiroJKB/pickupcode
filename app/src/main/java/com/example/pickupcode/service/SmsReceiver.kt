@@ -18,6 +18,7 @@ import com.example.pickupcode.widget.PickupWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -60,6 +61,8 @@ class SmsReceiver : BroadcastReceiver() {
                         messageTimestamp = timestamp
                     )
                 }
+                val pendingCount = app.repository.allItemsFlow.first().count { !it.isPickedUp }
+                AppBadgeManager.updateBadgeCount(context, pendingCount)
                 PickupWidgetProvider.notifyWidgetDataChanged(context)
             } finally {
                 pendingResult.finish()

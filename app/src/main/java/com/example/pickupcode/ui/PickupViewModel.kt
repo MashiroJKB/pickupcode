@@ -299,10 +299,20 @@ class PickupViewModel(
         stationNumber: Int,
         displayName: String,
         badgeNumber: Int?,
-        keywords: List<String>
+        keywords: List<String>,
+        pendingNewKeyword: String = ""
     ) {
         viewModelScope.launch {
-            settingsDataStore.updateStationRule(stationNumber, displayName, badgeNumber, keywords)
+            val extra = pendingNewKeyword.trim()
+            val mergedKeywords = if (extra.isNotEmpty()) {
+                (keywords + extra).distinct()
+            } else {
+                keywords
+            }
+            settingsDataStore.updateStationRule(stationNumber, displayName, badgeNumber, mergedKeywords)
+            if (extra.isNotEmpty()) {
+                repository.reapplyStationRules()
+            }
             showCapsuleToast("已保存规则修改")
         }
     }

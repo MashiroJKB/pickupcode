@@ -264,10 +264,8 @@ fun SwipeablePickupItemCard(
     }
 
     // 计算滞留天数角标（超过 24 小时显示柔和橙色/红色「已到 N 天」标签）
-    val retentionDays = remember(item.createdAt) {
-        val elapsedHours = (System.currentTimeMillis() - item.createdAt) / (1000L * 60L * 60L)
-        if (elapsedHours >= 24L) (elapsedHours / 24L).toInt() else 0
-    }
+    val elapsedHours = (System.currentTimeMillis() - item.createdAt) / 3_600_000L
+    val retentionDays = if (elapsedHours >= 24L) (elapsedHours / 24L).toInt() else 0
 
     val checkScale by animateFloatAsState(
         targetValue = if (isSelected) 1.08f else 1f,
@@ -307,7 +305,7 @@ fun SwipeablePickupItemCard(
                         .background(checkGreen)
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch { offsetX. snapTo(0f) }
+                            scope.launch { offsetX.snapTo(0f) }
                             onQuickMarkPickedUp()
                         }
                 ) {
@@ -403,6 +401,14 @@ fun SwipeablePickupItemCard(
                     },
                     onLongClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (offsetX.value < -10f) {
+                            scope.launch {
+                                offsetX.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
+                                )
+                            }
+                        }
                         onLongPress()
                     }
                 )

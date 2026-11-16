@@ -12,8 +12,10 @@ import android.widget.Toast
 import com.example.pickupcode.MainActivity
 import com.example.pickupcode.PickupApplication
 import com.example.pickupcode.R
+import com.example.pickupcode.service.AppBadgeManager
 import com.example.pickupcode.ui.components.IdentityCodeType
 import com.example.pickupcode.ui.components.TaobaoDeepLinkLauncher
+import com.example.pickupcode.ui.components.loadAppleRoundedIconBitmapForWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,7 +25,8 @@ import kotlinx.coroutines.runBlocking
 
 /**
  * 桌面液态玻璃小组件 Provider：
- * 支持桌面直接按货架顺序浏览待取件码、一键点击标记「已取」、一键拉起淘宝/菜鸟/拼多多身份码与取件码。
+ * - 顶部提供原生苹果圆角裁剪的淘宝 / 菜鸟 / 拼多多图标快捷入口，使用直接 Activity PendingIntent 绕过 Android 12+ 后台启动限制
+ * - 列表按快递房顺序与货架号从小到大排序展示，支持直接点击「已取」并同步桌面角标
  */
 class PickupWidgetProvider : AppWidgetProvider() {
 
@@ -79,6 +82,8 @@ class PickupWidgetProvider : AppWidgetProvider() {
                     CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                         try {
                             app.repository.confirmPickedUpBatch(listOf(itemId))
+                            val remaining = app.repository.allItemsFlow.first().count { !it.isPickedUp }
+                            AppBadgeManager.updateBadgeCount(context, remaining)
                             notifyWidgetDataChanged(context)
                         } finally {
                             pendingResult.finish()
@@ -133,18 +138,52 @@ class PickupWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_header_title_area, openAppPendingIntent)
             views.setOnClickPendingIntent(R.id.widget_empty_view, openAppPendingIntent)
 
-            // 顶部淘宝/菜鸟/拼多多快捷按钮
+            // 顶部原生苹果圆角应用图标（淘宝 / 菜鸟 / 拼多多）
+            views.setImageViewBitmap(
+                R.id.widget_btn_taobao,
+                loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.TAOBAO, 96)
+            )
+            views.setImageViewBitmap(
+                R.id.widget_btn_cainiao,
+                loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.CAINIAO, 96)
+            )
+            views.setImageViewBitmap(
+                R.id.widget_btn_pdd,
+                loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.PINDUODUO, 96)
+            )
+
             views.setOnClickPendingIntent(
                 R.id.widget_btn_taobao,
-                createBroadcastPendingIntent(context, ACTION_LAUNCH_TAOBAO, 101)
+                createDirectLaunchOrFallbackPendingIntent(
+                    context = context,
+                    primaryUri = TaobaoDeepLinkLauncher.TAOBAO_IDENTITY_DEEPLINK,
+                    fallbackUri = TaobaoDeepLinkLauncher.CAINIAO_IDENTITY_DEEPLINK,
+                    targetPackage = TaobaoDeepLinkLauncher.TAOBAO_PACKAGE,
+                    fallbackBroadcastAction = ACTION_LAUNCH_TAOBAO,
+                    requestCode = 101
+                )
             )
             views.setOnClickPendingIntent(
                 R.id.widget_btn_cainiao,
-                createBroadcastPendingIntent(context, ACTION_LAUNCH_CAINIAO, 102)
+                createDirectLaunchOrFallbackPendingIntent(
+                    context = context,
+                    primaryUri = TaobaoDeepLinkLauncher.CAINIAO_IDENTITY_DEEPLINK,
+                    fallbackUri = TaobaoDeepLinkLauncher.TAOBAO_IDENTITY_DEEPLINK,
+                    targetPackage = TaobaoDeepLinkLauncher.TAOBAO_PACKAGE,
+                    fallbackBroadcastAction = ACTION_LAUNCH_CAINIAO,
+                    requestCode = 102
+                )
             )
             views.setOnClickPendingIntent(
                 R.id.widget_btn_pdd,
-                createBroadcastPendingIntent(context, ACTION_LAUNCH_PINDUODUO, 103)
+                createDirectLaunchOrFallbackPendingIntent(
+                    context = context,
+                    primaryUri = TaobaoDeepLinkLauncher.PINDUODUO_IDENTITY_DEEPLINK,
+                    fallbackUri = null,
+                    targetPackage = TaobaoDeepLinkLauncher.PINDUODUO_PACKAGE,
+                    fallbackBroadcastAction = ACTION_LAUNCH_PINDUODUO,
+                    requestCode = 103
+                )
             )
 
             // 绑定列表 RemoteViewsService
@@ -152,6 +191,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 data = Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
             }
+            @Suppress("DEPRECATION")
             views.setRemoteAdapter(R.id.widget_list_view, serviceIntent)
             views.setEmptyView(R.id.widget_list_view, R.id.widget_empty_view)
 
@@ -170,18 +210,39 @@ class PickupWidgetProvider : AppWidgetProvider() {
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
 
-        private fun createBroadcastPendingIntent(
+        private fun createDirectLaunchOrFallbackPendingIntent(
             context: Context,
-            action: String,
+            primaryUri: String,
+            fallbackUri: String?,
+            targetPackage: String,
+            fallbackBroadcastAction: String,
             requestCode: Int
         ): PendingIntent {
-            val intent = Intent(context, PickupWidgetProvider::class.java).apply {
-                this.action = action
+            val pm = context.packageManager
+            val candidates = listOfNotNull(primaryUri, fallbackUri)
+            for (uri in candidates) {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
+                    setPackage(targetPackage)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (intent.resolveActivity(pm) != null) {
+                    return PendingIntent.getActivity(
+                        context,
+                        requestCode,
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                }
+            }
+
+            // 未安装目标 App 时通过广播弹出轻提示
+            val broadcastIntent = Intent(context, PickupWidgetProvider::class.java).apply {
+                action = fallbackBroadcastAction
             }
             return PendingIntent.getBroadcast(
                 context,
                 requestCode,
-                intent,
+                broadcastIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
         }

@@ -86,7 +86,8 @@ import androidx.compose.ui.zIndex
 import com.example.pickupcode.data.local.AppSettings
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.StationRule
-import com.example.pickupcode.ui.components.PinduoduoRedStart
+import com.example.pickupcode.ui.components.AppBrandIcon
+import com.example.pickupcode.ui.components.IdentityCodeType
 import com.example.pickupcode.ui.components.StationBadgeSymbol
 import com.example.pickupcode.ui.home.SpringGlassDialog
 import com.example.pickupcode.ui.theme.AppleCorners
@@ -120,7 +121,7 @@ fun SettingsScreen(
     onReorderStations: (List<StationRule>) -> Unit,
     onAddStationKeyword: (stationNumber: Int, keyword: String) -> Unit,
     onRemoveStationKeyword: (stationNumber: Int, keyword: String) -> Unit,
-    onUpdateStationRuleInfo: (stationNumber: Int, newName: String, badgeNumber: Int?, keywords: List<String>) -> Unit,
+    onUpdateStationRuleInfo: (stationNumber: Int, newName: String, badgeNumber: Int?, keywords: List<String>, pendingNewKeyword: String) -> Unit,
     onResetStationRules: () -> Unit,
     onExportStationRules: () -> Unit,
     onImportStationRules: (String) -> Unit,
@@ -556,17 +557,22 @@ fun SettingsScreen(
                                                     it.stationNumber == rule.stationNumber
                                                 }
                                                 if (currentIndex != -1 && stepPx > 0f) {
-                                                    if (dragOffsetY > stepPx * 0.65f && currentIndex < localRules.lastIndex) {
+                                                    while (dragOffsetY > stepPx * 0.55f && currentIndex < localRules.lastIndex) {
+                                                        val idx = localRules.indexOfFirst { it.stationNumber == rule.stationNumber }
+                                                        if (idx == -1 || idx >= localRules.lastIndex) break
                                                         val mutable = localRules.toMutableList()
-                                                        val moved = mutable.removeAt(currentIndex)
-                                                        mutable.add(currentIndex + 1, moved)
+                                                        val moved = mutable.removeAt(idx)
+                                                        mutable.add(idx + 1, moved)
                                                         localRules = mutable
                                                         dragOffsetY -= stepPx
                                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    } else if (dragOffsetY < -stepPx * 0.65f && currentIndex > 0) {
+                                                    }
+                                                    while (dragOffsetY < -stepPx * 0.55f && currentIndex > 0) {
+                                                        val idx = localRules.indexOfFirst { it.stationNumber == rule.stationNumber }
+                                                        if (idx <= 0) break
                                                         val mutable = localRules.toMutableList()
-                                                        val moved = mutable.removeAt(currentIndex)
-                                                        mutable.add(currentIndex - 1, moved)
+                                                        val moved = mutable.removeAt(idx)
+                                                        mutable.add(idx - 1, moved)
                                                         localRules = mutable
                                                         dragOffsetY += stepPx
                                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -687,8 +693,7 @@ fun SettingsScreen(
 
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     IdentitySwitchRow(
-                        title = "淘宝身份码",
-                        accentColor = TaobaoOrangeStart,
+                        type = IdentityCodeType.TAOBAO,
                         checked = settings.showTaobaoIdentityBanner,
                         onCheckedChange = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -697,8 +702,7 @@ fun SettingsScreen(
                     )
 
                     IdentitySwitchRow(
-                        title = "菜鸟身份码",
-                        accentColor = MaterialTheme.colorScheme.primary,
+                        type = IdentityCodeType.CAINIAO,
                         checked = settings.showCainiaoIdentityBanner,
                         onCheckedChange = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -707,8 +711,7 @@ fun SettingsScreen(
                     )
 
                     IdentitySwitchRow(
-                        title = "拼多多取件码",
-                        accentColor = PinduoduoRedStart,
+                        type = IdentityCodeType.PINDUODUO,
                         checked = settings.showPinduoduoIdentityBanner,
                         onCheckedChange = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -734,12 +737,13 @@ fun SettingsScreen(
             onRemoveKeyword = { kw ->
                 onRemoveStationKeyword(activeEditingRule.stationNumber, kw)
             },
-            onSaveRuleInfo = { newName, newBadgeNum ->
+            onSaveRuleInfo = { newName, newBadgeNum, pendingKw ->
                 onUpdateStationRuleInfo(
                     activeEditingRule.stationNumber,
                     newName,
                     newBadgeNum,
-                    activeEditingRule.keywords
+                    activeEditingRule.keywords,
+                    pendingKw
                 )
             }
         )
@@ -781,8 +785,7 @@ fun SettingsScreen(
 
 @Composable
 private fun IdentitySwitchRow(
-    title: String,
-    accentColor: Color,
+    type: IdentityCodeType,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
@@ -793,25 +796,32 @@ private fun IdentitySwitchRow(
             .fillMaxWidth()
             .liquidGlassInnerCard(
                 cornerRadius = AppleCorners.InnerCard,
-                accentTint = if (checked) accentColor else Color.Unspecified
+                accentTint = if (checked) type.primaryColor else Color.Unspecified
             )
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AppBrandIcon(
+                type = type,
+                size = 30.dp
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = type.title,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
 
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = accentColor
+                checkedTrackColor = type.primaryColor
             )
         )
     }
@@ -872,7 +882,7 @@ private fun EditStationRuleDialog(
     onDismiss: () -> Unit,
     onAddKeyword: (String) -> Unit,
     onRemoveKeyword: (String) -> Unit,
-    onSaveRuleInfo: (newName: String, badgeNumber: Int?) -> Unit
+    onSaveRuleInfo: (newName: String, badgeNumber: Int?, pendingNewKeyword: String) -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
     var displayName by remember(rule.stationNumber) { mutableStateOf(rule.displayName) }
@@ -1023,10 +1033,7 @@ private fun EditStationRuleDialog(
                 Button(
                     onClick = {
                         val finalName = displayName.trim().ifEmpty { rule.displayName }
-                        onSaveRuleInfo(finalName, previewBadgeNum)
-                        if (newKeyword.isNotBlank()) {
-                            onAddKeyword(newKeyword.trim())
-                        }
+                        onSaveRuleInfo(finalName, previewBadgeNum, newKeyword.trim())
                         onDismiss()
                     },
                     shape = RoundedCornerShape(AppleCorners.InnerCard)

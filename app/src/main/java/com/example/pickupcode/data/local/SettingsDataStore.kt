@@ -150,8 +150,8 @@ class SettingsDataStore(private val context: Context) {
             assignedNum = if (badgeNumber != null && badgeNumber in 1..20 && badgeNumber !in usedNumbers) {
                 badgeNumber
             } else {
-                (1..20).firstOrNull { it !in usedNumbers }
-                    ?: ((usedNumbers.maxOrNull() ?: 7) + 1).coerceAtMost(20)
+                (1..100).firstOrNull { it !in usedNumbers }
+                    ?: ((usedNumbers.maxOrNull() ?: 20) + 1)
             }
 
             val finalName = customName.trim().ifEmpty { "${assignedNum}号快递房" }
@@ -344,7 +344,7 @@ class SettingsDataStore(private val context: Context) {
                 for (i in 0 until array.length()) {
                     val obj = array.getJSONObject(i)
                     val num = obj.optInt("stationNumber", 0)
-                    if (num in 1..20) {
+                    if (num in 1..100) {
                         val name = obj.optString("displayName", "${num}号快递房")
                         val badgeNumber = if (obj.has("badgeNumber")) {
                             if (obj.isNull("badgeNumber")) null

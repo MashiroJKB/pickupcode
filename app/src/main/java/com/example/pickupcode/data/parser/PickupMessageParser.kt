@@ -183,7 +183,7 @@ object PickupMessageParser {
         val activeNumbers = stationRules.map { it.stationNumber }.toSet()
 
         val keywordPairs = stationRules
-            .filter { it.stationNumber in 1..20 }
+            .filter { it.stationNumber in 1..100 }
             .flatMap { rule ->
                 rule.keywords
                     .map { it.trim() }
@@ -203,8 +203,10 @@ object PickupMessageParser {
             if (match != null) {
                 val numToken = match.groupValues[1]
                 val parsedNum = parseStationDigit(numToken)
-                if (parsedNum in activeNumbers) {
-                    return parsedNum to match.value
+                val targetStation = stationRules.firstOrNull { it.badgeNumber == parsedNum }?.stationNumber
+                    ?: parsedNum.takeIf { it in activeNumbers }
+                if (targetStation != null) {
+                    return targetStation to match.value
                 }
             }
         }

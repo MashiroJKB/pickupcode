@@ -148,9 +148,9 @@ object TaobaoDeepLinkLauncher {
 }
 
 /**
- * 首页顶部身份码入口容器：
- * - 当仅开启 1 个身份码时，展示完整单栏液态玻璃 Banner
- * - 当同时开启 2 个或 3 个身份码时，自动切换为「身份码」紧凑并排模式（一行 2~3 格液态玻璃方块按钮，仅显示对应应用图标）
+ * 首页顶部身份码/取件码入口容器：
+ * - 当仅开启 1 个开关时，展示完整单栏液态玻璃 Banner
+ * - 当同时开启 2 个或 3 个开关时，自动切换为标题为「身份码/取件码」的紧凑并排模式（一行 2~3 格液态玻璃方块按钮，仅显示对应应用图标）
  */
 @Composable
 fun IdentityCodeBannersSection(
@@ -176,7 +176,7 @@ fun IdentityCodeBannersSection(
 }
 
 /**
- * 多个身份码紧凑并排模式：标题为「身份码」，下方一行 2~3 格紧凑型液态玻璃方块按钮，只显示应用图标
+ * 多个身份码/取件码紧凑并排模式：标题为「身份码/取件码」，下方一行 2~3 格紧凑型液态玻璃方块按钮，只显示原生苹果圆角应用图标
  */
 @Composable
 fun CompactIdentityCodeBar(
@@ -194,7 +194,7 @@ fun CompactIdentityCodeBar(
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(
-            text = "身份码",
+            text = "身份码/取件码",
             style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
@@ -224,11 +224,10 @@ fun CompactIdentityCodeBar(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .weight(1f)
-                        .height(66.dp)
+                        .height(68.dp)
                         .scale(scale)
                         .liquidGlassInnerCard(
-                            cornerRadius = AppleCorners.InnerCard,
-                            accentTint = type.primaryColor
+                            cornerRadius = AppleCorners.InnerCard
                         )
                         .pointerInput(type) {
                             detectTapGestures(
@@ -250,8 +249,7 @@ fun CompactIdentityCodeBar(
                 ) {
                     AppBrandIcon(
                         type = type,
-                        size = 44.dp,
-                        cornerRadius = 12.dp
+                        size = 48.dp
                     )
                 }
             }
@@ -323,8 +321,7 @@ fun IdentityCodeBanner(
             ) {
                 AppBrandIcon(
                     type = type,
-                    size = 46.dp,
-                    cornerRadius = AppleCorners.InnerCard
+                    size = 46.dp
                 )
 
                 Spacer(modifier = Modifier.width(14.dp))

@@ -146,7 +146,7 @@ object AppBadgeManager {
             )
 
             val notification = NotificationCompat.Builder(context, BADGE_CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_stat_pickup)
                 .setContentTitle("待取快递")
                 .setContentText("当前有 $count 件快递待取")
                 .setNumber(count)
