@@ -273,6 +273,8 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         onRemoveStationKeyword = viewModel::removeStationKeyword,
                         onUpdateStationDisplayName = viewModel::updateStationDisplayName,
                         onResetStationRules = viewModel::resetStationRules,
+                        onRestorePickedUpItem = viewModel::restorePickedUpItem,
+                        onDeletePickedUpItem = viewModel::deleteItem,
                         onFeedbackMessage = viewModel::showCapsuleToast,
                         listState = settingsListState
                     )

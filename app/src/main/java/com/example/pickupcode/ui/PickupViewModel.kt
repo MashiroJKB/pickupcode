@@ -121,6 +121,16 @@ class PickupViewModel(
         }
     }
 
+    /**
+     * 从「7天内已取记录」中将单条已取快递恢复回待取列表
+     */
+    fun restorePickedUpItem(item: PickupItemEntity) {
+        viewModelScope.launch {
+            repository.undoPickedUpBatch(listOf(item.id))
+            showCapsuleToast("已将 ${item.code} 恢复至待取列表")
+        }
+    }
+
     fun updateProductRemark(itemId: Long, productName: String) {
         viewModelScope.launch {
             repository.updateProductRemark(itemId, productName)

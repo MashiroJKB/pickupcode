@@ -15,16 +15,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -34,6 +37,7 @@ import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -65,10 +69,14 @@ import com.example.pickupcode.ui.theme.AppleOrangeDark
 import com.example.pickupcode.ui.theme.AppleOrangeLight
 import com.example.pickupcode.ui.theme.AppleRedDark
 import com.example.pickupcode.ui.theme.AppleRedLight
+import com.example.pickupcode.ui.theme.PickupCodeMonospaceStyle
 import com.example.pickupcode.ui.theme.TaobaoOrangeStart
 import com.example.pickupcode.ui.theme.liquidGlass
 import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 import com.example.pickupcode.ui.theme.stationAccentColor
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -85,6 +93,8 @@ fun SettingsScreen(
     onRemoveStationKeyword: (stationNumber: Int, keyword: String) -> Unit,
     onUpdateStationDisplayName: (stationNumber: Int, newName: String, keywords: List<String>) -> Unit,
     onResetStationRules: () -> Unit,
+    onRestorePickedUpItem: (PickupItemEntity) -> Unit,
+    onDeletePickedUpItem: (PickupItemEntity) -> Unit,
     onFeedbackMessage: (String) -> Unit,
     listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
@@ -98,9 +108,14 @@ fun SettingsScreen(
 
     var editingStationRule by remember { mutableStateOf<StationRule?>(null) }
     var showAddStationDialog by remember { mutableStateOf(false) }
+    var showPickedUpHistoryDialog by remember { mutableStateOf(false) }
 
     val pendingCount = items.count { !it.isPickedUp }
-    val pickedUpCount = items.count { it.isPickedUp }
+    val pickedUpItems = remember(items) {
+        items.filter { it.isPickedUp }
+            .sortedByDescending { it.pickedUpAt ?: it.updatedAt }
+    }
+    val pickedUpCount = pickedUpItems.size
 
     LazyColumn(
         state = listState,
@@ -199,6 +214,10 @@ fun SettingsScreen(
                         value = "$pickedUpCount",
                         unit = "件",
                         accent = statusGreen,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showPickedUpHistoryDialog = true
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     StatBox(
@@ -609,6 +628,17 @@ fun SettingsScreen(
             }
         )
     }
+
+    // 7天内已取记录弹窗
+    if (showPickedUpHistoryDialog) {
+        PickedUpHistoryDialog(
+            pickedUpItems = pickedUpItems,
+            stationRules = settings.stationRules,
+            onDismiss = { showPickedUpHistoryDialog = false },
+            onRestoreItem = onRestorePickedUpItem,
+            onDeleteItem = onDeletePickedUpItem
+        )
+    }
 }
 
 @Composable
@@ -617,12 +647,20 @@ private fun StatBox(
     value: String,
     unit: String,
     accent: Color,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .liquidGlassInnerCard(cornerRadius = AppleCorners.InnerCard, accentTint = accent)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                }
+            )
             .padding(vertical = 12.dp, horizontal = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
@@ -777,6 +815,198 @@ private fun AddNewStationDialog(
                     shape = RoundedCornerShape(AppleCorners.InnerCard)
                 ) {
                     Text("添加", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PickedUpHistoryDialog(
+    pickedUpItems: List<PickupItemEntity>,
+    stationRules: List<StationRule>,
+    onDismiss: () -> Unit,
+    onRestoreItem: (PickupItemEntity) -> Unit,
+    onDeleteItem: (PickupItemEntity) -> Unit
+) {
+    val isDark = isSystemInDarkTheme()
+    val haptic = LocalHapticFeedback.current
+    val dateFormat = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
+    val rulesByNum = remember(stationRules) { stationRules.associateBy { it.stationNumber } }
+    val deleteRed = if (isDark) AppleRedDark else AppleRedLight
+
+    SpringGlassDialog(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column {
+                    Text(
+                        text = "7天内已取记录",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "共 ${pickedUpItems.size} 件 · 满 7 天自动清理",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "关闭",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (pickedUpItems.isEmpty()) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 36.dp)
+                ) {
+                    Text(
+                        text = "最近 7 天暂无已取件记录",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        items = pickedUpItems,
+                        key = { it.id }
+                    ) { item ->
+                        val accent = stationAccentColor(item.stationNumber, isDark)
+                        val stationName = if (item.stationNumber > 0) {
+                            rulesByNum[item.stationNumber]?.displayName ?: "${item.stationNumber}号快递房"
+                        } else {
+                            "待分类"
+                        }
+                        val timeText = dateFormat.format(Date(item.pickedUpAt ?: item.updatedAt))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .liquidGlassInnerCard(
+                                    cornerRadius = AppleCorners.InnerCard,
+                                    accentTint = accent
+                                )
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(accent.copy(alpha = 0.16f))
+                                ) {
+                                    Text(
+                                        text = item.stationCircleSymbol,
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.ExtraBold
+                                        ),
+                                        color = accent
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Column {
+                                    Text(
+                                        text = item.code,
+                                        style = PickupCodeMonospaceStyle.copy(fontSize = 18.sp),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        softWrap = false
+                                    )
+                                    val subInfo = buildString {
+                                        append(stationName)
+                                        if (item.productName.isNotBlank()) {
+                                            append(" · ").append(item.productName)
+                                        }
+                                        append(" · ").append(timeText)
+                                    }
+                                    Text(
+                                        text = subInfo,
+                                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                // 恢复至待取按钮
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(AppleCorners.Pill))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onRestoreItem(item)
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Rounded.Undo,
+                                        contentDescription = "恢复待取",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "恢复",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
+                                // 删除按钮
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(deleteRed.copy(alpha = 0.12f))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onDeleteItem(item)
+                                        }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.DeleteOutline,
+                                        contentDescription = "删除记录",
+                                        tint = deleteRed,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
