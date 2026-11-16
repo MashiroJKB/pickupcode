@@ -227,6 +227,40 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    /**
+     * 导出当前识别规则为纯文本口令，方便复制分享给同校同学
+     */
+    fun exportStationRulesToken(rules: List<StationRule>): String {
+        val json = serializeStationRulesJson(rules)
+        return "【取件码识别规则】$json"
+    }
+
+    /**
+     * 从剪贴板或纯文本口令导入识别规则，返回成功导入的快递房数量（失败返回 0）
+     */
+    suspend fun importStationRulesToken(rawText: String): Int {
+        val trimmed = rawText.trim()
+        val startIdx = trimmed.indexOf('[')
+        val endIdx = trimmed.lastIndexOf(']')
+        if (startIdx < 0 || endIdx <= startIdx) return 0
+
+        val jsonPart = trimmed.substring(startIdx, endIdx + 1)
+        val parsed = try {
+            val array = JSONArray(jsonPart)
+            if (array.length() == 0) return 0
+            parseStationRulesJson(jsonPart)
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+        if (parsed.isEmpty()) return 0
+
+        context.dataStore.edit { prefs ->
+            prefs[KEY_STATION_RULES_JSON] = serializeStationRulesJson(parsed)
+        }
+        return parsed.size
+    }
+
     companion object {
         const val DEFAULT_SMS_SCAN_DAYS = 7
 

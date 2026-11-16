@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">取件码</string>
+    <string name="widget_description">取件码 · 液态玻璃桌面小组件（按货架排序展示待取码，一键直达淘宝/菜鸟/拼多多）</string>
 </resources>

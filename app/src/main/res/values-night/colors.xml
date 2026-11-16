@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_glass_bg_start">#E61E222E</color>
+    <color name="widget_glass_bg_end">#D9151821</color>
+    <color name="widget_glass_border">#33FFFFFF</color>
+    <color name="widget_row_bg">#CC2A2E3D</color>
+    <color name="widget_row_border">#22FFFFFF</color>
+    <color name="widget_text_primary">#FFF8FAFC</color>
+    <color name="widget_text_secondary">#FF94A3B8</color>
+    <color name="widget_accent_blue">#FF0A84FF</color>
+    <color name="widget_accent_green">#FF30D158</color>
+</resources>

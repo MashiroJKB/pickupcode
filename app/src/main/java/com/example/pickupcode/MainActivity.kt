@@ -50,17 +50,20 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.pickupcode.data.local.PickupItemEntity
+import com.example.pickupcode.service.AppBadgeManager
 import com.example.pickupcode.ui.PickupViewModel
 import com.example.pickupcode.ui.components.HomeBottomFloatingBar
 import com.example.pickupcode.ui.home.AddOrPastePickupDialog
 import com.example.pickupcode.ui.home.EditProductRemarkDialog
 import com.example.pickupcode.ui.home.HomeScreen
+import com.example.pickupcode.ui.home.LongPressQuickActionDialog
 import com.example.pickupcode.ui.home.RawMessageDetailDialog
 import com.example.pickupcode.ui.settings.SettingsScreen
 import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.LiquidGlassBackdrop
 import com.example.pickupcode.ui.theme.PickupCodeTheme
 import com.example.pickupcode.ui.theme.liquidGlass
+import com.example.pickupcode.widget.PickupWidgetProvider
 
 class MainActivity : ComponentActivity() {
 
@@ -147,6 +150,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     // 弹窗控制状态
     var activeDetailItem by remember { mutableStateOf<PickupItemEntity?>(null) }
     var activeEditProductItem by remember { mutableStateOf<PickupItemEntity?>(null) }
+    var activeLongPressItem by remember { mutableStateOf<PickupItemEntity?>(null) }
     var showAddOrPasteDialog by remember { mutableStateOf(false) }
 
     val smsPermissionLauncher = rememberLauncherForActivityResult(
@@ -161,12 +165,14 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     }
 
     val requestSmsPermissions = {
-        smsPermissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.READ_SMS,
-                Manifest.permission.RECEIVE_SMS
-            )
-        )
+        val perms = buildList {
+            add(Manifest.permission.READ_SMS)
+            add(Manifest.permission.RECEIVE_SMS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }.toTypedArray()
+        smsPermissionLauncher.launch(perms)
     }
 
     // 首次打开且尚未授予短信权限时自动索取权限；后续已开启权限则直接进入待取件界面，不再弹窗
@@ -193,6 +199,13 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
+    }
+
+    // 根据待取快递数量实时更新桌面应用角标与桌面液态玻璃小组件
+    LaunchedEffect(items, settings.stationRules) {
+        val pendingCount = items.count { !it.isPickedUp }
+        AppBadgeManager.updateBadgeCount(context, pendingCount)
+        PickupWidgetProvider.notifyWidgetDataChanged(context)
     }
 
     val activeSelectedCount = remember(items, selectedItemIds) {
@@ -233,6 +246,9 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         onRequestSmsPermission = requestSmsPermissions,
                         onQuickAddClick = { showAddOrPasteDialog = true },
                         onToggleSelectItem = viewModel::toggleSelectItem,
+                        onQuickMarkPickedUp = viewModel::markSingleItemPickedUp,
+                        onQuickDeleteItem = viewModel::deleteItem,
+                        onLongPressItem = { activeLongPressItem = it },
                         onClickMoreActions = { activeDetailItem = it },
                         onClickProductRemark = { activeEditProductItem = it },
                         onFeedbackMessage = viewModel::showCapsuleToast,
@@ -278,6 +294,8 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         onRemoveStationKeyword = viewModel::removeStationKeyword,
                         onUpdateStationRuleInfo = viewModel::updateStationRuleInfo,
                         onResetStationRules = viewModel::resetStationRules,
+                        onExportStationRules = { viewModel.exportStationRulesToClipboard(context) },
+                        onImportStationRules = viewModel::importStationRulesFromText,
                         onRestorePickedUpItem = viewModel::restorePickedUpItem,
                         onDeletePickedUpItem = viewModel::deleteItem,
                         listState = settingsListState
@@ -345,7 +363,18 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         )
     }
 
-    // 3. 添加取件码弹窗（默认手动输入取件码）
+    // 3. 长按取件码弹出「已取」或「删除」快捷弹窗
+    activeLongPressItem?.let { currentItem ->
+        val latestItem = items.firstOrNull { it.id == currentItem.id } ?: currentItem
+        LongPressQuickActionDialog(
+            item = latestItem,
+            onDismiss = { activeLongPressItem = null },
+            onConfirmPickedUp = viewModel::markSingleItemPickedUp,
+            onDelete = viewModel::deleteItem
+        )
+    }
+
+    // 4. 添加取件码弹窗（默认手动输入取件码）
     if (showAddOrPasteDialog) {
         AddOrPastePickupDialog(
             stationRules = settings.stationRules,

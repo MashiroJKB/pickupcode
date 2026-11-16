@@ -11,9 +11,20 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
-    <!-- Android 11+ 包可见性声明：用于直接唤起淘宝/菜鸟/拼多多身份码 DeepLink -->
+    <!-- 桌面角标通知与各主流国产系统桌面角标权限 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="com.huawei.android.launcher.permission.CHANGE_BADGE" />
+    <uses-permission android:name="com.hihonor.android.launcher.permission.CHANGE_BADGE" />
+    <uses-permission android:name="com.sec.android.provider.badge.permission.READ" />
+    <uses-permission android:name="com.sec.android.provider.badge.permission.WRITE" />
+    <uses-permission android:name="com.oppo.launcher.permission.READ_SETTINGS" />
+    <uses-permission android:name="com.oppo.launcher.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="com.vivo.notification.permission.BADGE_ICON" />
+
+    <!-- Android 11+ 包可见性声明：用于读取对应官方图标与直接唤起淘宝/菜鸟/拼多多 -->
     <queries>
         <package android:name="com.taobao.taobao" />
+        <package android:name="com.cainiao.wireless" />
         <package android:name="com.xunmeng.pinduoduo" />
     </queries>
 
@@ -46,6 +57,28 @@
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
+
+        <!-- 桌面液态玻璃小组件 -->
+        <receiver
+            android:name=".widget.PickupWidgetProvider"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.pickupcode.widget.ACTION_LAUNCH_TAOBAO" />
+                <action android:name="com.example.pickupcode.widget.ACTION_LAUNCH_CAINIAO" />
+                <action android:name="com.example.pickupcode.widget.ACTION_LAUNCH_PINDUODUO" />
+                <action android:name="com.example.pickupcode.widget.ACTION_ITEM_CLICK" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/pickup_widget_info" />
+        </receiver>
+
+        <service
+            android:name=".widget.PickupWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
 
     </application>
 

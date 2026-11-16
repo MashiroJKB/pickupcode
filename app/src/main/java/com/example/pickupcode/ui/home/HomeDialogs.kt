@@ -26,9 +26,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,6 +59,8 @@ import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.StationRule
 import com.example.pickupcode.ui.components.StationBadgeSymbol
 import com.example.pickupcode.ui.theme.AppleCorners
+import com.example.pickupcode.ui.theme.AppleGreenDark
+import com.example.pickupcode.ui.theme.AppleGreenLight
 import com.example.pickupcode.ui.theme.AppleRedDark
 import com.example.pickupcode.ui.theme.AppleRedLight
 import com.example.pickupcode.ui.theme.PickupCodeMonospaceStyle
@@ -570,6 +574,91 @@ fun AddOrPastePickupDialog(
                             Text("智能解析入库", fontWeight = FontWeight.Bold)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 4. 长按取件码快捷操作弹窗（弹出「已取」或「删除」按钮）
+ */
+@Composable
+fun LongPressQuickActionDialog(
+    item: PickupItemEntity,
+    onDismiss: () -> Unit,
+    onConfirmPickedUp: (PickupItemEntity) -> Unit,
+    onDelete: (PickupItemEntity) -> Unit
+) {
+    val isDark = isSystemInDarkTheme()
+    val checkGreen = if (isDark) AppleGreenDark else AppleGreenLight
+    val deleteRed = if (isDark) AppleRedDark else AppleRedLight
+
+    SpringGlassDialog(onDismissRequest = onDismiss) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = item.code,
+                style = PickupCodeMonospaceStyle.copy(fontSize = 22.sp),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (item.productName.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = item.productName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Button(
+                    onClick = {
+                        onConfirmPickedUp(item)
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = checkGreen),
+                    shape = RoundedCornerShape(AppleCorners.InnerCard),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("已取", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+
+                Button(
+                    onClick = {
+                        onDelete(item)
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = deleteRed),
+                    shape = RoundedCornerShape(AppleCorners.InnerCard),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DeleteOutline,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("删除", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }

@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import com.example.pickupcode.PickupApplication
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.repository.PickupRepository
+import com.example.pickupcode.widget.PickupWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -59,6 +60,7 @@ class SmsReceiver : BroadcastReceiver() {
                         messageTimestamp = timestamp
                     )
                 }
+                PickupWidgetProvider.notifyWidgetDataChanged(context)
             } finally {
                 pendingResult.finish()
             }

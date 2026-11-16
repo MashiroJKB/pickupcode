@@ -16,13 +16,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
-import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,6 +48,7 @@ import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.TaobaoOrangeEnd
 import com.example.pickupcode.ui.theme.TaobaoOrangeStart
 import com.example.pickupcode.ui.theme.liquidGlass
+import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 
 val CainiaoBlueStart = Color(0xFF0A84FF)
 val CainiaoBlueEnd = Color(0xFF0055D4)
@@ -75,8 +76,8 @@ enum class IdentityCodeType(
         secondaryColor = CainiaoBlueEnd
     ),
     PINDUODUO(
-        title = "拼多多身份码",
-        subtitle = "一键直达拼多多驿站身份码",
+        title = "拼多多取件码",
+        subtitle = "一键直达拼多多驿站取件码",
         primaryColor = PinduoduoRedStart,
         secondaryColor = PinduoduoRedEnd
     )
@@ -94,7 +95,7 @@ object TaobaoDeepLinkLauncher {
     const val TAOBAO_IDENTITY_DEEPLINK =
         "taobao://m.taobao.com/tbopen/index.html?h5Url=https://pages-fast.m.taobao.com/wow/z/uniapp/1011717/last-mile-fe/end-collect-platform/identity-code"
 
-    // 拼多多身份码 DeepLink
+    // 拼多多取件码 DeepLink
     const val PINDUODUO_IDENTITY_DEEPLINK =
         "pinduoduo://com.xunmeng.pinduoduo/mdkd/package"
 
@@ -147,7 +148,119 @@ object TaobaoDeepLinkLauncher {
 }
 
 /**
- * 顶部「淘宝身份码 / 菜鸟身份码 / 拼多多身份码」液态玻璃快捷 Banner
+ * 首页顶部身份码入口容器：
+ * - 当仅开启 1 个身份码时，展示完整单栏液态玻璃 Banner
+ * - 当同时开启 2 个或 3 个身份码时，自动切换为「身份码」紧凑并排模式（一行 2~3 格液态玻璃方块按钮，仅显示对应应用图标）
+ */
+@Composable
+fun IdentityCodeBannersSection(
+    enabledTypes: List<IdentityCodeType>,
+    onFeedbackMessage: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (enabledTypes.isEmpty()) return
+
+    if (enabledTypes.size == 1) {
+        IdentityCodeBanner(
+            type = enabledTypes.first(),
+            onFeedbackMessage = onFeedbackMessage,
+            modifier = modifier
+        )
+    } else {
+        CompactIdentityCodeBar(
+            enabledTypes = enabledTypes,
+            onFeedbackMessage = onFeedbackMessage,
+            modifier = modifier
+        )
+    }
+}
+
+/**
+ * 多个身份码紧凑并排模式：标题为「身份码」，下方一行 2~3 格紧凑型液态玻璃方块按钮，只显示应用图标
+ */
+@Composable
+fun CompactIdentityCodeBar(
+    enabledTypes: List<IdentityCodeType>,
+    onFeedbackMessage: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .liquidGlass(cornerRadius = AppleCorners.OuterCard)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "身份码",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            ),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 2.dp)
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            enabledTypes.forEach { type ->
+                var isPressed by remember { mutableStateOf(false) }
+                val scale by animateFloatAsState(
+                    targetValue = if (isPressed) 0.94f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "compact_tile_scale"
+                )
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(66.dp)
+                        .scale(scale)
+                        .liquidGlassInnerCard(
+                            cornerRadius = AppleCorners.InnerCard,
+                            accentTint = type.primaryColor
+                        )
+                        .pointerInput(type) {
+                            detectTapGestures(
+                                onPress = {
+                                    isPressed = true
+                                    tryAwaitRelease()
+                                    isPressed = false
+                                },
+                                onTap = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    TaobaoDeepLinkLauncher.launchIdentityCode(
+                                        context = context,
+                                        type = type,
+                                        onFeedbackMessage = onFeedbackMessage
+                                    )
+                                }
+                            )
+                        }
+                ) {
+                    AppBrandIcon(
+                        type = type,
+                        size = 44.dp,
+                        cornerRadius = 12.dp
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 单个身份码液态玻璃快捷 Banner（使用对应淘宝/菜鸟/拼多多应用图标）
  */
 @Composable
 fun IdentityCodeBanner(
@@ -208,20 +321,11 @@ fun IdentityCodeBanner(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(AppleCorners.InnerCard))
-                        .background(brush = brandGradient)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.QrCodeScanner,
-                        contentDescription = type.title,
-                        tint = Color.White,
-                        modifier = Modifier.size(25.dp)
-                    )
-                }
+                AppBrandIcon(
+                    type = type,
+                    size = 46.dp,
+                    cornerRadius = AppleCorners.InnerCard
+                )
 
                 Spacer(modifier = Modifier.width(14.dp))
 

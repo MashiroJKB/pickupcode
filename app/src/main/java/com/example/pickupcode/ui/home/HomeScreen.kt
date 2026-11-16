@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.StationRule
-import com.example.pickupcode.ui.components.IdentityCodeBanner
+import com.example.pickupcode.ui.components.IdentityCodeBannersSection
 import com.example.pickupcode.ui.components.IdentityCodeType
 import com.example.pickupcode.ui.components.StationGroupCard
 import com.example.pickupcode.ui.theme.AppleCorners
@@ -89,6 +89,9 @@ fun HomeScreen(
     onRequestSmsPermission: () -> Unit,
     onQuickAddClick: () -> Unit,
     onToggleSelectItem: (PickupItemEntity) -> Unit,
+    onQuickMarkPickedUp: (PickupItemEntity) -> Unit,
+    onQuickDeleteItem: (PickupItemEntity) -> Unit,
+    onLongPressItem: (PickupItemEntity) -> Unit,
     onClickMoreActions: (PickupItemEntity) -> Unit,
     onClickProductRemark: (PickupItemEntity) -> Unit,
     onFeedbackMessage: (String) -> Unit,
@@ -105,7 +108,18 @@ fun HomeScreen(
         pendingItems.filter { it.stationNumber > 0 }.map { it.stationNumber }.distinct().size
     }
 
-    // 分组排序同步遵循「设置 -> 识别规则」中用户拖拽排序的顺序，且快递房前缀序号/实心圆同步变动
+    val enabledIdentityTypes = remember(
+        showTaobaoIdentityBanner,
+        showCainiaoIdentityBanner,
+        showPinduoduoIdentityBanner
+    ) {
+        buildList {
+            if (showTaobaoIdentityBanner) add(IdentityCodeType.TAOBAO)
+            if (showCainiaoIdentityBanner) add(IdentityCodeType.CAINIAO)
+            if (showPinduoduoIdentityBanner) add(IdentityCodeType.PINDUODUO)
+        }
+    }
+
     val groupedSections = remember(pendingItems, stationRules) {
         val rulesByNum = stationRules.associateBy { it.stationNumber }
         val orderMap = stationRules.mapIndexed { index, rule -> rule.stationNumber to index }.toMap()
@@ -159,29 +173,11 @@ fun HomeScreen(
             )
         }
 
-        // 根据设置页开关动态渲染淘宝、菜鸟、拼多多身份码 Banner（支持任意组合同时开启）
-        if (showTaobaoIdentityBanner) {
-            item(key = "taobao_identity_banner", contentType = "banner") {
-                IdentityCodeBanner(
-                    type = IdentityCodeType.TAOBAO,
-                    onFeedbackMessage = onFeedbackMessage
-                )
-            }
-        }
-
-        if (showCainiaoIdentityBanner) {
-            item(key = "cainiao_identity_banner", contentType = "banner") {
-                IdentityCodeBanner(
-                    type = IdentityCodeType.CAINIAO,
-                    onFeedbackMessage = onFeedbackMessage
-                )
-            }
-        }
-
-        if (showPinduoduoIdentityBanner) {
-            item(key = "pinduoduo_identity_banner", contentType = "banner") {
-                IdentityCodeBanner(
-                    type = IdentityCodeType.PINDUODUO,
+        // 身份码入口：开启 1 个时显示完整 Banner；开启 2~3 个时自动切换为紧凑并排方块模式
+        if (enabledIdentityTypes.isNotEmpty()) {
+            item(key = "identity_code_section", contentType = "banner") {
+                IdentityCodeBannersSection(
+                    enabledTypes = enabledIdentityTypes,
                     onFeedbackMessage = onFeedbackMessage
                 )
             }
@@ -208,6 +204,9 @@ fun HomeScreen(
                     items = section.items,
                     selectedItemIds = selectedItemIds,
                     onToggleSelectItem = onToggleSelectItem,
+                    onQuickMarkPickedUp = onQuickMarkPickedUp,
+                    onQuickDeleteItem = onQuickDeleteItem,
+                    onLongPressItem = onLongPressItem,
                     onClickMoreActions = onClickMoreActions,
                     onClickProductRemark = onClickProductRemark
                 )

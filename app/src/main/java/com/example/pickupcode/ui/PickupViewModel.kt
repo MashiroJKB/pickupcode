@@ -1,5 +1,7 @@
 package com.example.pickupcode.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -98,6 +100,23 @@ class PickupViewModel(
         viewModelScope.launch {
             repository.confirmPickedUpBatch(idsToConfirm)
             _undoableItemIds.value = idsToConfirm
+            undoTimerJob = launch {
+                delay(3000L)
+                _undoableItemIds.value = emptyList()
+            }
+        }
+    }
+
+    /**
+     * 左滑或长按单条取件码直接标记为已取（同样支持 3 秒底部撤销）
+     */
+    fun markSingleItemPickedUp(item: PickupItemEntity) {
+        _selectedItemIds.value = _selectedItemIds.value - item.id
+        undoTimerJob?.cancel()
+
+        viewModelScope.launch {
+            repository.confirmPickedUpBatch(listOf(item.id))
+            _undoableItemIds.value = listOf(item.id)
             undoTimerJob = launch {
                 delay(3000L)
                 _undoableItemIds.value = emptyList()
@@ -208,8 +227,28 @@ class PickupViewModel(
         viewModelScope.launch {
             settingsDataStore.setShowPinduoduoIdentityBanner(enabled)
             showCapsuleToast(
-                if (enabled) "已开启：拼多多身份码" else "已关闭：拼多多身份码"
+                if (enabled) "已开启：拼多多取件码" else "已关闭：拼多多取件码"
             )
+        }
+    }
+
+    fun exportStationRulesToClipboard(context: Context) {
+        val rules = settingsState.value.stationRules
+        val token = settingsDataStore.exportStationRulesToken(rules)
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        clipboard?.setPrimaryClip(ClipData.newPlainText("取件码识别规则", token))
+        showCapsuleToast("已复制识别规则口令到剪贴板，可直接分享给同学")
+    }
+
+    fun importStationRulesFromText(rawText: String) {
+        viewModelScope.launch {
+            val count = settingsDataStore.importStationRulesToken(rawText)
+            if (count > 0) {
+                repository.reapplyStationRules()
+                showCapsuleToast("成功导入 $count 个快递房识别规则")
+            } else {
+                showCapsuleToast("未识别到有效的识别规则口令")
+            }
         }
     }
 

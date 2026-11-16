@@ -34,8 +34,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.RestartAlt
@@ -69,7 +72,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -116,6 +122,8 @@ fun SettingsScreen(
     onRemoveStationKeyword: (stationNumber: Int, keyword: String) -> Unit,
     onUpdateStationRuleInfo: (stationNumber: Int, newName: String, badgeNumber: Int?, keywords: List<String>) -> Unit,
     onResetStationRules: () -> Unit,
+    onExportStationRules: () -> Unit,
+    onImportStationRules: (String) -> Unit,
     onRestorePickedUpItem: (PickupItemEntity) -> Unit,
     onDeletePickedUpItem: (PickupItemEntity) -> Unit,
     listState: LazyListState = rememberLazyListState(),
@@ -130,6 +138,7 @@ fun SettingsScreen(
 
     var editingStationNumber by remember { mutableStateOf<Int?>(null) }
     var showAddStationDialog by remember { mutableStateOf(false) }
+    var showImportRulesDialog by remember { mutableStateOf(false) }
     var showPickedUpHistoryDialog by remember { mutableStateOf(false) }
 
     // 支持按住拖动排序的本地规则列表状态
@@ -436,6 +445,72 @@ fun SettingsScreen(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 识别规则一键导出 / 导入口令操作栏
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onExportStationRules()
+                            }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.FileUpload,
+                            contentDescription = "导出规则口令",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "导出规则口令",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showImportRulesDialog = true
+                            }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.FileDownload,
+                            contentDescription = "导入规则口令",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "导入规则口令",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -632,7 +707,7 @@ fun SettingsScreen(
                     )
 
                     IdentitySwitchRow(
-                        title = "拼多多身份码",
+                        title = "拼多多取件码",
                         accentColor = PinduoduoRedStart,
                         checked = settings.showPinduoduoIdentityBanner,
                         onCheckedChange = {
@@ -677,6 +752,17 @@ fun SettingsScreen(
             onConfirm = { name, badgeNum, keywords ->
                 onAddStation(name, badgeNum, keywords)
                 showAddStationDialog = false
+            }
+        )
+    }
+
+    // 导入识别规则口令弹窗
+    if (showImportRulesDialog) {
+        ImportStationRulesDialog(
+            onDismiss = { showImportRulesDialog = false },
+            onImport = { tokenText ->
+                onImportStationRules(tokenText)
+                showImportRulesDialog = false
             }
         )
     }
@@ -1026,6 +1112,80 @@ private fun AddNewStationDialog(
                     shape = RoundedCornerShape(AppleCorners.InnerCard)
                 ) {
                     Text("添加", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportStationRulesDialog(
+    onDismiss: () -> Unit,
+    onImport: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var inputToken by remember { mutableStateOf("") }
+
+    SpringGlassDialog(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "导入识别规则",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                TextButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                        val clipText = clipboard?.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+                        if (clipText.isNotBlank()) {
+                            inputToken = clipText
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ContentPaste,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("粘贴剪贴板", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = inputToken,
+                onValueChange = { inputToken = it },
+                placeholder = { Text("在此粘贴同学分享的【取件码识别规则】口令...") },
+                minLines = 4,
+                maxLines = 6,
+                shape = RoundedCornerShape(AppleCorners.InnerCard),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Button(
+                    enabled = inputToken.isNotBlank(),
+                    onClick = { onImport(inputToken) },
+                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                ) {
+                    Text("导入规则", fontWeight = FontWeight.Bold)
                 }
             }
         }
