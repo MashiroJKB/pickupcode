@@ -42,8 +42,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.StationRule
+import com.example.pickupcode.ui.components.IdentityCodeBanner
+import com.example.pickupcode.ui.components.IdentityCodeType
 import com.example.pickupcode.ui.components.StationGroupCard
-import com.example.pickupcode.ui.components.TaobaoIdentityBanner
 import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.AppleOrangeDark
 import com.example.pickupcode.ui.theme.AppleOrangeLight
@@ -58,8 +59,7 @@ data class StationGroupSection(
 private val NUMBER_TOKEN_REGEX = Regex("""\d+""")
 
 /**
- * 同一个快递房内的取件码按照数字大小从小到大自然排序：
- * 依次比较取件码中的各段数字（如货架号 -> 层号 -> 包裹序号），例如 1-4-3092 < 2-1-8831 < 30-3-1020 < 94-3-1001 < 94-7-1005 < 100-1-1002 < 102-2-1008
+ * 同一个快递房内的取件码按照数字大小从小到大自然排序
  */
 private val NaturalPickupCodeComparator = Comparator<PickupItemEntity> { a, b ->
     val numsA = NUMBER_TOKEN_REGEX.findAll(a.code).map { it.value.toLongOrNull() ?: 0L }.toList()
@@ -80,7 +80,8 @@ fun HomeScreen(
     items: List<PickupItemEntity>,
     stationRules: List<StationRule>,
     selectedItemIds: Set<Long>,
-    useTaobaoExitCode: Boolean,
+    showTaobaoIdentityBanner: Boolean,
+    showCainiaoIdentityBanner: Boolean,
     hasSmsPermission: Boolean,
     onOpenSettings: () -> Unit,
     onRequestSmsPermission: () -> Unit,
@@ -143,11 +144,23 @@ fun HomeScreen(
             )
         }
 
-        item(key = "taobao_identity_banner", contentType = "banner") {
-            TaobaoIdentityBanner(
-                useTaobaoExitCode = useTaobaoExitCode,
-                onFeedbackMessage = onFeedbackMessage
-            )
+        // 根据设置开关动态展示「淘宝身份码」与「菜鸟身份码」Banner（支持同时开启）
+        if (showTaobaoIdentityBanner) {
+            item(key = "taobao_identity_banner", contentType = "banner") {
+                IdentityCodeBanner(
+                    type = IdentityCodeType.TAOBAO,
+                    onFeedbackMessage = onFeedbackMessage
+                )
+            }
+        }
+
+        if (showCainiaoIdentityBanner) {
+            item(key = "cainiao_identity_banner", contentType = "banner") {
+                IdentityCodeBanner(
+                    type = IdentityCodeType.CAINIAO,
+                    onFeedbackMessage = onFeedbackMessage
+                )
+            }
         }
 
         if (groupedSections.isEmpty()) {

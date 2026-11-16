@@ -186,11 +186,20 @@ class PickupViewModel(
         }
     }
 
-    fun setUseTaobaoExitCode(useTaobao: Boolean) {
+    fun setShowTaobaoIdentityBanner(enabled: Boolean) {
         viewModelScope.launch {
-            settingsDataStore.setUseTaobaoExitCode(useTaobao)
+            settingsDataStore.setShowTaobaoIdentityBanner(enabled)
             showCapsuleToast(
-                if (useTaobao) "已切换为：淘宝出库码" else "已切换为：菜鸟出库码"
+                if (enabled) "已开启：淘宝身份码" else "已关闭：淘宝身份码"
+            )
+        }
+    }
+
+    fun setShowCainiaoIdentityBanner(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setShowCainiaoIdentityBanner(enabled)
+            showCapsuleToast(
+                if (enabled) "已开启：菜鸟身份码" else "已关闭：菜鸟身份码"
             )
         }
     }

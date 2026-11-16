@@ -28,11 +28,13 @@ data class StationRule(
 
 /**
  * 应用全局设置快照
- * - useTaobaoExitCode: 默认 true 使用「淘宝出库码」，false 使用「菜鸟出库码」
+ * - showTaobaoIdentityBanner: 是否开启「淘宝身份码」Banner（默认开启）
+ * - showCainiaoIdentityBanner: 是否开启「菜鸟身份码」Banner（支持同时开启）
  */
 data class AppSettings(
     val onboardingCompleted: Boolean = false,
-    val useTaobaoExitCode: Boolean = true,
+    val showTaobaoIdentityBanner: Boolean = true,
+    val showCainiaoIdentityBanner: Boolean = false,
     val stationRules: List<StationRule> = SettingsDataStore.defaultStationRules()
 )
 
@@ -40,8 +42,8 @@ class SettingsDataStore(private val context: Context) {
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
         val onboardingCompleted = prefs[KEY_ONBOARDING_COMPLETED] ?: false
-        // 默认使用淘宝出库码 (true)
-        val useTaobaoExitCode = prefs[KEY_USE_TAOBAO_EXIT_CODE] ?: true
+        val showTaobao = prefs[KEY_SHOW_TAOBAO_IDENTITY] ?: true
+        val showCainiao = prefs[KEY_SHOW_CAINIAO_IDENTITY] ?: false
         val rulesJson = prefs[KEY_STATION_RULES_JSON]
         val stationRules = if (rulesJson.isNullOrBlank()) {
             defaultStationRules()
@@ -51,7 +53,8 @@ class SettingsDataStore(private val context: Context) {
 
         AppSettings(
             onboardingCompleted = onboardingCompleted,
-            useTaobaoExitCode = useTaobaoExitCode,
+            showTaobaoIdentityBanner = showTaobao,
+            showCainiaoIdentityBanner = showCainiao,
             stationRules = stationRules
         )
     }
@@ -62,9 +65,15 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
-    suspend fun setUseTaobaoExitCode(useTaobao: Boolean) {
+    suspend fun setShowTaobaoIdentityBanner(enabled: Boolean) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_USE_TAOBAO_EXIT_CODE] = useTaobao
+            prefs[KEY_SHOW_TAOBAO_IDENTITY] = enabled
+        }
+    }
+
+    suspend fun setShowCainiaoIdentityBanner(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_SHOW_CAINIAO_IDENTITY] = enabled
         }
     }
 
@@ -186,7 +195,8 @@ class SettingsDataStore(private val context: Context) {
         const val DEFAULT_SMS_SCAN_DAYS = 7
 
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
-        private val KEY_USE_TAOBAO_EXIT_CODE = booleanPreferencesKey("use_taobao_exit_code_v2")
+        private val KEY_SHOW_TAOBAO_IDENTITY = booleanPreferencesKey("show_taobao_identity_banner")
+        private val KEY_SHOW_CAINIAO_IDENTITY = booleanPreferencesKey("show_cainiao_identity_banner")
         private val KEY_STATION_RULES_JSON = stringPreferencesKey("station_rules_json_v2")
 
         private val CHINESE_NUMERALS = mapOf(

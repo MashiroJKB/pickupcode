@@ -225,7 +225,8 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         items = items,
                         stationRules = settings.stationRules,
                         selectedItemIds = selectedItemIds,
-                        useTaobaoExitCode = settings.useTaobaoExitCode,
+                        showTaobaoIdentityBanner = settings.showTaobaoIdentityBanner,
+                        showCainiaoIdentityBanner = settings.showCainiaoIdentityBanner,
                         hasSmsPermission = hasSmsPermission,
                         onOpenSettings = { showSettingsScreen = true },
                         onRequestSmsPermission = requestSmsPermissions,
@@ -266,7 +267,8 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         hasSmsPermission = hasSmsPermission,
                         onBack = { showSettingsScreen = false },
                         onRequestSmsPermission = requestSmsPermissions,
-                        onSelectExitCodeMode = viewModel::setUseTaobaoExitCode,
+                        onToggleTaobaoBanner = viewModel::setShowTaobaoIdentityBanner,
+                        onToggleCainiaoBanner = viewModel::setShowCainiaoIdentityBanner,
                         onAddStation = viewModel::addStationRule,
                         onDeleteStation = viewModel::deleteStationRule,
                         onAddStationKeyword = viewModel::addStationKeyword,
@@ -275,7 +277,6 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         onResetStationRules = viewModel::resetStationRules,
                         onRestorePickedUpItem = viewModel::restorePickedUpItem,
                         onDeletePickedUpItem = viewModel::deleteItem,
-                        onFeedbackMessage = viewModel::showCapsuleToast,
                         listState = settingsListState
                     )
                 }

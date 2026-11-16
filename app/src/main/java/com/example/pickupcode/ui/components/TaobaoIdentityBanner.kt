@@ -49,28 +49,53 @@ import com.example.pickupcode.ui.theme.TaobaoOrangeEnd
 import com.example.pickupcode.ui.theme.TaobaoOrangeStart
 import com.example.pickupcode.ui.theme.liquidGlass
 
+private val CainiaoBlueStart = Color(0xFF0A84FF)
+private val CainiaoBlueEnd = Color(0xFF0055D4)
+
+enum class IdentityCodeType(
+    val title: String,
+    val subtitle: String,
+    val primaryColor: Color,
+    val secondaryColor: Color
+) {
+    TAOBAO(
+        title = "淘宝身份码",
+        subtitle = "一键直达淘宝驿站身份码",
+        primaryColor = TaobaoOrangeStart,
+        secondaryColor = TaobaoOrangeEnd
+    ),
+    CAINIAO(
+        title = "菜鸟身份码",
+        subtitle = "一键直达菜鸟驿站身份码",
+        primaryColor = CainiaoBlueStart,
+        secondaryColor = CainiaoBlueEnd
+    )
+}
+
 object TaobaoDeepLinkLauncher {
     const val TAOBAO_PACKAGE = "com.taobao.taobao"
 
-    // 菜鸟出库码（原主链路）
-    const val CAINIAO_EXIT_CODE_DEEPLINK =
+    // 菜鸟身份码 DeepLink
+    const val CAINIAO_IDENTITY_DEEPLINK =
         "tbopen://m.taobao.com/tbopen/index.html?h5Url=https://market.m.taobao.com/app/cn-yz/multi-activity/authCode.html"
 
-    // 淘宝出库码（原备用链路，现为默认链路）
-    const val TAOBAO_EXIT_CODE_DEEPLINK =
+    // 淘宝身份码 DeepLink
+    const val TAOBAO_IDENTITY_DEEPLINK =
         "taobao://m.taobao.com/tbopen/index.html?h5Url=https://pages-fast.m.taobao.com/wow/z/uniapp/1011717/last-mile-fe/end-collect-platform/identity-code"
 
-    /**
-     * 唤起本地淘宝/菜鸟出库码页：
-     * 默认使用「淘宝出库码」，若异常则自动降级尝试「菜鸟出库码」；未安装淘宝则弹出轻提示。
-     */
     fun launchIdentityCode(
         context: Context,
-        useTaobaoExitCode: Boolean,
+        type: IdentityCodeType,
         onFeedbackMessage: (String) -> Unit
     ) {
-        val firstUrl = if (useTaobaoExitCode) TAOBAO_EXIT_CODE_DEEPLINK else CAINIAO_EXIT_CODE_DEEPLINK
-        val secondUrl = if (useTaobaoExitCode) CAINIAO_EXIT_CODE_DEEPLINK else TAOBAO_EXIT_CODE_DEEPLINK
+        val firstUrl = when (type) {
+            IdentityCodeType.TAOBAO -> TAOBAO_IDENTITY_DEEPLINK
+            IdentityCodeType.CAINIAO -> CAINIAO_IDENTITY_DEEPLINK
+        }
+        val secondUrl = when (type) {
+            IdentityCodeType.TAOBAO -> CAINIAO_IDENTITY_DEEPLINK
+            IdentityCodeType.CAINIAO -> TAOBAO_IDENTITY_DEEPLINK
+        }
 
         if (tryStartTaobaoUri(context, firstUrl)) {
             return
@@ -98,11 +123,11 @@ object TaobaoDeepLinkLauncher {
 }
 
 /**
- * 顶部「淘宝身份码 / 扫码出库」液态玻璃快捷 Banner
+ * 顶部「淘宝身份码 / 菜鸟身份码」液态玻璃快捷 Banner
  */
 @Composable
-fun TaobaoIdentityBanner(
-    useTaobaoExitCode: Boolean,
+fun IdentityCodeBanner(
+    type: IdentityCodeType,
     onFeedbackMessage: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -113,11 +138,15 @@ fun TaobaoIdentityBanner(
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.97f else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
+            dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium
         ),
         label = "banner_press_scale"
     )
+
+    val brandGradient = remember(type) {
+        Brush.linearGradient(colors = listOf(type.primaryColor, type.secondaryColor))
+    }
 
     Box(
         modifier = modifier
@@ -125,10 +154,9 @@ fun TaobaoIdentityBanner(
             .scale(scale)
             .liquidGlass(
                 cornerRadius = AppleCorners.OuterCard,
-                tintColor = TaobaoOrangeStart,
-                shadowElevation = 12.dp
+                tintColor = type.primaryColor
             )
-            .pointerInput(useTaobaoExitCode) {
+            .pointerInput(type) {
                 detectTapGestures(
                     onPress = {
                         isPressed = true
@@ -139,13 +167,13 @@ fun TaobaoIdentityBanner(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         TaobaoDeepLinkLauncher.launchIdentityCode(
                             context = context,
-                            useTaobaoExitCode = useTaobaoExitCode,
+                            type = type,
                             onFeedbackMessage = onFeedbackMessage
                         )
                     }
                 )
             }
-            .padding(horizontal = 18.dp, vertical = 15.dp)
+            .padding(horizontal = 18.dp, vertical = 14.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -161,15 +189,11 @@ fun TaobaoIdentityBanner(
                     modifier = Modifier
                         .size(46.dp)
                         .clip(RoundedCornerShape(AppleCorners.InnerCard))
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(TaobaoOrangeStart, TaobaoOrangeEnd)
-                            )
-                        )
+                        .background(brush = brandGradient)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.QrCodeScanner,
-                        contentDescription = "淘宝身份码",
+                        contentDescription = type.title,
                         tint = Color.White,
                         modifier = Modifier.size(25.dp)
                     )
@@ -180,7 +204,7 @@ fun TaobaoIdentityBanner(
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "淘宝身份码",
+                            text = type.title,
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 17.sp
@@ -191,7 +215,7 @@ fun TaobaoIdentityBanner(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(TaobaoOrangeStart.copy(alpha = 0.16f))
+                                .background(type.primaryColor.copy(alpha = 0.16f))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
@@ -200,13 +224,13 @@ fun TaobaoIdentityBanner(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 11.sp
                                 ),
-                                color = TaobaoOrangeStart
+                                color = type.primaryColor
                             )
                         }
                     }
 
                     Text(
-                        text = "一键直达驿站身份码",
+                        text = type.subtitle,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp)
@@ -218,16 +242,12 @@ fun TaobaoIdentityBanner(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(AppleCorners.SmallElement))
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(TaobaoOrangeStart, TaobaoOrangeEnd)
-                        )
-                    )
+                    .background(brush = brandGradient)
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         TaobaoDeepLinkLauncher.launchIdentityCode(
                             context = context,
-                            useTaobaoExitCode = useTaobaoExitCode,
+                            type = type,
                             onFeedbackMessage = onFeedbackMessage
                         )
                     }

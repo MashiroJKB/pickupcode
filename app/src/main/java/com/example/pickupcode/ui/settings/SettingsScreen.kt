@@ -1,8 +1,12 @@
 package com.example.pickupcode.ui.settings
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,12 +28,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
@@ -41,6 +48,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,9 +60,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,7 +71,6 @@ import androidx.compose.ui.unit.sp
 import com.example.pickupcode.data.local.AppSettings
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.StationRule
-import com.example.pickupcode.ui.components.TaobaoDeepLinkLauncher
 import com.example.pickupcode.ui.home.SpringGlassDialog
 import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.AppleGreenDark
@@ -79,7 +88,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     items: List<PickupItemEntity>,
@@ -87,7 +95,8 @@ fun SettingsScreen(
     hasSmsPermission: Boolean,
     onBack: () -> Unit,
     onRequestSmsPermission: () -> Unit,
-    onSelectExitCodeMode: (Boolean) -> Unit,
+    onToggleTaobaoBanner: (Boolean) -> Unit,
+    onToggleCainiaoBanner: (Boolean) -> Unit,
     onAddStation: (displayName: String, keywords: List<String>) -> Unit,
     onDeleteStation: (stationNumber: Int) -> Unit,
     onAddStationKeyword: (stationNumber: Int, keyword: String) -> Unit,
@@ -96,18 +105,16 @@ fun SettingsScreen(
     onResetStationRules: () -> Unit,
     onRestorePickedUpItem: (PickupItemEntity) -> Unit,
     onDeletePickedUpItem: (PickupItemEntity) -> Unit,
-    onFeedbackMessage: (String) -> Unit,
     listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val isDark = isSystemInDarkTheme()
     val statusGreen = if (isDark) AppleGreenDark else AppleGreenLight
     val statusAmber = if (isDark) AppleOrangeDark else AppleOrangeLight
     val deleteRed = if (isDark) AppleRedDark else AppleRedLight
 
-    var editingStationRule by remember { mutableStateOf<StationRule?>(null) }
+    var editingStationNumber by remember { mutableStateOf<Int?>(null) }
     var showAddStationDialog by remember { mutableStateOf(false) }
     var showPickedUpHistoryDialog by remember { mutableStateOf(false) }
 
@@ -129,47 +136,63 @@ fun SettingsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 顶部栏：固定 40.dp 行高，与首页顶部栏严格对齐，切换页面绝不移位
+        // 顶部栏：优雅一体化圆角返回箭头 + 「设置」标题（固定 40.dp 行高，带非线性弹簧按压反馈）
         item(key = "settings_header") {
+            var isBackPressed by remember { mutableStateOf(false) }
+            val backScale by animateFloatAsState(
+                targetValue = if (isBackPressed) 0.95f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMedium
+                ),
+                label = "back_header_scale"
+            )
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 2.dp)
                     .height(40.dp)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onBack()
+                        .scale(backScale)
+                        .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    isBackPressed = true
+                                    tryAwaitRelease()
+                                    isBackPressed = false
+                                },
+                                onTap = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onBack()
+                                }
+                            )
                         }
+                        .padding(end = 12.dp, top = 2.dp, bottom = 2.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBackIos,
+                        imageVector = Icons.Rounded.ChevronLeft,
                         contentDescription = "返回",
                         tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier
-                            .padding(start = 5.dp)
-                            .size(18.dp)
+                            .size(32.dp)
+                            .offset(x = (-4).dp)
+                    )
+                    Text(
+                        text = "设置",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.offset(x = (-4).dp)
                     )
                 }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Text(
-                    text = "设置",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
             }
         }
 
-        // 1. 取件统计与离线隐私承诺卡片（去除右上角“48h 跨引擎幂等去重”文字）
+        // 1. 取件统计与离线隐私承诺卡片
         item(key = "stats_and_privacy_card") {
             Column(
                 modifier = Modifier
@@ -232,7 +255,7 @@ fun SettingsScreen(
             }
         }
 
-        // 2. 仅当未开启短信权限时展示授权卡片（开启权限后不再显示抓取状态卡片）
+        // 2. 仅当未开启短信权限时展示授权卡片
         if (!hasSmsPermission) {
             item(key = "sms_permission_card") {
                 Column(
@@ -305,7 +328,7 @@ fun SettingsScreen(
             }
         }
 
-        // 3. 识别规则（支持添加/删除快递房、添加/删除各号房关键词）
+        // 3. 识别规则（一级菜单仅展示快递房名称与编辑/删除圆形图标，详细匹配关键词点击笔图标在弹窗中查看与编辑）
         item(key = "station_rules_card") {
             Column(
                 modifier = Modifier
@@ -331,7 +354,6 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // 添加快递房按钮
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -356,7 +378,6 @@ fun SettingsScreen(
                             )
                         }
 
-                        // 重置按钮
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -385,123 +406,89 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     settings.stationRules.forEach { rule ->
                         val accent = stationAccentColor(rule.stationNumber, isDark)
-                        Column(
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .liquidGlassInnerCard(
                                     cornerRadius = AppleCorners.InnerCard,
                                     accentTint = accent
                                 )
-                                .padding(12.dp)
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    editingStationNumber = rule.stationNumber
+                                }
+                                .padding(horizontal = 14.dp, vertical = 12.dp)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = rule.circleSymbol,
-                                        style = MaterialTheme.typography.titleLarge.copy(
-                                            fontWeight = FontWeight.ExtraBold,
-                                            fontSize = 21.sp
-                                        ),
-                                        color = accent
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = rule.displayName,
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontWeight = FontWeight.Bold
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    // 关键词 / 改名圆形笔图标按钮
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .background(accent.copy(alpha = 0.14f))
-                                            .clickable { editingStationRule = rule }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Edit,
-                                            contentDescription = "编辑规则与名称",
-                                            tint = accent,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
-
-                                    // 删除该快递房按钮
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .background(deleteRed.copy(alpha = 0.12f))
-                                            .clickable {
-                                                onDeleteStation(rule.stationNumber)
-                                            }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.DeleteOutline,
-                                            contentDescription = "删除快递房",
-                                            tint = deleteRed,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = rule.circleSymbol,
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 21.sp
+                                    ),
+                                    color = accent
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = rule.displayName,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
+                                )
                             }
 
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                rule.keywords.forEach { kw ->
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(AppleCorners.Pill))
-                                            .background(
-                                                MaterialTheme.colorScheme.onSurface.copy(
-                                                    alpha = if (isDark) 0.10f else 0.06f
-                                                )
-                                            )
-                                            .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = kw,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Icon(
-                                            imageVector = Icons.Rounded.Close,
-                                            contentDescription = "删除关键词 $kw",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier
-                                                .size(14.dp)
-                                                .clip(CircleShape)
-                                                .clickable {
-                                                    onRemoveStationKeyword(rule.stationNumber, kw)
-                                                }
-                                        )
-                                    }
+                                // 圆形笔图标按钮
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(accent.copy(alpha = 0.14f))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            editingStationNumber = rule.stationNumber
+                                        }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Edit,
+                                        contentDescription = "编辑识别规则",
+                                        tint = accent,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+
+                                // 圆形删除按钮
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(deleteRed.copy(alpha = 0.12f))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onDeleteStation(rule.stationNumber)
+                                        }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.DeleteOutline,
+                                        contentDescription = "删除快递房",
+                                        tint = deleteRed,
+                                        modifier = Modifier.size(15.dp)
+                                    )
                                 }
                             }
                         }
@@ -510,8 +497,8 @@ fun SettingsScreen(
             }
         }
 
-        // 4. 出库码链路选择卡片（淘宝出库码 [默认] / 菜鸟出库码，删除加载示例数据按钮）
-        item(key = "exit_code_deeplink_card") {
+        // 4. 身份码跳转链路卡片（支持同时打开淘宝身份码与菜鸟身份码开关）
+        item(key = "identity_code_switches_card") {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -529,7 +516,8 @@ fun SettingsScreen(
                     Text(
                         text = "身份码跳转链路",
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
                         ),
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -537,77 +525,51 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 淘宝出库码（默认） vs 菜鸟出库码 切换器
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(AppleCorners.InnerCard))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
-                        .padding(4.dp)
-                ) {
-                    val options = listOf(
-                        true to "淘宝出库码",
-                        false to "菜鸟出库码"
-                    )
-                    options.forEach { (isTaobaoMode, label) ->
-                        val selected = settings.useTaobaoExitCode == isTaobaoMode
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(AppleCorners.SmallElement))
-                                .background(
-                                    if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
-                                )
-                                .clickable {
-                                    onSelectExitCodeMode(isTaobaoMode)
-                                }
-                                .padding(vertical = 10.dp)
-                        ) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                ),
-                                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    IdentitySwitchRow(
+                        title = "淘宝身份码",
+                        accentColor = TaobaoOrangeStart,
+                        checked = settings.showTaobaoIdentityBanner,
+                        onCheckedChange = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleTaobaoBanner(it)
                         }
-                    }
-                }
+                    )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Button(
-                    onClick = {
-                        TaobaoDeepLinkLauncher.launchIdentityCode(
-                            context = context,
-                            useTaobaoExitCode = settings.useTaobaoExitCode,
-                            onFeedbackMessage = onFeedbackMessage
-                        )
-                    },
-                    shape = RoundedCornerShape(AppleCorners.InnerCard),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = if (settings.useTaobaoExitCode) "测试唤起淘宝出库码" else "测试唤起菜鸟出库码",
-                        fontWeight = FontWeight.Bold
+                    IdentitySwitchRow(
+                        title = "菜鸟身份码",
+                        accentColor = MaterialTheme.colorScheme.primary,
+                        checked = settings.showCainiaoIdentityBanner,
+                        onCheckedChange = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleCainiaoBanner(it)
+                        }
                     )
                 }
             }
         }
     }
 
-    // 快递房新增关键词/改名弹窗
-    editingStationRule?.let { rule ->
+    // 快递房识别规则编辑弹窗（响应式读取最新关键词列表，在新增匹配关键词下方展示当前已配置关键词）
+    val activeEditingRule = editingStationNumber?.let { num ->
+        settings.stationRules.firstOrNull { it.stationNumber == num }
+    }
+    if (activeEditingRule != null) {
         EditStationRuleDialog(
-            rule = rule,
-            onDismiss = { editingStationRule = null },
+            rule = activeEditingRule,
+            onDismiss = { editingStationNumber = null },
             onAddKeyword = { newKw ->
-                onAddStationKeyword(rule.stationNumber, newKw)
+                onAddStationKeyword(activeEditingRule.stationNumber, newKw)
+            },
+            onRemoveKeyword = { kw ->
+                onRemoveStationKeyword(activeEditingRule.stationNumber, kw)
             },
             onSaveDisplayName = { newName ->
-                onUpdateStationDisplayName(rule.stationNumber, newName, rule.keywords)
+                onUpdateStationDisplayName(
+                    activeEditingRule.stationNumber,
+                    newName,
+                    activeEditingRule.keywords
+                )
             }
         )
     }
@@ -631,6 +593,44 @@ fun SettingsScreen(
             onDismiss = { showPickedUpHistoryDialog = false },
             onRestoreItem = onRestorePickedUpItem,
             onDeleteItem = onDeletePickedUpItem
+        )
+    }
+}
+
+@Composable
+private fun IdentitySwitchRow(
+    title: String,
+    accentColor: Color,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlassInnerCard(
+                cornerRadius = AppleCorners.InnerCard,
+                accentTint = if (checked) accentColor else Color.Unspecified
+            )
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = accentColor
+            )
         )
     }
 }
@@ -683,13 +683,17 @@ private fun StatBox(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EditStationRuleDialog(
     rule: StationRule,
     onDismiss: () -> Unit,
     onAddKeyword: (String) -> Unit,
+    onRemoveKeyword: (String) -> Unit,
     onSaveDisplayName: (String) -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
+    val accent = stationAccentColor(rule.stationNumber, isDark)
     var displayName by remember(rule.stationNumber) { mutableStateOf(rule.displayName) }
     var newKeyword by remember(rule.stationNumber) { mutableStateOf("") }
 
@@ -718,9 +722,85 @@ private fun EditStationRuleDialog(
                 onValueChange = { newKeyword = it.take(20) },
                 label = { Text("新增匹配关键词") },
                 singleLine = true,
+                trailingIcon = {
+                    if (newKeyword.isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                onAddKeyword(newKeyword.trim())
+                                newKeyword = ""
+                            }
+                        ) {
+                            Text("添加", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
                 shape = RoundedCornerShape(AppleCorners.InnerCard),
                 modifier = Modifier.fillMaxWidth()
             )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 在新增匹配关键词下方新开一栏展示详细匹配规则关键词
+            Text(
+                text = "当前匹配关键词",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp, max = 180.dp)
+                    .clip(RoundedCornerShape(AppleCorners.InnerCard))
+                    .background(
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f)
+                    )
+                    .padding(12.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                if (rule.keywords.isEmpty()) {
+                    Text(
+                        text = "暂无匹配关键词",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        rule.keywords.forEach { kw ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(AppleCorners.Pill))
+                                    .background(accent.copy(alpha = if (isDark) 0.20f else 0.12f))
+                                    .padding(start = 11.dp, end = 7.dp, top = 5.dp, bottom = 5.dp)
+                            ) {
+                                Text(
+                                    text = kw,
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = "删除关键词 $kw",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .size(15.dp)
+                                        .clip(CircleShape)
+                                        .clickable { onRemoveKeyword(kw) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(18.dp))
 
@@ -951,7 +1031,6 @@ private fun PickedUpHistoryDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                // 恢复至待取按钮
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
@@ -979,7 +1058,6 @@ private fun PickedUpHistoryDialog(
                                     )
                                 }
 
-                                // 删除按钮
                                 Box(
                                     contentAlignment = Alignment.Center,
                                     modifier = Modifier
