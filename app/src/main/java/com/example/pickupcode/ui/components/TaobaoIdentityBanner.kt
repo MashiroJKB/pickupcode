@@ -49,8 +49,12 @@ import com.example.pickupcode.ui.theme.TaobaoOrangeEnd
 import com.example.pickupcode.ui.theme.TaobaoOrangeStart
 import com.example.pickupcode.ui.theme.liquidGlass
 
-private val CainiaoBlueStart = Color(0xFF0A84FF)
-private val CainiaoBlueEnd = Color(0xFF0055D4)
+val CainiaoBlueStart = Color(0xFF0A84FF)
+val CainiaoBlueEnd = Color(0xFF0055D4)
+
+// 拼多多品牌图标红
+val PinduoduoRedStart = Color(0xFFE02E24)
+val PinduoduoRedEnd = Color(0xFFC8161D)
 
 enum class IdentityCodeType(
     val title: String,
@@ -69,11 +73,18 @@ enum class IdentityCodeType(
         subtitle = "一键直达菜鸟驿站身份码",
         primaryColor = CainiaoBlueStart,
         secondaryColor = CainiaoBlueEnd
+    ),
+    PINDUODUO(
+        title = "拼多多身份码",
+        subtitle = "一键直达拼多多驿站身份码",
+        primaryColor = PinduoduoRedStart,
+        secondaryColor = PinduoduoRedEnd
     )
 }
 
 object TaobaoDeepLinkLauncher {
     const val TAOBAO_PACKAGE = "com.taobao.taobao"
+    const val PINDUODUO_PACKAGE = "com.xunmeng.pinduoduo"
 
     // 菜鸟身份码 DeepLink
     const val CAINIAO_IDENTITY_DEEPLINK =
@@ -83,33 +94,46 @@ object TaobaoDeepLinkLauncher {
     const val TAOBAO_IDENTITY_DEEPLINK =
         "taobao://m.taobao.com/tbopen/index.html?h5Url=https://pages-fast.m.taobao.com/wow/z/uniapp/1011717/last-mile-fe/end-collect-platform/identity-code"
 
+    // 拼多多身份码 DeepLink
+    const val PINDUODUO_IDENTITY_DEEPLINK =
+        "pinduoduo://com.xunmeng.pinduoduo/mdkd/package"
+
     fun launchIdentityCode(
         context: Context,
         type: IdentityCodeType,
         onFeedbackMessage: (String) -> Unit
     ) {
-        val firstUrl = when (type) {
-            IdentityCodeType.TAOBAO -> TAOBAO_IDENTITY_DEEPLINK
-            IdentityCodeType.CAINIAO -> CAINIAO_IDENTITY_DEEPLINK
-        }
-        val secondUrl = when (type) {
-            IdentityCodeType.TAOBAO -> CAINIAO_IDENTITY_DEEPLINK
-            IdentityCodeType.CAINIAO -> TAOBAO_IDENTITY_DEEPLINK
-        }
+        when (type) {
+            IdentityCodeType.TAOBAO -> {
+                if (tryStartAppUri(context, TAOBAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
+                if (tryStartAppUri(context, CAINIAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
+                onFeedbackMessage("未检测到淘宝客户端，请先安装手机淘宝后再试")
+            }
 
-        if (tryStartTaobaoUri(context, firstUrl)) {
-            return
+            IdentityCodeType.CAINIAO -> {
+                if (tryStartAppUri(context, CAINIAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
+                if (tryStartAppUri(context, TAOBAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
+                onFeedbackMessage("未检测到淘宝客户端，请先安装手机淘宝后再试")
+            }
+
+            IdentityCodeType.PINDUODUO -> {
+                if (tryStartAppUri(context, PINDUODUO_IDENTITY_DEEPLINK, PINDUODUO_PACKAGE)) return
+                if (tryStartAppUri(context, PINDUODUO_IDENTITY_DEEPLINK, null)) return
+                onFeedbackMessage("未检测到拼多多客户端，请先安装拼多多后再试")
+            }
         }
-        if (tryStartTaobaoUri(context, secondUrl)) {
-            return
-        }
-        onFeedbackMessage("未检测到淘宝客户端，请先安装手机淘宝后再试")
     }
 
-    private fun tryStartTaobaoUri(context: Context, uriString: String): Boolean {
+    private fun tryStartAppUri(
+        context: Context,
+        uriString: String,
+        targetPackage: String?
+    ): Boolean {
         return try {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uriString)).apply {
-                setPackage(TAOBAO_PACKAGE)
+                if (!targetPackage.isNullOrBlank()) {
+                    setPackage(targetPackage)
+                }
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
@@ -123,7 +147,7 @@ object TaobaoDeepLinkLauncher {
 }
 
 /**
- * 顶部「淘宝身份码 / 菜鸟身份码」液态玻璃快捷 Banner
+ * 顶部「淘宝身份码 / 菜鸟身份码 / 拼多多身份码」液态玻璃快捷 Banner
  */
 @Composable
 fun IdentityCodeBanner(

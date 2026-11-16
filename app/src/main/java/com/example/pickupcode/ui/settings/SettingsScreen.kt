@@ -1,12 +1,10 @@
 package com.example.pickupcode.ui.settings
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,11 +28,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
@@ -53,24 +50,38 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.example.pickupcode.data.local.AppSettings
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.StationRule
+import com.example.pickupcode.ui.components.PinduoduoRedStart
+import com.example.pickupcode.ui.components.StationBadgeSymbol
 import com.example.pickupcode.ui.home.SpringGlassDialog
 import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.AppleGreenDark
@@ -97,11 +108,13 @@ fun SettingsScreen(
     onRequestSmsPermission: () -> Unit,
     onToggleTaobaoBanner: (Boolean) -> Unit,
     onToggleCainiaoBanner: (Boolean) -> Unit,
-    onAddStation: (displayName: String, keywords: List<String>) -> Unit,
+    onTogglePinduoduoBanner: (Boolean) -> Unit,
+    onAddStation: (displayName: String, badgeNumber: Int?, keywords: List<String>) -> Unit,
     onDeleteStation: (stationNumber: Int) -> Unit,
+    onReorderStations: (List<StationRule>) -> Unit,
     onAddStationKeyword: (stationNumber: Int, keyword: String) -> Unit,
     onRemoveStationKeyword: (stationNumber: Int, keyword: String) -> Unit,
-    onUpdateStationDisplayName: (stationNumber: Int, newName: String, keywords: List<String>) -> Unit,
+    onUpdateStationRuleInfo: (stationNumber: Int, newName: String, badgeNumber: Int?, keywords: List<String>) -> Unit,
     onResetStationRules: () -> Unit,
     onRestorePickedUpItem: (PickupItemEntity) -> Unit,
     onDeletePickedUpItem: (PickupItemEntity) -> Unit,
@@ -109,6 +122,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
     val isDark = isSystemInDarkTheme()
     val statusGreen = if (isDark) AppleGreenDark else AppleGreenLight
     val statusAmber = if (isDark) AppleOrangeDark else AppleOrangeLight
@@ -117,6 +131,19 @@ fun SettingsScreen(
     var editingStationNumber by remember { mutableStateOf<Int?>(null) }
     var showAddStationDialog by remember { mutableStateOf(false) }
     var showPickedUpHistoryDialog by remember { mutableStateOf(false) }
+
+    // 支持按住拖动排序的本地规则列表状态
+    var localRules by remember { mutableStateOf(settings.stationRules) }
+    var draggingStationNumber by remember { mutableStateOf<Int?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    var itemRowHeightPx by remember { mutableIntStateOf(with(density) { 52.dp.roundToPx() }) }
+    val itemSpacingPx = remember(density) { with(density) { 9.dp.toPx() } }
+
+    LaunchedEffect(settings.stationRules) {
+        if (draggingStationNumber == null) {
+            localRules = settings.stationRules
+        }
+    }
 
     val pendingCount = items.count { !it.isPickedUp }
     val pickedUpItems = remember(items) {
@@ -136,59 +163,64 @@ fun SettingsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 顶部栏：优雅一体化圆角返回箭头 + 「设置」标题（固定 40.dp 行高，带非线性弹簧按压反馈）
+        // 顶部栏：仅保留带灰色底色圆圈的小于号返回功能（小于号严格几何居中），「设置」二字静态展示无点击联动
         item(key = "settings_header") {
-            var isBackPressed by remember { mutableStateOf(false) }
-            val backScale by animateFloatAsState(
-                targetValue = if (isBackPressed) 0.95f else 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMedium
-                ),
-                label = "back_header_scale"
-            )
-
+            val iconColor = MaterialTheme.colorScheme.onBackground
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 2.dp)
                     .height(40.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .scale(backScale)
-                        .clip(RoundedCornerShape(AppleCorners.SmallElement))
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    isBackPressed = true
-                                    tryAwaitRelease()
-                                    isBackPressed = false
-                                },
-                                onTap = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onBack()
-                                }
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            MaterialTheme.colorScheme.onSurface.copy(
+                                alpha = if (isDark) 0.14f else 0.08f
                             )
+                        )
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onBack()
                         }
-                        .padding(end = 12.dp, top = 2.dp, bottom = 2.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.ChevronLeft,
-                        contentDescription = "返回",
-                        tint = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .offset(x = (-4).dp)
-                    )
-                    Text(
-                        text = "设置",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.offset(x = (-4).dp)
-                    )
+                    Canvas(modifier = Modifier.size(16.dp)) {
+                        val w = size.width
+                        val h = size.height
+                        // 严格以圆心 (0.50w, 0.50h) 对称绘制小于号 `<`
+                        val xLeft = w * 0.32f
+                        val xRight = w * 0.68f
+                        val yTop = h * 0.16f
+                        val yMid = h * 0.50f
+                        val yBottom = h * 0.84f
+                        val path = Path().apply {
+                            moveTo(xRight, yTop)
+                            lineTo(xLeft, yMid)
+                            lineTo(xRight, yBottom)
+                        }
+                        drawPath(
+                            path = path,
+                            color = iconColor,
+                            style = Stroke(
+                                width = 2.3.dp.toPx(),
+                                cap = StrokeCap.Round,
+                                join = StrokeJoin.Round
+                            )
+                        )
+                    }
                 }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Text(
+                    text = "设置",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
             }
         }
 
@@ -328,7 +360,7 @@ fun SettingsScreen(
             }
         }
 
-        // 3. 识别规则（一级菜单仅展示快递房名称与编辑/删除圆形图标，详细匹配关键词点击笔图标在弹窗中查看与编辑）
+        // 3. 识别规则（支持按住并拖动排序，前缀 ①② 等与实心圆可在笔图标弹窗内自定义）
         item(key = "station_rules_card") {
             Column(
                 modifier = Modifier
@@ -407,88 +439,141 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    settings.stationRules.forEach { rule ->
-                        val accent = stationAccentColor(rule.stationNumber, isDark)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .liquidGlassInnerCard(
-                                    cornerRadius = AppleCorners.InnerCard,
-                                    accentTint = accent
-                                )
-                                .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    editingStationNumber = rule.stationNumber
-                                }
-                                .padding(horizontal = 14.dp, vertical = 12.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = rule.circleSymbol,
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 21.sp
-                                    ),
-                                    color = accent
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = rule.displayName,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1
-                                )
-                            }
+                    localRules.forEach { rule ->
+                        key(rule.stationNumber) {
+                            val isDragging = draggingStationNumber == rule.stationNumber
+                            val accent = stationAccentColor(rule.badgeNumber ?: rule.stationNumber, isDark)
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // 圆形笔图标按钮
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(accent.copy(alpha = 0.14f))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            editingStationNumber = rule.stationNumber
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .zIndex(if (isDragging) 1f else 0f)
+                                    .onGloballyPositioned { coords ->
+                                        if (coords.size.height > 0) {
+                                            itemRowHeightPx = coords.size.height
                                         }
+                                    }
+                                    .graphicsLayer {
+                                        if (isDragging) {
+                                            translationY = dragOffsetY
+                                            scaleX = 1.03f
+                                            scaleY = 1.03f
+                                        }
+                                    }
+                                    .liquidGlassInnerCard(
+                                        cornerRadius = AppleCorners.InnerCard,
+                                        accentTint = accent
+                                    )
+                                    .pointerInput(rule.stationNumber) {
+                                        detectDragGesturesAfterLongPress(
+                                            onDragStart = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                draggingStationNumber = rule.stationNumber
+                                                dragOffsetY = 0f
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                dragOffsetY += dragAmount.y
+                                                val stepPx = itemRowHeightPx + itemSpacingPx
+                                                val currentIndex = localRules.indexOfFirst {
+                                                    it.stationNumber == rule.stationNumber
+                                                }
+                                                if (currentIndex != -1 && stepPx > 0f) {
+                                                    if (dragOffsetY > stepPx * 0.65f && currentIndex < localRules.lastIndex) {
+                                                        val mutable = localRules.toMutableList()
+                                                        val moved = mutable.removeAt(currentIndex)
+                                                        mutable.add(currentIndex + 1, moved)
+                                                        localRules = mutable
+                                                        dragOffsetY -= stepPx
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    } else if (dragOffsetY < -stepPx * 0.65f && currentIndex > 0) {
+                                                        val mutable = localRules.toMutableList()
+                                                        val moved = mutable.removeAt(currentIndex)
+                                                        mutable.add(currentIndex - 1, moved)
+                                                        localRules = mutable
+                                                        dragOffsetY += stepPx
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    }
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                draggingStationNumber = null
+                                                dragOffsetY = 0f
+                                                onReorderStations(localRules)
+                                            },
+                                            onDragCancel = {
+                                                draggingStationNumber = null
+                                                dragOffsetY = 0f
+                                                onReorderStations(localRules)
+                                            }
+                                        )
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Edit,
-                                        contentDescription = "编辑识别规则",
-                                        tint = accent,
-                                        modifier = Modifier.size(15.dp)
+                                    StationBadgeSymbol(
+                                        badgeNumber = rule.badgeNumber,
+                                        accentColor = accent
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = rule.displayName,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1
                                     )
                                 }
 
-                                // 圆形删除按钮
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(deleteRed.copy(alpha = 0.12f))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onDeleteStation(rule.stationNumber)
-                                        }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.DeleteOutline,
-                                        contentDescription = "删除快递房",
-                                        tint = deleteRed,
-                                        modifier = Modifier.size(15.dp)
-                                    )
+                                    // 圆形笔图标按钮
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .clip(CircleShape)
+                                            .background(accent.copy(alpha = 0.14f))
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                editingStationNumber = rule.stationNumber
+                                            }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Edit,
+                                            contentDescription = "编辑识别规则",
+                                            tint = accent,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+
+                                    // 圆形删除按钮
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .clip(CircleShape)
+                                            .background(deleteRed.copy(alpha = 0.12f))
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onDeleteStation(rule.stationNumber)
+                                            }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.DeleteOutline,
+                                            contentDescription = "删除快递房",
+                                            tint = deleteRed,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -497,7 +582,7 @@ fun SettingsScreen(
             }
         }
 
-        // 4. 身份码跳转链路卡片（支持同时打开淘宝身份码与菜鸟身份码开关）
+        // 4. 身份码跳转链路卡片（淘宝身份码、菜鸟身份码、拼多多身份码三开关独立控制）
         item(key = "identity_code_switches_card") {
             Column(
                 modifier = Modifier
@@ -545,12 +630,22 @@ fun SettingsScreen(
                             onToggleCainiaoBanner(it)
                         }
                     )
+
+                    IdentitySwitchRow(
+                        title = "拼多多身份码",
+                        accentColor = PinduoduoRedStart,
+                        checked = settings.showPinduoduoIdentityBanner,
+                        onCheckedChange = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onTogglePinduoduoBanner(it)
+                        }
+                    )
                 }
             }
         }
     }
 
-    // 快递房识别规则编辑弹窗（响应式读取最新关键词列表，在新增匹配关键词下方展示当前已配置关键词）
+    // 快递房识别规则编辑弹窗
     val activeEditingRule = editingStationNumber?.let { num ->
         settings.stationRules.firstOrNull { it.stationNumber == num }
     }
@@ -564,10 +659,11 @@ fun SettingsScreen(
             onRemoveKeyword = { kw ->
                 onRemoveStationKeyword(activeEditingRule.stationNumber, kw)
             },
-            onSaveDisplayName = { newName ->
-                onUpdateStationDisplayName(
+            onSaveRuleInfo = { newName, newBadgeNum ->
+                onUpdateStationRuleInfo(
                     activeEditingRule.stationNumber,
                     newName,
+                    newBadgeNum,
                     activeEditingRule.keywords
                 )
             }
@@ -578,8 +674,8 @@ fun SettingsScreen(
     if (showAddStationDialog) {
         AddNewStationDialog(
             onDismiss = { showAddStationDialog = false },
-            onConfirm = { name, keywords ->
-                onAddStation(name, keywords)
+            onConfirm = { name, badgeNum, keywords ->
+                onAddStation(name, badgeNum, keywords)
                 showAddStationDialog = false
             }
         )
@@ -690,26 +786,53 @@ private fun EditStationRuleDialog(
     onDismiss: () -> Unit,
     onAddKeyword: (String) -> Unit,
     onRemoveKeyword: (String) -> Unit,
-    onSaveDisplayName: (String) -> Unit
+    onSaveRuleInfo: (newName: String, badgeNumber: Int?) -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
-    val accent = stationAccentColor(rule.stationNumber, isDark)
     var displayName by remember(rule.stationNumber) { mutableStateOf(rule.displayName) }
+    var badgeNumberText by remember(rule.stationNumber) {
+        mutableStateOf(rule.badgeNumber?.toString().orEmpty())
+    }
     var newKeyword by remember(rule.stationNumber) { mutableStateOf("") }
+
+    val previewBadgeNum = badgeNumberText.trim().toIntOrNull()?.takeIf { it in 1..20 }
+    val accent = stationAccentColor(previewBadgeNum ?: rule.stationNumber, isDark)
 
     SpringGlassDialog(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "配置 ${rule.circleSymbol} 识别规则",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StationBadgeSymbol(
+                    badgeNumber = previewBadgeNum,
+                    accentColor = accent
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "配置识别规则",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
             Spacer(modifier = Modifier.height(14.dp))
 
             OutlinedTextField(
                 value = displayName,
                 onValueChange = { displayName = it.take(18) },
                 label = { Text("快递房显示名称") },
+                singleLine = true,
+                shape = RoundedCornerShape(AppleCorners.InnerCard),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 在快递房显示名称后新添加一栏：输入 1 即显示 ①，留空则为实心等大圆
+            OutlinedTextField(
+                value = badgeNumberText,
+                onValueChange = { input ->
+                    badgeNumberText = input.filter { it.isDigit() }.take(2)
+                },
+                label = { Text("快递房序号（留空则为实心圆）") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 shape = RoundedCornerShape(AppleCorners.InnerCard),
                 modifier = Modifier.fillMaxWidth()
@@ -740,7 +863,6 @@ private fun EditStationRuleDialog(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 在新增匹配关键词下方新开一栏展示详细匹配规则关键词
             Text(
                 text = "当前匹配关键词",
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
@@ -751,7 +873,7 @@ private fun EditStationRuleDialog(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 56.dp, max = 180.dp)
+                    .heightIn(min = 56.dp, max = 160.dp)
                     .clip(RoundedCornerShape(AppleCorners.InnerCard))
                     .background(
                         MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f)
@@ -814,9 +936,8 @@ private fun EditStationRuleDialog(
                 Spacer(modifier = Modifier.width(6.dp))
                 Button(
                     onClick = {
-                        if (displayName.isNotBlank() && displayName != rule.displayName) {
-                            onSaveDisplayName(displayName.trim())
-                        }
+                        val finalName = displayName.trim().ifEmpty { rule.displayName }
+                        onSaveRuleInfo(finalName, previewBadgeNum)
                         if (newKeyword.isNotBlank()) {
                             onAddKeyword(newKeyword.trim())
                         }
@@ -834,9 +955,10 @@ private fun EditStationRuleDialog(
 @Composable
 private fun AddNewStationDialog(
     onDismiss: () -> Unit,
-    onConfirm: (displayName: String, keywords: List<String>) -> Unit
+    onConfirm: (displayName: String, badgeNumber: Int?, keywords: List<String>) -> Unit
 ) {
     var displayName by remember { mutableStateOf("") }
+    var badgeNumberText by remember { mutableStateOf("") }
     var keywordsText by remember { mutableStateOf("") }
 
     SpringGlassDialog(onDismissRequest = onDismiss) {
@@ -852,6 +974,20 @@ private fun AddNewStationDialog(
                 value = displayName,
                 onValueChange = { displayName = it.take(18) },
                 label = { Text("快递房名称") },
+                singleLine = true,
+                shape = RoundedCornerShape(AppleCorners.InnerCard),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = badgeNumberText,
+                onValueChange = { input ->
+                    badgeNumberText = input.filter { it.isDigit() }.take(2)
+                },
+                label = { Text("快递房序号（留空则为实心圆）") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 shape = RoundedCornerShape(AppleCorners.InnerCard),
                 modifier = Modifier.fillMaxWidth()
@@ -884,7 +1020,8 @@ private fun AddNewStationDialog(
                             .split(Regex("""[、,，/\s]+"""))
                             .map { it.trim() }
                             .filter { it.isNotEmpty() }
-                        onConfirm(displayName.trim(), kws)
+                        val badgeNum = badgeNumberText.trim().toIntOrNull()?.takeIf { it in 1..20 }
+                        onConfirm(displayName.trim(), badgeNum, kws)
                     },
                     shape = RoundedCornerShape(AppleCorners.InnerCard)
                 ) {
@@ -964,9 +1101,15 @@ private fun PickedUpHistoryDialog(
                         items = pickedUpItems,
                         key = { it.id }
                     ) { item ->
-                        val accent = stationAccentColor(item.stationNumber, isDark)
+                        val rule = rulesByNum[item.stationNumber]
+                        val badgeNum = if (item.stationNumber > 0) {
+                            if (rule != null) rule.badgeNumber else item.stationNumber
+                        } else {
+                            null
+                        }
+                        val accent = stationAccentColor(badgeNum ?: item.stationNumber, isDark)
                         val stationName = if (item.stationNumber > 0) {
-                            rulesByNum[item.stationNumber]?.displayName ?: "${item.stationNumber}号快递房"
+                            rule?.displayName ?: "${item.stationNumber}号快递房"
                         } else {
                             "待分类"
                         }
@@ -987,21 +1130,11 @@ private fun PickedUpHistoryDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(accent.copy(alpha = 0.16f))
-                                ) {
-                                    Text(
-                                        text = item.stationCircleSymbol,
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.ExtraBold
-                                        ),
-                                        color = accent
-                                    )
-                                }
+                                StationBadgeSymbol(
+                                    badgeNumber = badgeNum,
+                                    accentColor = accent,
+                                    isUnclassified = item.stationNumber == 0
+                                )
 
                                 Spacer(modifier = Modifier.width(10.dp))
 

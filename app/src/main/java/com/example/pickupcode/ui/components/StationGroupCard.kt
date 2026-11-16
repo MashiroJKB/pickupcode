@@ -49,11 +49,68 @@ import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 import com.example.pickupcode.ui.theme.stationAccentColor
 
 /**
- * 快递房分组卡片（常驻展开）
+ * 统一的快递房前缀序号/实心圆组件（主页与设置页识别规则共用）：
+ * - 当 badgeNumber 为 1~20 时显示 ① ~ ⑳
+ * - 当 badgeNumber 为 null（留空）时显示等大实心圆
+ * - 当 isUnclassified 为 true 时显示 ？
+ * 无外层多余同心大圆包裹。
+ */
+@Composable
+fun StationBadgeSymbol(
+    badgeNumber: Int?,
+    accentColor: Color,
+    isUnclassified: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.size(22.dp)
+    ) {
+        when {
+            isUnclassified -> {
+                Text(
+                    text = "？",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 21.sp,
+                        lineHeight = 22.sp
+                    ),
+                    color = accentColor
+                )
+            }
+
+            badgeNumber != null && badgeNumber in 1..20 -> {
+                Text(
+                    text = PickupItemEntity.stationCircleSymbolFor(badgeNumber),
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 21.sp,
+                        lineHeight = 22.sp
+                    ),
+                    color = accentColor
+                )
+            }
+
+            else -> {
+                // 留空时渲染与 ① 视觉直径完全一致的实心圆
+                Box(
+                    modifier = Modifier
+                        .size(17.dp)
+                        .clip(CircleShape)
+                        .background(accentColor)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 快递房分组卡片（常驻展开，主页快递房名称前仅显示 ①② 等或等大实心圆，无外层大同心圆）
  */
 @Composable
 fun StationGroupCard(
     stationNumber: Int,
+    badgeNumber: Int?,
     stationDisplayName: String,
     items: List<PickupItemEntity>,
     selectedItemIds: Set<Long>,
@@ -63,8 +120,7 @@ fun StationGroupCard(
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
-    val accentColor = stationAccentColor(stationNumber, isDark)
-    val circleSymbol = PickupItemEntity.stationCircleSymbolFor(stationNumber)
+    val accentColor = stationAccentColor(badgeNumber ?: stationNumber, isDark)
 
     Column(
         modifier = modifier
@@ -86,25 +142,13 @@ fun StationGroupCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(accentColor.copy(alpha = if (isDark) 0.24f else 0.16f))
-                        .border(1.dp, accentColor.copy(alpha = 0.5f), CircleShape)
-                ) {
-                    Text(
-                        text = circleSymbol,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 20.sp
-                        ),
-                        color = accentColor
-                    )
-                }
+                StationBadgeSymbol(
+                    badgeNumber = badgeNumber,
+                    accentColor = accentColor,
+                    isUnclassified = stationNumber == 0
+                )
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Column {
                     Text(
@@ -164,11 +208,7 @@ fun StationGroupCard(
 }
 
 /**
- * 极简取件码子卡片：
- * - 左侧：多选勾选圆圈
- * - 中部上方：完整显示取件码（大字号等宽特粗）
- * - 中部下方：显示「点击备注商品」或已备注的商品名称，点击弹出备注框
- * - 右侧：三个竖点按钮（⋮），点击弹出原文与编辑归类弹窗（点击卡片空白处不再触发弹窗）
+ * 极简取件码子卡片
  */
 @Composable
 fun PickupItemCard(
@@ -210,7 +250,6 @@ fun PickupItemCard(
             )
             .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
     ) {
-        // 左侧多选圆形勾选框
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -240,7 +279,6 @@ fun PickupItemCard(
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        // 主体区域：上方完整取件码 + 下方商品备注入口
         Column(
             modifier = Modifier.weight(1f)
         ) {
@@ -286,7 +324,6 @@ fun PickupItemCard(
             }
         }
 
-        // 右侧三个竖点按钮（⋮）
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier

@@ -204,12 +204,29 @@ class PickupViewModel(
         }
     }
 
-    fun addStationRule(displayName: String, keywords: List<String>) {
+    fun setShowPinduoduoIdentityBanner(enabled: Boolean) {
         viewModelScope.launch {
-            val num = settingsDataStore.addStationRule(displayName, keywords)
+            settingsDataStore.setShowPinduoduoIdentityBanner(enabled)
+            showCapsuleToast(
+                if (enabled) "已开启：拼多多身份码" else "已关闭：拼多多身份码"
+            )
+        }
+    }
+
+    fun addStationRule(displayName: String, badgeNumber: Int?, keywords: List<String>) {
+        viewModelScope.launch {
+            val num = settingsDataStore.addStationRule(displayName, badgeNumber, keywords)
             repository.reapplyStationRules()
-            val symbol = PickupItemEntity.stationCircleSymbolFor(num)
+            val symbol = badgeNumber?.takeIf { it in 1..20 }?.let {
+                PickupItemEntity.stationCircleSymbolFor(it)
+            } ?: "●"
             showCapsuleToast("已添加 $symbol ${displayName.ifBlank { "${num}号快递房" }}")
+        }
+    }
+
+    fun reorderStationRules(orderedRules: List<com.example.pickupcode.data.local.StationRule>) {
+        viewModelScope.launch {
+            settingsDataStore.reorderStationRules(orderedRules)
         }
     }
 
@@ -239,10 +256,15 @@ class PickupViewModel(
         }
     }
 
-    fun updateStationDisplayName(stationNumber: Int, displayName: String, keywords: List<String>) {
+    fun updateStationRuleInfo(
+        stationNumber: Int,
+        displayName: String,
+        badgeNumber: Int?,
+        keywords: List<String>
+    ) {
         viewModelScope.launch {
-            settingsDataStore.updateStationRule(stationNumber, displayName, keywords)
-            showCapsuleToast("已更新名称为「$displayName」")
+            settingsDataStore.updateStationRule(stationNumber, displayName, badgeNumber, keywords)
+            showCapsuleToast("已保存规则修改")
         }
     }
 

@@ -11,9 +11,10 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
-    <!-- Android 11+ 包可见性声明：用于直接唤起淘宝/菜鸟出库码 DeepLink -->
+    <!-- Android 11+ 包可见性声明：用于直接唤起淘宝/菜鸟/拼多多身份码 DeepLink -->
     <queries>
         <package android:name="com.taobao.taobao" />
+        <package android:name="com.xunmeng.pinduoduo" />
     </queries>
 
     <application

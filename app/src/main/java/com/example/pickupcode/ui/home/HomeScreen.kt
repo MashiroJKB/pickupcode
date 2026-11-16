@@ -52,6 +52,7 @@ import com.example.pickupcode.ui.theme.liquidGlass
 
 data class StationGroupSection(
     val stationNumber: Int,
+    val badgeNumber: Int?,
     val displayName: String,
     val items: List<PickupItemEntity>
 )
@@ -82,6 +83,7 @@ fun HomeScreen(
     selectedItemIds: Set<Long>,
     showTaobaoIdentityBanner: Boolean,
     showCainiaoIdentityBanner: Boolean,
+    showPinduoduoIdentityBanner: Boolean,
     hasSmsPermission: Boolean,
     onOpenSettings: () -> Unit,
     onRequestSmsPermission: () -> Unit,
@@ -103,23 +105,36 @@ fun HomeScreen(
         pendingItems.filter { it.stationNumber > 0 }.map { it.stationNumber }.distinct().size
     }
 
+    // 分组排序同步遵循「设置 -> 识别规则」中用户拖拽排序的顺序，且快递房前缀序号/实心圆同步变动
     val groupedSections = remember(pendingItems, stationRules) {
         val rulesByNum = stationRules.associateBy { it.stationNumber }
+        val orderMap = stationRules.mapIndexed { index, rule -> rule.stationNumber to index }.toMap()
+
         pendingItems
             .groupBy { it.stationNumber }
             .map { (stationNum, groupItems) ->
+                val rule = rulesByNum[stationNum]
                 val displayName = if (stationNum > 0) {
-                    rulesByNum[stationNum]?.displayName ?: "${stationNum}号快递房"
+                    rule?.displayName ?: "${stationNum}号快递房"
                 } else {
                     "待分类快递房"
                 }
+                val badgeNumber = if (stationNum > 0) {
+                    if (rule != null) rule.badgeNumber else stationNum
+                } else {
+                    null
+                }
                 StationGroupSection(
                     stationNumber = stationNum,
+                    badgeNumber = badgeNumber,
                     displayName = displayName,
                     items = groupItems.sortedWith(NaturalPickupCodeComparator)
                 )
             }
-            .sortedBy { if (it.stationNumber == 0) -1 else it.stationNumber }
+            .sortedBy { section ->
+                if (section.stationNumber == 0) -1
+                else orderMap[section.stationNumber] ?: (1000 + section.stationNumber)
+            }
     }
 
     LazyColumn(
@@ -144,7 +159,7 @@ fun HomeScreen(
             )
         }
 
-        // 根据设置开关动态展示「淘宝身份码」与「菜鸟身份码」Banner（支持同时开启）
+        // 根据设置页开关动态渲染淘宝、菜鸟、拼多多身份码 Banner（支持任意组合同时开启）
         if (showTaobaoIdentityBanner) {
             item(key = "taobao_identity_banner", contentType = "banner") {
                 IdentityCodeBanner(
@@ -158,6 +173,15 @@ fun HomeScreen(
             item(key = "cainiao_identity_banner", contentType = "banner") {
                 IdentityCodeBanner(
                     type = IdentityCodeType.CAINIAO,
+                    onFeedbackMessage = onFeedbackMessage
+                )
+            }
+        }
+
+        if (showPinduoduoIdentityBanner) {
+            item(key = "pinduoduo_identity_banner", contentType = "banner") {
+                IdentityCodeBanner(
+                    type = IdentityCodeType.PINDUODUO,
                     onFeedbackMessage = onFeedbackMessage
                 )
             }
@@ -179,6 +203,7 @@ fun HomeScreen(
             ) { section ->
                 StationGroupCard(
                     stationNumber = section.stationNumber,
+                    badgeNumber = section.badgeNumber,
                     stationDisplayName = section.displayName,
                     items = section.items,
                     selectedItemIds = selectedItemIds,

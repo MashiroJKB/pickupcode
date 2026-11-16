@@ -55,6 +55,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.StationRule
+import com.example.pickupcode.ui.components.StationBadgeSymbol
 import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.AppleRedDark
 import com.example.pickupcode.ui.theme.AppleRedLight
@@ -151,7 +152,13 @@ fun RawMessageDetailDialog(
     onDelete: (PickupItemEntity) -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
-    val accent = stationAccentColor(item.stationNumber, isDark)
+    val matchedRule = stationRules.firstOrNull { it.stationNumber == item.stationNumber }
+    val badgeNum = if (item.stationNumber > 0) {
+        if (matchedRule != null) matchedRule.badgeNumber else item.stationNumber
+    } else {
+        null
+    }
+    val accent = stationAccentColor(badgeNum ?: item.stationNumber, isDark)
     val dateFormat = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
 
     SpringGlassDialog(onDismissRequest = onDismiss) {
@@ -162,21 +169,11 @@ fun RawMessageDetailDialog(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(accent.copy(alpha = 0.18f))
-                    ) {
-                        Text(
-                            text = item.stationCircleSymbol,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.ExtraBold
-                            ),
-                            color = accent
-                        )
-                    }
+                    StationBadgeSymbol(
+                        badgeNumber = badgeNum,
+                        accentColor = accent,
+                        isUnclassified = item.stationNumber == 0
+                    )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
@@ -242,7 +239,7 @@ fun RawMessageDetailDialog(
                     stationRules.forEach { rule ->
                         val num = rule.stationNumber
                         val selected = item.stationNumber == num
-                        val numAccent = stationAccentColor(num, isDark)
+                        val numAccent = stationAccentColor(rule.badgeNumber ?: num, isDark)
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
@@ -483,19 +480,19 @@ fun AddOrPastePickupDialog(
                                 stationRules.forEach { rule ->
                                     val num = rule.stationNumber
                                     val selected = manualStation == num
-                                    val accent = stationAccentColor(num, isDark)
+                                    val accent = stationAccentColor(rule.badgeNumber ?: num, isDark)
                                     Box(
                                         contentAlignment = Alignment.Center,
                                         modifier = Modifier
-                                            .size(38.dp)
-                                            .clip(CircleShape)
+                                            .clip(RoundedCornerShape(AppleCorners.SmallElement))
                                             .background(if (selected) accent else accent.copy(alpha = 0.14f))
                                             .clickable { manualStation = num }
+                                            .padding(horizontal = 10.dp, vertical = 7.dp)
                                     ) {
                                         Text(
-                                            text = rule.circleSymbol,
-                                            style = MaterialTheme.typography.titleMedium.copy(
-                                                fontWeight = FontWeight.ExtraBold
+                                            text = "${rule.circleSymbol} ${rule.displayName}",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontWeight = FontWeight.Bold
                                             ),
                                             color = if (selected) Color.White else accent
                                         )
