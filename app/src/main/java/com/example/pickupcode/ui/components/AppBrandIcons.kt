@@ -2,6 +2,7 @@ package com.example.pickupcode.ui.components
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
 import android.graphics.Path as AndroidPath
@@ -14,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -65,9 +67,15 @@ private fun buildAndroidAppleSquirclePath(sizePx: Float): AndroidPath {
     }
 }
 
+private fun brandDrawableRes(type: IdentityCodeType): Int = when (type) {
+    IdentityCodeType.TAOBAO -> R.drawable.ic_brand_taobao
+    IdentityCodeType.CAINIAO -> R.drawable.ic_brand_cainiao
+    IdentityCodeType.PINDUODUO -> R.drawable.ic_brand_pinduoduo
+}
+
 /**
- * 淘宝 / 菜鸟 / 拼多多 高辨识度原生矢量应用图标组件：
- * - 全部自动加载对应的高辨识度矢量图标（ic_brand_taobao / ic_brand_cainiao / ic_brand_pinduoduo）
+ * 淘宝 / 菜鸟 / 拼多多 原生应用图标组件：
+ * - 加载用户指定的高清品牌图标资源（ic_brand_taobao / ic_brand_cainiao / ic_brand_pinduoduo）
  * - 统一使用 Apple 连续圆角（AppleIconSquircleShape）裁剪，无任何多余外圈或系统主题边框
  */
 @Composable
@@ -76,15 +84,10 @@ fun AppBrandIcon(
     size: Dp = 46.dp,
     modifier: Modifier = Modifier
 ) {
-    val drawableRes = when (type) {
-        IdentityCodeType.TAOBAO -> R.drawable.ic_brand_taobao
-        IdentityCodeType.CAINIAO -> R.drawable.ic_brand_cainiao
-        IdentityCodeType.PINDUODUO -> R.drawable.ic_brand_pinduoduo
-    }
-
     Image(
-        painter = painterResource(id = drawableRes),
+        painter = painterResource(id = brandDrawableRes(type)),
         contentDescription = type.title,
+        contentScale = ContentScale.Crop,
         modifier = modifier
             .size(size)
             .clip(AppleIconSquircleShape)
@@ -92,32 +95,48 @@ fun AppBrandIcon(
 }
 
 /**
- * 为桌面液态玻璃小组件生成统一 Apple 连续圆角裁剪的高清矢量应用图标 Bitmap
+ * 为桌面液态玻璃小组件生成统一 Apple 连续圆角裁剪的高清应用图标 Bitmap（支持按目标尺寸降采样以控制内存）
  */
 fun loadAppleRoundedIconBitmapForWidget(
     context: Context,
     type: IdentityCodeType,
     sizePx: Int = 128
 ): Bitmap {
-    val drawableRes = when (type) {
-        IdentityCodeType.TAOBAO -> R.drawable.ic_brand_taobao
-        IdentityCodeType.CAINIAO -> R.drawable.ic_brand_cainiao
-        IdentityCodeType.PINDUODUO -> R.drawable.ic_brand_pinduoduo
-    }
-
+    val drawableRes = brandDrawableRes(type)
     val output = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     val canvas = AndroidCanvas(output)
     canvas.clipPath(buildAndroidAppleSquirclePath(sizePx.toFloat()))
 
-    val drawable = ContextCompat.getDrawable(context, drawableRes)
-    if (drawable != null) {
-        drawable.setBounds(0, 0, sizePx, sizePx)
-        drawable.draw(canvas)
-    } else {
-        val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.GRAY
+    val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeResource(context.resources, drawableRes, boundsOpts)
+    val decoded = if (boundsOpts.outWidth > 0 && boundsOpts.outHeight > 0) {
+        var sampleSize = 1
+        while (boundsOpts.outWidth / (sampleSize * 2) >= sizePx &&
+            boundsOpts.outHeight / (sampleSize * 2) >= sizePx
+        ) {
+            sampleSize *= 2
         }
-        canvas.drawRect(RectF(0f, 0f, sizePx.toFloat(), sizePx.toFloat()), fallbackPaint)
+        val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        BitmapFactory.decodeResource(context.resources, drawableRes, decodeOpts)
+    } else {
+        null
+    }
+
+    if (decoded != null) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(decoded, null, RectF(0f, 0f, sizePx.toFloat(), sizePx.toFloat()), paint)
+        decoded.recycle()
+    } else {
+        val drawable = ContextCompat.getDrawable(context, drawableRes)
+        if (drawable != null) {
+            drawable.setBounds(0, 0, sizePx, sizePx)
+            drawable.draw(canvas)
+        } else {
+            val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.GRAY
+            }
+            canvas.drawRect(RectF(0f, 0f, sizePx.toFloat(), sizePx.toFloat()), fallbackPaint)
+        }
     }
     return output
 }

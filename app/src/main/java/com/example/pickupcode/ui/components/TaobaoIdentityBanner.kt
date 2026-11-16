@@ -50,11 +50,11 @@ import com.example.pickupcode.ui.theme.TaobaoOrangeStart
 import com.example.pickupcode.ui.theme.liquidGlass
 import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 
-val CainiaoBlueStart = Color(0xFF0A84FF)
+val CainiaoBlueStart = Color(0xFF006EFF)
 val CainiaoBlueEnd = Color(0xFF0055D4)
 
 // 拼多多品牌图标红
-val PinduoduoRedStart = Color(0xFFE02E24)
+val PinduoduoRedStart = Color(0xFFE12A1F)
 val PinduoduoRedEnd = Color(0xFFC8161D)
 
 enum class IdentityCodeType(
