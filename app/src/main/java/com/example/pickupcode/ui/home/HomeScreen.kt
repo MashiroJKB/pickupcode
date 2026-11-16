@@ -274,7 +274,9 @@ private fun HomeTopHeader(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp
                             ),
-                            color = statusAmber
+                            color = statusAmber,
+                            softWrap = false,
+                            maxLines = 1
                         )
                     }
                 }
@@ -365,9 +367,9 @@ private fun EmptyPickupStateCard(
 
         Text(
             text = if (hasSmsPermission) {
-                "每次打开应用会自动扫描最近 7 天的快递短信并排除已取包裹。您也可以点击右下角「+」手动添加或粘贴短信。"
+                "每次打开自动扫描最近 7 天取件短信，也可点击右下角「+」手动添加。"
             } else {
-                "请先授予短信读取权限，以便每次打开应用时自动提取最近 7 天的取件码。"
+                "授予短信读取权限后，每次打开将自动扫描最近 7 天的取件短信。"
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

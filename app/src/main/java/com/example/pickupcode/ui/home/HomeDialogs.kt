@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -447,7 +448,9 @@ fun AddOrPastePickupDialog(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             ),
-                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            softWrap = false,
+                            maxLines = 1
                         )
                     }
                 }
@@ -541,7 +544,7 @@ fun AddOrPastePickupDialog(
                 } else {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "支持包含多个取件码的合并短信，将自动拆分为多条独立记录：",
+                            text = "支持多码合并短信，自动拆分为独立记录：",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -707,12 +710,16 @@ fun NotificationAndBadgePermissionDialog(
                     Text(
                         text = "开启通知与桌面角标",
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "便于在桌面图标右上角实时显示待取件数量",
+                        text = "在桌面图标实时显示待取件数",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -720,8 +727,8 @@ fun NotificationAndBadgePermissionDialog(
             Spacer(modifier = Modifier.height(14.dp))
 
             PermissionGuideItemRow(
-                title = "系统通知权限",
-                subtitle = "用于向系统同步待取包裹数量状态",
+                title = "通知权限",
+                subtitle = "允许同步待取件数量状态",
                 statusText = if (hasNotificationPermission) "已开启" else "点击授权",
                 statusColor = if (hasNotificationPermission) statusGreen else statusAmber,
                 clickable = !hasNotificationPermission,
@@ -731,8 +738,8 @@ fun NotificationAndBadgePermissionDialog(
             Spacer(modifier = Modifier.height(9.dp))
 
             PermissionGuideItemRow(
-                title = "桌面图标角标权限",
-                subtitle = "OriginOS / 澎湃OS / ColorOS 等系统请在通知管理内开启「桌面图标角标」",
+                title = "桌面图标角标",
+                subtitle = "请在系统通知管理开启「桌面角标」",
                 statusText = "去设置",
                 statusColor = MaterialTheme.colorScheme.primary,
                 clickable = true,
@@ -798,13 +805,17 @@ private fun PermissionGuideItemRow(
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp
                 ),
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
@@ -819,7 +830,9 @@ private fun PermissionGuideItemRow(
             Text(
                 text = statusText,
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = statusColor
+                color = statusColor,
+                softWrap = false,
+                maxLines = 1
             )
         }
     }

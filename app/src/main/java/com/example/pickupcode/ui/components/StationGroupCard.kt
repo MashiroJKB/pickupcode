@@ -51,6 +51,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pickupcode.data.local.PickupItemEntity
@@ -182,17 +183,23 @@ fun StationGroupCard(
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     if (stationNumber == 0) {
                         Text(
-                            text = "点击右侧竖点按钮可指定所属快递房",
+                            text = "点击右侧竖点按钮指定快递房",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.width(8.dp))
 
             Box(
                 modifier = Modifier
@@ -205,7 +212,9 @@ fun StationGroupCard(
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    color = Color.White
+                    color = Color.White,
+                    softWrap = false,
+                    maxLines = 1
                 )
             }
         }
@@ -270,7 +279,7 @@ fun SwipeablePickupItemCard(
 
     // 当其他卡片左滑打开或列表开始滚动时，平滑收起当前卡片
     LaunchedEffect(isSwipedOpen) {
-        if (!isSwipedOpen && offsetX.value < -0.5f && !offsetX.isRunning) {
+        if (!isSwipedOpen && offsetX.value < -0.5f) {
             offsetX.animateTo(
                 targetValue = 0f,
                 animationSpec = spring(
@@ -529,13 +538,17 @@ fun SwipeablePickupItemCard(
                 modifier = Modifier.weight(1f)
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = item.code,
                         style = PickupCodeMonospaceStyle.copy(fontSize = codeFontSize),
                         color = MaterialTheme.colorScheme.onSurface,
-                        softWrap = false
+                        softWrap = false,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
 
                     if (retentionDays >= 1) {
@@ -553,7 +566,9 @@ fun SwipeablePickupItemCard(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 10.sp
                                 ),
-                                color = tagColor
+                                color = tagColor,
+                                softWrap = false,
+                                maxLines = 1
                             )
                         }
                     }
@@ -582,7 +597,10 @@ fun SwipeablePickupItemCard(
                             MaterialTheme.colorScheme.onSurface
                         } else {
                             accentColor
-                        }
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(

@@ -42,6 +42,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pickupcode.ui.theme.AppleCorners
@@ -326,7 +327,7 @@ fun IdentityCodeBanner(
 
                 Spacer(modifier = Modifier.width(14.dp))
 
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = type.title,
@@ -334,7 +335,10 @@ fun IdentityCodeBanner(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 17.sp
                             ),
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
@@ -349,7 +353,9 @@ fun IdentityCodeBanner(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 11.sp
                                 ),
-                                color = type.primaryColor
+                                color = type.primaryColor,
+                                softWrap = false,
+                                maxLines = 1
                             )
                         }
                     }
@@ -358,10 +364,14 @@ fun IdentityCodeBanner(
                         text = type.subtitle,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.width(10.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -384,7 +394,9 @@ fun IdentityCodeBanner(
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     ),
-                    color = Color.White
+                    color = Color.White,
+                    softWrap = false,
+                    maxLines = 1
                 )
                 Spacer(modifier = Modifier.width(3.dp))
                 Icon(

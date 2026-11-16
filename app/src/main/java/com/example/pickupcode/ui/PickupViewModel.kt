@@ -56,6 +56,8 @@ class PickupViewModel(
 
     private var toastJob: Job? = null
     private var undoTimerJob: Job? = null
+    private var isSmsScanRunning: Boolean = false
+    private var lastSmsScanCompletedAtMs: Long = 0L
 
     fun showCapsuleToast(message: String) {
         toastJob?.cancel()
@@ -70,10 +72,18 @@ class PickupViewModel(
      * 每次打开应用（冷启动与热启动）自动扫描最近 7 天短信，自动排除已取快递并清理超过 7 天的已取记录
      */
     fun scanRecentSmsOnAppOpen(context: Context) {
+        val now = System.currentTimeMillis()
+        if (isSmsScanRunning || now - lastSmsScanCompletedAtMs < 1200L) return
+        isSmsScanRunning = true
         viewModelScope.launch {
-            val count = repository.scanRecentSmsInbox(context)
-            if (count > 0) {
-                showCapsuleToast("已自动同步 $count 条新取件码")
+            try {
+                val count = repository.scanRecentSmsInbox(context)
+                lastSmsScanCompletedAtMs = System.currentTimeMillis()
+                if (count > 0) {
+                    showCapsuleToast("已自动同步 $count 条新取件码")
+                }
+            } finally {
+                isSmsScanRunning = false
             }
         }
     }
@@ -203,12 +213,6 @@ class PickupViewModel(
                 productName = productName
             )
             showCapsuleToast("已添加取件码 ${code.uppercase()}")
-        }
-    }
-
-    fun completeOnboarding() {
-        viewModelScope.launch {
-            settingsDataStore.setOnboardingCompleted(true)
         }
     }
 

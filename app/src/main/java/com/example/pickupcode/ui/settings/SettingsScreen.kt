@@ -82,6 +82,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -263,7 +264,9 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold
                         ),
-                        color = statusGreen
+                        color = statusGreen,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -308,7 +311,7 @@ fun SettingsScreen(
                 PermissionStatusCard(
                     icon = Icons.Rounded.Sms,
                     title = "监听短信权限未开启",
-                    subtitle = "授权后每次打开应用自动扫描最近 7 天取件短信",
+                    subtitle = "授权后自动扫描最近 7 天取件短信",
                     accentColor = statusAmber,
                     buttonText = "开启权限",
                     onClick = onRequestSmsPermission
@@ -321,8 +324,8 @@ fun SettingsScreen(
             if (!hasNotificationPermission) {
                 PermissionStatusCard(
                     icon = Icons.Rounded.NotificationsActive,
-                    title = "通知与桌面角标权限未开启",
-                    subtitle = "开启通知并允许「桌面图标角标」，可在桌面实时显示待取件数",
+                    title = "通知与桌面角标未开启",
+                    subtitle = "开启通知与角标，实时显示待取件数",
                     accentColor = statusAmber,
                     buttonText = "开启通知",
                     onClick = onRequestNotificationPermission
@@ -330,8 +333,8 @@ fun SettingsScreen(
             } else {
                 PermissionStatusCard(
                     icon = Icons.Rounded.NotificationsActive,
-                    title = "桌面图标角标与通知已就绪",
-                    subtitle = "若桌面图标未显示角标数字，请在系统通知管理中开启「桌面图标角标」",
+                    title = "桌面角标与通知已就绪",
+                    subtitle = "可在系统通知管理开启「桌面图标角标」",
                     accentColor = statusGreen,
                     buttonText = "管理角标",
                     onClick = onOpenBadgeSettings
@@ -385,7 +388,9 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
+                                softWrap = false,
+                                maxLines = 1
                             )
                         }
 
@@ -409,7 +414,9 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.SemiBold
                                 ),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                softWrap = false,
+                                maxLines = 1
                             )
                         }
                     }
@@ -577,7 +584,8 @@ fun SettingsScreen(
                                             fontWeight = FontWeight.Bold
                                         ),
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
 
@@ -798,14 +806,18 @@ private fun PermissionStatusCard(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp
                             ),
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -823,7 +835,9 @@ private fun PermissionStatusCard(
                 Text(
                     text = buttonText,
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = accentColor
+                    color = accentColor,
+                    softWrap = false,
+                    maxLines = 1
                 )
             }
         }
@@ -1369,10 +1383,14 @@ private fun PickedUpHistoryDialog(
                                     Text(
                                         text = subInfo,
                                         style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
+
+                            Spacer(modifier = Modifier.width(6.dp))
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1401,7 +1419,9 @@ private fun PickedUpHistoryDialog(
                                         style = MaterialTheme.typography.labelMedium.copy(
                                             fontWeight = FontWeight.Bold
                                         ),
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = MaterialTheme.colorScheme.primary,
+                                        softWrap = false,
+                                        maxLines = 1
                                     )
                                 }
 

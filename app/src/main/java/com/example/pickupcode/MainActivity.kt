@@ -46,6 +46,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -186,7 +188,6 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         val smsGranted = checkSmsPermission(context)
         hasSmsPermission = smsGranted
         hasNotificationPermission = AppBadgeManager.hasNotificationPermission(context)
-        viewModel.completeOnboarding()
         if (smsGranted) {
             viewModel.scanRecentSmsOnAppOpen(context)
         }
@@ -268,11 +269,8 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         if (startupPerms.isNotEmpty()) {
             awaitingBadgeDialogAfterStartupPrompt = !settings.badgePermissionPrompted
             startupPermissionLauncher.launch(startupPerms.toTypedArray())
-        } else {
-            viewModel.completeOnboarding()
-            if (!settings.badgePermissionPrompted) {
-                showNotificationBadgeDialog = true
-            }
+        } else if (!settings.badgePermissionPrompted) {
+            showNotificationBadgeDialog = true
         }
     }
 
@@ -331,6 +329,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         .fillMaxSize()
                         .graphicsLayer {
                             alpha = (1f - settingsProgress).coerceIn(0f, 1f)
+                            translationX = -settingsProgress * 24.dp.toPx()
                         }
                 ) {
                     HomeScreen(
@@ -341,7 +340,9 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         showCainiaoIdentityBanner = settings.showCainiaoIdentityBanner,
                         showPinduoduoIdentityBanner = settings.showPinduoduoIdentityBanner,
                         hasSmsPermission = hasSmsPermission,
-                        onOpenSettings = { showSettingsScreen = true },
+                        onOpenSettings = {
+                            if (!showSettingsScreen) showSettingsScreen = true
+                        },
                         onRequestSmsPermission = requestSmsPermissions,
                         onQuickAddClick = { showAddOrPasteDialog = true },
                         onToggleSelectItem = viewModel::toggleSelectItem,
@@ -375,6 +376,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         .fillMaxSize()
                         .graphicsLayer {
                             alpha = settingsProgress.coerceIn(0f, 1f)
+                            translationX = (1f - settingsProgress) * 32.dp.toPx()
                         }
                 ) {
                     SettingsScreen(
@@ -382,7 +384,9 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         settings = settings,
                         hasSmsPermission = hasSmsPermission,
                         hasNotificationPermission = hasNotificationPermission,
-                        onBack = { showSettingsScreen = false },
+                        onBack = {
+                            if (showSettingsScreen) showSettingsScreen = false
+                        },
                         onRequestSmsPermission = requestSmsPermissions,
                         onRequestNotificationPermission = requestNotificationPermission,
                         onOpenBadgeSettings = { AppBadgeManager.openNotificationAndBadgeSettings(context) },
@@ -431,7 +435,10 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

@@ -35,14 +35,12 @@ data class StationRule(
 
 /**
  * 应用全局设置快照
- * - onboardingCompleted: 首次打开引导是否已完成
  * - badgePermissionPrompted: 首次通知与桌面角标授权弹窗是否已引导
  * - showTaobaoIdentityBanner: 是否开启「淘宝身份码」Banner（默认开启）
  * - showCainiaoIdentityBanner: 是否开启「菜鸟身份码」Banner
  * - showPinduoduoIdentityBanner: 是否开启「拼多多取件码」Banner
  */
 data class AppSettings(
-    val onboardingCompleted: Boolean = false,
     val badgePermissionPrompted: Boolean = false,
     val showTaobaoIdentityBanner: Boolean = true,
     val showCainiaoIdentityBanner: Boolean = false,
@@ -53,7 +51,6 @@ data class AppSettings(
 class SettingsDataStore(private val context: Context) {
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
-        val onboardingCompleted = prefs[KEY_ONBOARDING_COMPLETED] ?: false
         val badgePermissionPrompted = prefs[KEY_BADGE_PERMISSION_PROMPTED] ?: false
         val showTaobao = prefs[KEY_SHOW_TAOBAO_IDENTITY] ?: true
         val showCainiao = prefs[KEY_SHOW_CAINIAO_IDENTITY] ?: false
@@ -66,19 +63,12 @@ class SettingsDataStore(private val context: Context) {
         }
 
         AppSettings(
-            onboardingCompleted = onboardingCompleted,
             badgePermissionPrompted = badgePermissionPrompted,
             showTaobaoIdentityBanner = showTaobao,
             showCainiaoIdentityBanner = showCainiao,
             showPinduoduoIdentityBanner = showPinduoduo,
             stationRules = stationRules
         )
-    }
-
-    suspend fun setOnboardingCompleted(completed: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[KEY_ONBOARDING_COMPLETED] = completed
-        }
     }
 
     suspend fun setBadgePermissionPrompted(prompted: Boolean) {
@@ -275,7 +265,6 @@ class SettingsDataStore(private val context: Context) {
     companion object {
         const val DEFAULT_SMS_SCAN_DAYS = 7
 
-        private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         private val KEY_BADGE_PERMISSION_PROMPTED = booleanPreferencesKey("badge_permission_prompted")
         private val KEY_SHOW_TAOBAO_IDENTITY = booleanPreferencesKey("show_taobao_identity_banner")
         private val KEY_SHOW_CAINIAO_IDENTITY = booleanPreferencesKey("show_cainiao_identity_banner")
