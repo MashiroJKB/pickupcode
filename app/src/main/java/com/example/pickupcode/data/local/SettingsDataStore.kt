@@ -187,7 +187,7 @@ class SettingsDataStore(private val context: Context) {
 
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         private val KEY_USE_TAOBAO_EXIT_CODE = booleanPreferencesKey("use_taobao_exit_code_v2")
-        private val KEY_STATION_RULES_JSON = stringPreferencesKey("station_rules_json")
+        private val KEY_STATION_RULES_JSON = stringPreferencesKey("station_rules_json_v2")
 
         private val CHINESE_NUMERALS = mapOf(
             1 to "一",
@@ -219,10 +219,18 @@ class SettingsDataStore(private val context: Context) {
         }
 
         fun defaultStationRules(): List<StationRule> {
-            return (1..7).map { num ->
+            val defaultStations = listOf(
+                1 to "家属区1号 京东",
+                2 to "家属区2号",
+                3 to "家属区3号",
+                5 to "田径场5号 顺丰",
+                6 to "田径场6号 极兔",
+                7 to "田径场7号 中通"
+            )
+            return defaultStations.map { (num, name) ->
                 StationRule(
                     stationNumber = num,
-                    displayName = "${num}号快递房",
+                    displayName = name,
                     keywords = defaultKeywordsForNumber(num)
                 )
             }

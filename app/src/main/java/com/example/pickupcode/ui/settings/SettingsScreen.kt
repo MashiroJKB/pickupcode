@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.RestartAlt
@@ -425,29 +426,22 @@ fun SettingsScreen(
 
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
+                                    // 关键词 / 改名圆形笔图标按钮
+                                    Box(
+                                        contentAlignment = Alignment.Center,
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(AppleCorners.Pill))
+                                            .size(28.dp)
+                                            .clip(CircleShape)
                                             .background(accent.copy(alpha = 0.14f))
                                             .clickable { editingStationRule = rule }
-                                            .padding(horizontal = 10.dp, vertical = 4.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Rounded.Add,
-                                            contentDescription = "添加关键词",
+                                            imageVector = Icons.Rounded.Edit,
+                                            contentDescription = "编辑规则与名称",
                                             tint = accent,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = "关键词 / 改名",
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                fontWeight = FontWeight.Bold
-                                            ),
-                                            color = accent
+                                            modifier = Modifier.size(15.dp)
                                         )
                                     }
 
@@ -455,7 +449,7 @@ fun SettingsScreen(
                                     Box(
                                         contentAlignment = Alignment.Center,
                                         modifier = Modifier
-                                            .size(26.dp)
+                                            .size(28.dp)
                                             .clip(CircleShape)
                                             .background(deleteRed.copy(alpha = 0.12f))
                                             .clickable {

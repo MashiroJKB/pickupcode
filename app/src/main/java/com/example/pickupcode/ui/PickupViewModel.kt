@@ -241,7 +241,7 @@ class PickupViewModel(
         viewModelScope.launch {
             settingsDataStore.resetStationRulesToDefault()
             repository.reapplyStationRules()
-            showCapsuleToast("已恢复默认 ①~⑦ 识别规则")
+            showCapsuleToast("已恢复默认识别规则")
         }
     }
 
