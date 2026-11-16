@@ -1,5 +1,6 @@
 package com.example.pickupcode.ui.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -45,11 +46,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pickupcode.data.local.PickupItemEntity
@@ -65,7 +66,6 @@ import com.example.pickupcode.ui.theme.liquidGlass
 import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 import com.example.pickupcode.ui.theme.stationAccentColor
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 /**
  * 统一的快递房前缀序号/实心圆组件（主页与设置页识别规则共用）
@@ -119,7 +119,7 @@ fun StationBadgeSymbol(
 }
 
 /**
- * 快递房分组卡片
+ * 快递房分组卡片（支持 120Hz 平滑高度过渡）
  */
 @Composable
 fun StationGroupCard(
@@ -128,6 +128,8 @@ fun StationGroupCard(
     stationDisplayName: String,
     items: List<PickupItemEntity>,
     selectedItemIds: Set<Long>,
+    activeSwipedItemId: Long?,
+    onSwipeOpenChange: (Long, Boolean) -> Unit,
     onToggleSelectItem: (PickupItemEntity) -> Unit,
     onQuickMarkPickedUp: (PickupItemEntity) -> Unit,
     onQuickDeleteItem: (PickupItemEntity) -> Unit,
@@ -145,6 +147,12 @@ fun StationGroupCard(
             .liquidGlass(
                 cornerRadius = AppleCorners.OuterCard,
                 tintColor = accentColor
+            )
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = 0.86f,
+                    stiffness = 420f
+                )
             )
             .padding(14.dp)
     ) {
@@ -213,6 +221,8 @@ fun StationGroupCard(
                     SwipeablePickupItemCard(
                         item = item,
                         isSelected = item.id in selectedItemIds,
+                        isSwipedOpen = activeSwipedItemId == item.id,
+                        onSwipeOpenChange = { open -> onSwipeOpenChange(item.id, open) },
                         accentColor = accentColor,
                         onToggleSelect = { onToggleSelectItem(item) },
                         onQuickMarkPickedUp = { onQuickMarkPickedUp(item) },
@@ -228,13 +238,15 @@ fun StationGroupCard(
 }
 
 /**
- * 支持左滑快捷操作（已取 / 删除）、长按弹出快捷菜单、滞留天数提醒角标的取件码卡片
+ * iOS 风格优雅左滑快捷操作卡片（GPU hardware-layer translationX + 弹性阻尼过拉 + 视差渐变按钮展开 + 120Hz 惯性衔接）
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SwipeablePickupItemCard(
     item: PickupItemEntity,
     isSelected: Boolean,
+    isSwipedOpen: Boolean,
+    onSwipeOpenChange: (Boolean) -> Unit,
     accentColor: Color,
     onToggleSelect: () -> Unit,
     onQuickMarkPickedUp: () -> Unit,
@@ -253,12 +265,34 @@ fun SwipeablePickupItemCard(
     val deleteRed = if (isDark) AppleRedDark else AppleRedLight
     val warnOrange = if (isDark) AppleOrangeDark else AppleOrangeLight
 
-    val maxRevealPx = remember(density) { with(density) { 136.dp.toPx() } }
+    val openRevealPx = remember(density) { with(density) { 140.dp.toPx() } }
     val offsetX = remember { Animatable(0f) }
+
+    // 当其他卡片左滑打开或列表开始滚动时，平滑收起当前卡片
+    LaunchedEffect(isSwipedOpen) {
+        if (!isSwipedOpen && offsetX.value < -0.5f && !offsetX.isRunning) {
+            offsetX.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = 0.88f,
+                    stiffness = 460f
+                )
+            )
+        }
+    }
 
     val draggableState = rememberDraggableState { delta ->
         scope.launch {
-            val next = (offsetX.value + delta).coerceIn(-maxRevealPx, 0f)
+            val current = offsetX.value
+            val dampedDelta = if (current < -openRevealPx && delta < 0f) {
+                delta * 0.25f // 橡皮筋过拉阻尼
+            } else {
+                delta
+            }
+            val next = (current + dampedDelta).coerceIn(-openRevealPx * 1.25f, 0f)
+            if (next < -14f && !isSwipedOpen) {
+                onSwipeOpenChange(true)
+            }
             offsetX.snapTo(next)
         }
     }
@@ -287,35 +321,54 @@ fun SwipeablePickupItemCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(AppleCorners.InnerCard))
     ) {
-        // 底层：左滑漏出的「已取」与「删除」快捷操作按钮
-        if (offsetX.value < -2f) {
+        // 底层：渐进视差展开的「已取」与「删除」Apple 圆角按钮
+        val revealPx = (-offsetX.value).coerceAtLeast(0f)
+        if (revealPx > 1f) {
+            val progress = (revealPx / openRevealPx).coerceIn(0f, 1f)
+            val actionAlpha = ((progress - 0.06f) / 0.48f).coerceIn(0f, 1f)
+            val buttonScale = 0.78f + 0.22f * progress
+            val remainPx = (openRevealPx - revealPx).coerceAtLeast(0f)
+
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 4.dp)
+                    .matchParentSize()
+                    .padding(vertical = 1.dp)
             ) {
+                Spacer(modifier = Modifier.weight(1f))
+
+                // 绿色「已取」按钮（带视差滑出与缩放）
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .width(62.dp)
-                        .height(54.dp)
-                        .clip(RoundedCornerShape(13.dp))
+                        .fillMaxHeight()
+                        .graphicsLayer {
+                            alpha = actionAlpha
+                            scaleX = buttonScale
+                            scaleY = buttonScale
+                            translationX = remainPx * 0.58f
+                        }
+                        .clip(RoundedCornerShape(AppleCorners.InnerCard))
                         .background(checkGreen)
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch { offsetX.snapTo(0f) }
+                            onSwipeOpenChange(false)
                             onQuickMarkPickedUp()
                         }
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         Icon(
                             imageVector = Icons.Rounded.Check,
                             contentDescription = "已取",
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(19.dp)
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "已取",
                             style = MaterialTheme.typography.labelMedium.copy(
@@ -327,26 +380,37 @@ fun SwipeablePickupItemCard(
                     }
                 }
 
+                // 红色「删除」按钮（带微错位视差）
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .width(62.dp)
-                        .height(54.dp)
-                        .clip(RoundedCornerShape(13.dp))
+                        .fillMaxHeight()
+                        .graphicsLayer {
+                            alpha = actionAlpha
+                            scaleX = buttonScale
+                            scaleY = buttonScale
+                            translationX = remainPx * 0.26f
+                        }
+                        .clip(RoundedCornerShape(AppleCorners.InnerCard))
                         .background(deleteRed)
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch { offsetX.snapTo(0f) }
+                            onSwipeOpenChange(false)
                             onQuickDelete()
                         }
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         Icon(
                             imageVector = Icons.Rounded.DeleteOutline,
                             contentDescription = "删除",
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(19.dp)
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "删除",
                             style = MaterialTheme.typography.labelMedium.copy(
@@ -360,12 +424,14 @@ fun SwipeablePickupItemCard(
             }
         }
 
-        // 顶层：取件码主卡片（支持左滑拖拽与长按弹出快捷菜单）
+        // 顶层：GPU 硬件位移取件码主卡片（120Hz 零重排）
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
                 .fillMaxWidth()
+                .graphicsLayer {
+                    translationX = offsetX.value
+                }
                 .liquidGlassInnerCard(
                     cornerRadius = AppleCorners.InnerCard,
                     isPickedUp = false,
@@ -376,13 +442,19 @@ fun SwipeablePickupItemCard(
                     orientation = Orientation.Horizontal,
                     onDragStopped = { velocity ->
                         scope.launch {
-                            val shouldOpen = offsetX.value < -maxRevealPx * 0.4f || velocity < -600f
-                            val target = if (shouldOpen) -maxRevealPx else 0f
+                            val shouldOpen = when {
+                                velocity < -420f -> true
+                                velocity > 420f -> false
+                                else -> offsetX.value < -openRevealPx * 0.44f
+                            }
+                            onSwipeOpenChange(shouldOpen)
+                            val target = if (shouldOpen) -openRevealPx else 0f
                             offsetX.animateTo(
                                 targetValue = target,
+                                initialVelocity = velocity,
                                 animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMedium
+                                    dampingRatio = 0.84f,
+                                    stiffness = 460f
                                 )
                             )
                         }
@@ -390,22 +462,30 @@ fun SwipeablePickupItemCard(
                 )
                 .combinedClickable(
                     onClick = {
-                        if (offsetX.value < -10f) {
+                        if (offsetX.value < -8f) {
+                            onSwipeOpenChange(false)
                             scope.launch {
                                 offsetX.animateTo(
                                     targetValue = 0f,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
+                                    animationSpec = spring(
+                                        dampingRatio = 0.86f,
+                                        stiffness = 460f
+                                    )
                                 )
                             }
                         }
                     },
                     onLongClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (offsetX.value < -10f) {
+                        if (offsetX.value < -8f) {
+                            onSwipeOpenChange(false)
                             scope.launch {
                                 offsetX.animateTo(
                                     targetValue = 0f,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
+                                    animationSpec = spring(
+                                        dampingRatio = 0.86f,
+                                        stiffness = 460f
+                                    )
                                 )
                             }
                         }

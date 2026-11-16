@@ -162,6 +162,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         if (granted) {
             viewModel.scanRecentSmsOnAppOpen(context)
         }
+        AppBadgeManager.updateBadgeCount(context, items.count { !it.isPickedUp }, force = true)
     }
 
     val requestSmsPermissions = {

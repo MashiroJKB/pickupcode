@@ -1,5 +1,7 @@
 package com.example.pickupcode.ui.home
 
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -30,7 +32,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,6 +82,7 @@ private val NaturalPickupCodeComparator = Comparator<PickupItemEntity> { a, b ->
     a.code.compareTo(b.code, ignoreCase = true)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     items: List<PickupItemEntity>,
@@ -99,6 +106,14 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
+    var activeSwipedItemId by remember { mutableStateOf<Long?>(null) }
+
+    // 列表滚动时优雅自动收起已左滑展开的卡片
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress && activeSwipedItemId != null) {
+            activeSwipedItemId = null
+        }
+    }
 
     val pendingItems = remember(items) {
         items.filter { !it.isPickedUp }
@@ -203,12 +218,22 @@ fun HomeScreen(
                     stationDisplayName = section.displayName,
                     items = section.items,
                     selectedItemIds = selectedItemIds,
+                    activeSwipedItemId = activeSwipedItemId,
+                    onSwipeOpenChange = { id, open ->
+                        activeSwipedItemId = if (open) id else if (activeSwipedItemId == id) null else activeSwipedItemId
+                    },
                     onToggleSelectItem = onToggleSelectItem,
                     onQuickMarkPickedUp = onQuickMarkPickedUp,
                     onQuickDeleteItem = onQuickDeleteItem,
                     onLongPressItem = onLongPressItem,
                     onClickMoreActions = onClickMoreActions,
-                    onClickProductRemark = onClickProductRemark
+                    onClickProductRemark = onClickProductRemark,
+                    modifier = Modifier.animateItem(
+                        placementSpec = spring(
+                            dampingRatio = 0.86f,
+                            stiffness = 400f
+                        )
+                    )
                 )
             }
         }

@@ -3,7 +3,6 @@ package com.example.pickupcode.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -24,9 +23,9 @@ object AppBadgeManager {
 
     private var lastAppliedCount: Int = -1
 
-    fun updateBadgeCount(context: Context, pendingCount: Int) {
+    fun updateBadgeCount(context: Context, pendingCount: Int, force: Boolean = false) {
         val count = pendingCount.coerceAtLeast(0)
-        if (count == lastAppliedCount) return
+        if (!force && count == lastAppliedCount) return
         lastAppliedCount = count
 
         val appContext = context.applicationContext
