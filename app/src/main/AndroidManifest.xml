@@ -21,10 +21,9 @@
     <uses-permission android:name="com.oppo.launcher.permission.WRITE_SETTINGS" />
     <uses-permission android:name="com.vivo.notification.permission.BADGE_ICON" />
 
-    <!-- Android 11+ 包可见性声明：用于读取对应官方图标与直接唤起淘宝/菜鸟/拼多多 -->
+    <!-- Android 11+ 包可见性声明：用于直接唤起淘宝/拼多多 DeepLink -->
     <queries>
         <package android:name="com.taobao.taobao" />
-        <package android:name="com.cainiao.wireless" />
         <package android:name="com.xunmeng.pinduoduo" />
     </queries>
 

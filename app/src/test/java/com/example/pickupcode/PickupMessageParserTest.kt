@@ -80,4 +80,21 @@ class PickupMessageParserTest {
         assertEquals("9-1-4022", results[0].code)
         assertEquals(0, results[0].stationNumber)
     }
+
+    @Test
+    fun `matches station via custom badgeNumber`() {
+        val customRules = listOf(
+            com.example.pickupcode.data.local.StationRule(
+                stationNumber = 1,
+                displayName = "自定义驿站",
+                keywords = listOf("自定义驿站"),
+                badgeNumber = 4
+            )
+        )
+        val sms = "您的包裹已到4号快递房，请凭取件码 2-1-8844 领取。"
+        val results = PickupMessageParser.parse(sms, customRules)
+
+        assertEquals(1, results.size)
+        assertEquals(1, results[0].stationNumber)
+    }
 }

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 淘宝标志性温暖橙红渐变底色 -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="108"
+                android:endY="108"
+                android:startX="0"
+                android:startY="0"
+                android:type="linear">
+                <item
+                    android:color="#FFFF7A00"
+                    android:offset="0.0" />
+                <item
+                    android:color="#FFFF4500"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 淘宝标志性亮黄色水滴点 -->
+    <path
+        android:fillColor="#FFFFE600"
+        android:pathData="M31.5,33.5m-4.3,0a4.3,4.3 0,1 1,8.6 0a4.3,4.3 0,1 1,-8.6 0" />
+
+    <!-- 左侧三点水余下两笔（白色圆润笔触） -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M24.5,48.5 Q30,50.5 34.5,54.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="6.4" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M26,74.5 Q31.5,67.5 35.5,60.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="6.4" />
+
+    <!-- 右侧「淘」字外包框与勾 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M48.5,25.5 Q45.5,33.5 40.5,41.5 M45.5,34.5 L76.5,34.5 C79.5,34.5 81,36.5 80.5,41 L78,72 C77.5,77.5 74,80.5 68.5,79.5 L63.5,77.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="6.4" />
+
+    <!-- 内部「缶」字结构 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M46,47 L67.5,47 M42.5,57 L70.5,57 M56.5,41.5 L56.5,70 M45.5,61.5 L45.5,70.5 L67.5,70.5 L67.5,61.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="5.6" />
+
+</vector>

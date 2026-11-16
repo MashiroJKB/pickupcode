@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 拼多多标志性正红渐变底色 -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="108"
+                android:endY="108"
+                android:startX="0"
+                android:startY="0"
+                android:type="linear">
+                <item
+                    android:color="#FFEF3329"
+                    android:offset="0.0" />
+                <item
+                    android:color="#FFD1171D"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 拼多多白色标志性爱心轮廓 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,34 C46.5,20.5 25,21.5 21.5,37.5 C18,53.5 34.5,69.5 54,85.5 C73.5,69.5 90,53.5 86.5,37.5 C83,21.5 61.5,20.5 54,34 Z" />
+
+    <!-- 爱心内部拼图网格分隔线（还原官方多格拼接质感） -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,32 L54,84 M22,45 L86,45 M28,60 L80,60 M39,25 L39,70 M69,25 L69,70"
+        android:strokeColor="#FFE02E24"
+        android:strokeWidth="2.4" />
+
+    <!-- 爱心中央红色圆角方牌 -->
+    <path
+        android:fillColor="#FFE02E24"
+        android:pathData="M43,39 L65,39 Q69,39 69,43 L69,63 Q69,67 65,67 L43,67 Q39,67 39,63 L39,43 Q39,39 43,39 Z" />
+
+    <!-- 中央清晰白色「拼」字矢量路径 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M43.5,48.5 L50,48.5 M47,43.5 L47,62 M43.5,56 L50.5,53 M54,43.5 L56,47 M62.5,43.5 L60.5,47 M52.5,49 L64,49 M52,55.5 L64.5,55.5 M55.5,49 L55.5,62 M61,49 L61,62"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2.5" />
+
+</vector>

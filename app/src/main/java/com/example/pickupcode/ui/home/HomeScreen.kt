@@ -329,10 +329,13 @@ private fun HomeTopHeader(
         }
 
         Text(
-            text = if (totalPending > 0) {
-                "当前 $totalPending 件待取 · 分布在 $activeStationCount 个快递房"
-            } else {
-                "每次打开自动扫描最近 7 天取件短信"
+            text = when {
+                totalPending > 0 && activeStationCount > 0 ->
+                    "当前 $totalPending 件待取 · 分布在 $activeStationCount 个快递房"
+                totalPending > 0 ->
+                    "当前 $totalPending 件待取 · 待归类快递房"
+                else ->
+                    "每次打开自动扫描最近 7 天取件短信"
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
