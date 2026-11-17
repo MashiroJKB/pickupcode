@@ -27,7 +27,7 @@
 3. **禁止展示或识别快递品牌/代收点别名**：不识别、不存储、不显示任何快递品牌（如“中通快递”、“京东快递”）或代收点名称；数据库预留字段 `expressCompany` 始终置空 `""`。
 
 ### 1.2 明确排除项（禁止擅自添加）
-- **不要**包含「截图解析 / OCR / 照片选择器（Photo Picker） / ML Kit」等任何图片识别功能（维持极致轻量化与零多余三方重型依赖，Release 安装包体积约 `2.56 MiB`）。
+- **不要**包含「截图解析 / OCR / 照片选择器（Photo Picker） / ML Kit」等任何图片识别功能（维持极致轻量化与零多余三方重型依赖，Release 安装包体积约 `2.54 MiB`）。
 - **不要**在取件码卡片、弹窗或分享图片中计算并展示「已到 N 天 / 滞留天数」标签。
 - **不要**保留「以文本分享」或「仅复制文本」的分享入口；分享弹窗仅保留**「以图片分享」**。
 - **不要**使用 `NotificationListenerService`（通知监听服务）；仅靠 `READ_SMS` + `SMS_RECEIVED` 广播 + `ContentObserver(content://sms)` 加上手动录入/粘贴短信。
@@ -166,7 +166,18 @@ app/src/main/
     - `r = min(w, h) * 0.2237f`
     - `c = r * 1.28f`（直线切点）
     - `k = r * 0.44f`（三次贝塞尔曲线控制点，实现平滑 G2 曲率过渡）
-  - 桌面小组件同样调用 `loadAppleRoundedIconBitmapForWidget` 对 `ic_brand_taobao.webp`、`ic_brand_cainiao.png`、`ic_brand_pinduoduo.png` 按 `inSampleSize` 降采样后使用同一套 Squircle 路径裁成高清 `Bitmap`（96px）。
+  - 桌面小组件同样调用 `loadAppleRoundedIconBitmapForWidget` 对 `ic_brand_taobao.webp`、`ic_brand_cainiao.png`、`ic_brand_pinduoduo.png` 按 `inSampleSize` 降采样后使用同一套 Squircle 路径裁成高清 `Bitmap`（`72px`）。
+
+### 3.2.1 自适应矢量桌面图标与自定义 Canvas 矢量精确规范
+1. **自适应矢量图标（`ic_launcher.xml` & `ic_launcher_round.xml`）**：均使用 `<adaptive-icon>` 同时配置 `<background android:drawable="@color/launcher_icon_bg" />`、`<foreground android:drawable="@drawable/ic_launcher_foreground" />` 与 `<monochrome android:drawable="@drawable/ic_launcher_foreground" />`。
+   - 颜色自动切换：`values/colors.xml` 设 `launcher_icon_bg = #FFFFFFFF`、`launcher_icon_fg = #FF1C1F23`、`app_window_bg = #FFEEF2F9`；`values-night/colors.xml` 设 `launcher_icon_bg = #FF000000`、`launcher_icon_fg = #FFFFFFFF`、`app_window_bg = #FF0B0D13`（`themes.xml` 设 `forceDarkAllowed = false`）。
+   - `ic_launcher_foreground.xml`（`108dp × 108dp`，`viewport 108×108`）：
+     - 快递盒外框与 Y 型折线（`strokeColor="@color/launcher_icon_fg"`, `strokeWidth="4.0"`, `butt/miter`）：`M54,27.5 L76.95,40.75 L76.95,67.25 L54,80.5 L31.05,67.25 L31.05,40.75 Z M31.05,40.75 L54,54 L76.95,40.75 M54,54 L54,80.5`
+     - 顶部斜跨至右前立面胶带条（`fillColor="@color/launcher_icon_fg"`）：`M40.325,35.396 L44.725,32.855 L67.675,46.105 L67.675,57.605 L63.275,60.146 L63.275,48.646 Z`
+   - 通知小图标 `ic_stat_pickup.xml`（`24dp × 24dp`，纯白描边 `1.9` + 封口胶带）：同比例等轴测纸箱线条。
+2. **自定义 Canvas 矢量图标坐标**：
+   - 首页转发图标 `ForwardArrowIcon(15.dp)`：`tipX = 0.88w`、`tipY = 0.38h`；曲线主干从 `(0.12w, 0.84h)` 经控制点 `(0.14w, 0.44h)`、`(0.42w, tipY)` 至 `(tipX, tipY)`；箭头 `(0.58w, 0.14h) -> (tipX, tipY) -> (0.58w, 0.62h)`，圆角线宽 `1.9.dp`。
+   - 设置页返回图标（`16.dp` 居中于 `36.dp` 圆圈）：以几何中心 `(0.5w, 0.5h)` 对称绘制 `<`：`(0.68w, 0.16h) -> (0.32w, 0.50h) -> (0.68w, 0.84h)`，圆角线宽 `2.3.dp`。
 
 ### 3.3 120Hz 高帧率 Liquid Glass 实现原理
 为了保证低/中端及高刷屏上 `LazyColumn` 满帧 120Hz 零卡顿，**禁止**在滑动列表项中使用耗费 GPU 离屏渲染的 `Modifier.blur` 或动态模糊：
@@ -264,7 +275,8 @@ app/src/main/
 6. **`SharePickupMethodDialog`**：
    - **仅保留「以图片分享」卡片**，标题为 `以图片分享`（加载时显示 `正在准备清单图片...`），**卡片内不再展示下方的「生成高清分组清单长图……」这行小字**。
    - 卡片下方紧接一行可勾选开关按钮：左侧 `22.dp` 圆形复选框，未勾选时（默认）显示 **`不分享备注`**（右侧灰字 `图片中不附带备注`），勾选后显示 **`分享备注`**（右侧灰字 `图片中附带商品备注`）。
-   - 点击「以图片分享」后在 `Dispatchers.IO` 调用 `PickupShareHelper.launchImageShare` 绘制 `1080px` 宽高清液态玻璃 PNG 长图（头部展示 `待取快递清单`、时间、总件数胶囊；各快递房卡片内按自然顺序展示取件码，仅在 `includeRemarks && productName.isNotBlank()` 时绘制备注且动态调整行高 `76f` / `114f`；**不绘制任何「已到 N 天」角标**；底部 watermark `取件码 · 纯本地离线生成`），清理旧缓存并存入 `cacheDir/shared_images/`，通过 `FileProvider` 附带 `ClipData.newUri` 与 `FLAG_GRANT_READ_URI_PERMISSION` 调起系统分享弹窗（可直接发送微信）。分享成功后自动退出分享模式或清空普通勾选态。
+   - 点击「以图片分享」后在 `Dispatchers.IO` 调用 `PickupShareHelper.launchImageShare` 绘制 `1080px` 宽高清液态玻璃 PNG 长图，清理旧缓存并存入 `cacheDir/shared_images/`，通过 `FileProvider` 附带 `ClipData.newUri` 与 `FLAG_GRANT_READ_URI_PERMISSION` 调起系统分享弹窗（可直接发送微信）。分享成功后自动退出分享模式或清空普通勾选态。
+   - **长图精确绘制规范（`PickupShareHelper.renderShareBitmap`）**：画布宽 `1080px`，渐变底色 `0xFFF3F7FD -> 0xFFE9F0FA -> 0xFFF4F7FC` + 左上柔和蓝色径向光晕；外边距 `outerPad = 56f`、卡片内边距 `36f / 30f`、组间 `28f`、行间 `18f`；头部展示 `待取快递清单`（`54f` Bold）、`生成时间 MM-dd HH:mm`（`28f`）及蓝色 `共 N 件` 胶囊；各快递房白底描边圆角卡片内依次显示圆圈序号、名称、`N 件` 胶囊与自然排序的取件码行（`isPickedUp == false`；仅 `includeRemarks && productName.isNotBlank()` 时展示备注且单行高度为 `114f`，否则 `76f`，**不绘制「已到 N 天」标签**）；底部水印 `取件码 · 纯本地离线生成`。
 
 ---
 
@@ -288,8 +300,14 @@ app/src/main/
 
 ## 6. 智能短信解析、数据持久化与去重引擎
 
-### 6.1 默认 1～8 号识别规则（`SettingsDataStore.kt`）
-- 存储键：`KEY_STATION_RULES_JSON = stringPreferencesKey("station_rules_json_v4")`。
+### 6.1 数据模型与默认 1～8 号识别规则（`PickupItemEntity.kt` & `SettingsDataStore.kt`）
+- **Room 数据库（`pickup_code_local.db`, `version = 1`）**：表名 `pickup_items`，建索引 `(code, station_number, created_at)` 与 `(is_picked_up, created_at)`，字段包括 `id`、`code`、`station_number`（`0` 为待分类，`1..100` 为站点编号）、`station_raw_name`、`express_company`（始终为空 `""`）、`product_name`、`is_custom_remark`、`raw_message`、`source`（`"SMS"` | `"MANUAL"`）、`sender_or_package`、`is_picked_up`、`picked_up_at`、`created_at`、`updated_at`。
+- **DataStore 偏好键（`pickup_settings`）**：
+  - `badge_permission_prompted`（默认 `false`）
+  - `show_taobao_identity_banner`（默认 `true`）
+  - `show_cainiao_identity_banner`（默认 `false`）
+  - `show_pinduoduo_identity_banner`（默认 `false`）
+  - `station_rules_json_v4`（JSON 数组，每项字段：`stationNumber`、`displayName`、`badgeNumber`（可为 `null`）、`keywords` 数组）
 - **`defaultStationRules()`**：默认生成编号 **`1..8`** 共 8 个快递房，名称固定为 **`1号快递房` ~ `8号快递房`**，`badgeNumber = 1..8`，并自动预置匹配关键词（以 `num` 为例）：
   `["${num}号快递房", "${num}号房", "${num}号驿站", "${num}号快递站", "${num}号菜鸟"]` + 中文数字（一～十）`["${cn}号快递房", "${cn}号房", "${cn}号驿站"]`。
 
