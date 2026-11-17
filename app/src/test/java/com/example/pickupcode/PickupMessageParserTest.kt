@@ -128,6 +128,18 @@ class PickupMessageParserTest {
     }
 
     @Test
+    fun `provides default rules for stations 1 through 8`() {
+        assertEquals((1..8).toList(), defaultRules.map { it.stationNumber })
+        assertEquals((1..8).map { "${it}号快递房" }, defaultRules.map { it.displayName })
+
+        val sms4 = PickupMessageParser.parse("您的包裹已到4号快递房，凭取件码 3-1-2088 取件。", defaultRules)
+        val sms8 = PickupMessageParser.parse("【菜鸟】请凭取件码 8-2-9012 前往8号房领取。", defaultRules)
+
+        assertEquals(4, sms4.single().stationNumber)
+        assertEquals(8, sms8.single().stationNumber)
+    }
+
+    @Test
     fun `groups and naturally sorts pickup items for share image export`() {
         val now = System.currentTimeMillis()
         val items = listOf(
@@ -159,7 +171,7 @@ class PickupMessageParserTest {
         val groups = com.example.pickupcode.util.PickupShareHelper.groupItemsForShare(items, defaultRules)
 
         assertEquals(1, groups.size)
-        assertEquals("① 家属区1号 京东", "${groups[0].circleSymbol} ${groups[0].displayName}")
+        assertEquals("① 1号快递房", "${groups[0].circleSymbol} ${groups[0].displayName}")
         assertEquals(listOf("2-1-5", "10-1-2"), groups[0].items.map { it.code })
         assertEquals("数据线", groups[0].items[1].productName)
     }

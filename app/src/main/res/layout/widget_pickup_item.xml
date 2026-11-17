@@ -25,7 +25,7 @@
                 android:id="@+id/widget_item_station"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="① 家属区1号"
+                android:text="① 1号快递房"
                 android:textColor="@color/widget_accent_blue"
                 android:textSize="11sp"
                 android:textStyle="bold" />

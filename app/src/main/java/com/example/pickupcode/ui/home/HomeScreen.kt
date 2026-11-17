@@ -3,12 +3,15 @@ package com.example.pickupcode.ui.home
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -101,6 +104,7 @@ fun HomeScreen(
     onToggleShareItem: (PickupItemEntity) -> Unit,
     onRequestSmsPermission: () -> Unit,
     onQuickAddClick: () -> Unit,
+    onQuickAddToStation: (Int) -> Unit,
     onToggleSelectItem: (PickupItemEntity) -> Unit,
     onQuickMarkPickedUp: (PickupItemEntity) -> Unit,
     onQuickDeleteItem: (PickupItemEntity) -> Unit,
@@ -273,6 +277,10 @@ fun HomeScreen(
                     onLongPressItem = onLongPressItem,
                     onClickMoreActions = onClickMoreActions,
                     onClickProductRemark = onClickProductRemark,
+                    onQuickAddToStation = {
+                        activeSwipedItemId = null
+                        onQuickAddToStation(section.stationNumber)
+                    },
                     modifier = Modifier.animateItem(
                         placementSpec = spring(
                             dampingRatio = 0.86f,
@@ -437,74 +445,81 @@ private fun HomeTopHeader(
             Spacer(modifier = Modifier.width(8.dp))
 
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = 0.88f,
-                        stiffness = 460f
-                    )
-                )
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // 正常与普通勾选状态下均保留「分享取件码」入口；进入专用分享选择模式后底部已有主按钮则自动收起
+                // 正常与普通勾选状态下均保留「分享取件码」入口；进入专用分享选择模式后同步收起避免与「取消」碰撞抖动
                 AnimatedVisibility(
                     visible = headerMode != HomeHeaderMode.SHARE_SELECT,
-                    enter = fadeIn(animationSpec = spring(stiffness = 460f)) +
-                        scaleIn(
-                            initialScale = 0.90f,
-                            animationSpec = spring(stiffness = 460f)
-                        ),
-                    exit = fadeOut(animationSpec = spring(stiffness = 520f)) +
-                        scaleOut(
-                            targetScale = 0.90f,
-                            animationSpec = spring(stiffness = 520f)
-                        )
+                    enter = fadeIn(
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
+                    ) + expandHorizontally(
+                        expandFrom = Alignment.End,
+                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                    ),
+                    exit = fadeOut(
+                        animationSpec = tween(durationMillis = 100, easing = FastOutSlowInEasing)
+                    ) + shrinkHorizontally(
+                        shrinkTowards = Alignment.End,
+                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                    )
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .height(36.dp)
-                            .clip(RoundedCornerShape(AppleCorners.Pill))
-                            .background(primaryColor.copy(alpha = 0.14f))
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onEnterShareMode()
-                            }
-                            .padding(horizontal = 12.dp)
-                    ) {
-                        ForwardArrowIcon(
-                            tint = primaryColor,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = "分享取件码",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            ),
-                            color = primaryColor,
-                            softWrap = false,
-                            maxLines = 1
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(AppleCorners.Pill))
+                                .background(primaryColor.copy(alpha = 0.14f))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onEnterShareMode()
+                                }
+                                .padding(horizontal = 12.dp)
+                        ) {
+                            ForwardArrowIcon(
+                                tint = primaryColor,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "分享取件码",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                ),
+                                color = primaryColor,
+                                softWrap = false,
+                                maxLines = 1
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
                     }
                 }
 
-                // 最右侧：普通模式展示极简设置齿轮，勾选/分享选择状态下切换为「取消」以退出勾选状态
+                // 最右侧：右边缘锚定，普通模式展示设置齿轮，勾选/分享选择状态下平滑过渡为「取消」
                 AnimatedContent(
                     targetState = headerMode == HomeHeaderMode.NORMAL,
                     transitionSpec = {
-                        (fadeIn(animationSpec = spring(stiffness = 460f)) +
-                            scaleIn(
-                                initialScale = 0.88f,
-                                animationSpec = spring(stiffness = 460f)
-                            )) togetherWith
-                            (fadeOut(animationSpec = spring(stiffness = 520f)) +
-                                scaleOut(
-                                    targetScale = 0.88f,
-                                    animationSpec = spring(stiffness = 520f)
-                                )) using SizeTransform(clip = false)
+                        (fadeIn(
+                            animationSpec = tween(
+                                durationMillis = 180,
+                                delayMillis = 20,
+                                easing = FastOutSlowInEasing
+                            )
+                        ) + scaleIn(
+                            initialScale = 0.88f,
+                            animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                        )) togetherWith
+                            (fadeOut(
+                                animationSpec = tween(durationMillis = 110, easing = FastOutSlowInEasing)
+                            ) + scaleOut(
+                                targetScale = 0.88f,
+                                animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing)
+                            )) using SizeTransform(clip = false) { _, _ ->
+                            tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                        }
                     },
+                    contentAlignment = Alignment.CenterEnd,
                     label = "home_header_trailing_transition"
                 ) { isNormalMode ->
                     if (isNormalMode) {
@@ -539,7 +554,7 @@ private fun HomeTopHeader(
                                 )
                                 .clickable {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    if (headerMode == HomeHeaderMode.SHARE_SELECT) {
+                                    if (isShareSelectionMode) {
                                         onExitShareMode()
                                     } else {
                                         onClearPickupSelection()

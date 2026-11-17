@@ -191,6 +191,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     var activeEditProductItem by remember { mutableStateOf<PickupItemEntity?>(null) }
     var activeLongPressItem by remember { mutableStateOf<PickupItemEntity?>(null) }
     var showAddOrPasteDialog by remember { mutableStateOf(false) }
+    var quickAddTargetStation by remember { mutableStateOf<Int?>(null) }
     var showNotificationBadgeDialog by remember { mutableStateOf(false) }
     var awaitingBadgeDialogAfterStartupPrompt by remember { mutableStateOf(false) }
     var hasTriggeredInitialPermissionFlow by remember { mutableStateOf(false) }
@@ -414,7 +415,14 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                             }
                         },
                         onRequestSmsPermission = requestSmsPermissions,
-                        onQuickAddClick = { showAddOrPasteDialog = true },
+                        onQuickAddClick = {
+                            quickAddTargetStation = null
+                            showAddOrPasteDialog = true
+                        },
+                        onQuickAddToStation = { stationNumber ->
+                            quickAddTargetStation = stationNumber
+                            showAddOrPasteDialog = true
+                        },
                         onToggleSelectItem = viewModel::toggleSelectItem,
                         onQuickMarkPickedUp = viewModel::markSingleItemPickedUp,
                         onQuickDeleteItem = viewModel::deleteItem,
@@ -433,7 +441,10 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         onConfirmPickedUp = viewModel::confirmSelectedPickedUp,
                         onDeleteSelected = viewModel::deleteSelectedItems,
                         onUndoPickedUp = viewModel::undoRecentPickedUp,
-                        onQuickAddClick = { showAddOrPasteDialog = true },
+                        onQuickAddClick = {
+                            quickAddTargetStation = null
+                            showAddOrPasteDialog = true
+                        },
                         onConfirmShareClick = {
                             if (activeShareSelectedItems.isNotEmpty()) {
                                 showShareMethodDialog = true
@@ -561,12 +572,18 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         )
     }
 
-    // 4. 添加取件码弹窗（默认手动输入取件码）
+    // 4. 添加取件码弹窗（支持从首页快递房卡片右上角「+」直接归入该快递房）
     if (showAddOrPasteDialog) {
         AddOrPastePickupDialog(
             stationRules = settings.stationRules,
-            onDismiss = { showAddOrPasteDialog = false },
-            onPasteParse = viewModel::pasteAndParseSms,
+            initialStationNumber = quickAddTargetStation,
+            onDismiss = {
+                showAddOrPasteDialog = false
+                quickAddTargetStation = null
+            },
+            onPasteParse = { rawText, preferredStation ->
+                viewModel.pasteAndParseSms(rawText, preferredStation)
+            },
             onManualAdd = viewModel::addManualPickupCode
         )
     }

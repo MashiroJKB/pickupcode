@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.EditNote
@@ -58,8 +59,6 @@ import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.AppleGreenDark
 import com.example.pickupcode.ui.theme.AppleGreenLight
-import com.example.pickupcode.ui.theme.AppleOrangeDark
-import com.example.pickupcode.ui.theme.AppleOrangeLight
 import com.example.pickupcode.ui.theme.AppleRedDark
 import com.example.pickupcode.ui.theme.AppleRedLight
 import com.example.pickupcode.ui.theme.PickupCodeMonospaceStyle
@@ -138,9 +137,11 @@ fun StationGroupCard(
     onLongPressItem: (PickupItemEntity) -> Unit,
     onClickMoreActions: (PickupItemEntity) -> Unit,
     onClickProductRemark: (PickupItemEntity) -> Unit,
+    onQuickAddToStation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
+    val haptic = LocalHapticFeedback.current
     val accentColor = stationAccentColor(badgeNumber ?: stationNumber, isDark)
 
     Column(
@@ -202,21 +203,47 @@ fun StationGroupCard(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(AppleCorners.Pill))
-                    .background(accentColor)
-                    .padding(horizontal = 11.dp, vertical = 4.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = "${items.size} 件",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = Color.White,
-                    softWrap = false,
-                    maxLines = 1
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(AppleCorners.Pill))
+                        .background(accentColor)
+                        .padding(horizontal = 11.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "${items.size} 件",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = Color.White,
+                        softWrap = false,
+                        maxLines = 1
+                    )
+                }
+
+                if (!isShareSelectionMode) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(accentColor.copy(alpha = 0.14f))
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onQuickAddToStation()
+                            }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = "添加取件码到$stationDisplayName",
+                            tint = accentColor,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
         }
 
@@ -275,7 +302,6 @@ fun SwipeablePickupItemCard(
 
     val checkGreen = if (isDark) AppleGreenDark else AppleGreenLight
     val deleteRed = if (isDark) AppleRedDark else AppleRedLight
-    val warnOrange = if (isDark) AppleOrangeDark else AppleOrangeLight
 
     val openRevealPx = remember(density) { with(density) { 140.dp.toPx() } }
     val offsetX = remember { Animatable(0f) }
@@ -310,10 +336,6 @@ fun SwipeablePickupItemCard(
             offsetX.snapTo(next)
         }
     }
-
-    // 计算滞留天数角标（超过 24 小时显示柔和橙色/红色「已到 N 天」标签）
-    val elapsedHours = (System.currentTimeMillis() - item.createdAt) / 3_600_000L
-    val retentionDays = if (elapsedHours >= 24L) (elapsedHours / 24L).toInt() else 0
 
     val checkScale by animateFloatAsState(
         targetValue = if (isSelected) 1.08f else 1f,
@@ -547,46 +569,19 @@ fun SwipeablePickupItemCard(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // 中部：取件码 + 滞留天数角标 + 下方商品备注
+            // 中部：取件码与商品备注
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Text(
+                    text = item.code,
+                    style = PickupCodeMonospaceStyle.copy(fontSize = codeFontSize),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    softWrap = false,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = item.code,
-                        style = PickupCodeMonospaceStyle.copy(fontSize = codeFontSize),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        softWrap = false,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-
-                    if (retentionDays >= 1) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        val tagColor = if (retentionDays >= 2) deleteRed else warnOrange
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(tagColor.copy(alpha = 0.15f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "已到 ${retentionDays} 天",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp
-                                ),
-                                color = tagColor,
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                }
+                )
 
                 Spacer(modifier = Modifier.height(4.dp))
 

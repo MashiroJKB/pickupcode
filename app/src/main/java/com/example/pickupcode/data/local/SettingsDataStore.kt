@@ -269,7 +269,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_SHOW_TAOBAO_IDENTITY = booleanPreferencesKey("show_taobao_identity_banner")
         private val KEY_SHOW_CAINIAO_IDENTITY = booleanPreferencesKey("show_cainiao_identity_banner")
         private val KEY_SHOW_PINDUODUO_IDENTITY = booleanPreferencesKey("show_pinduoduo_identity_banner")
-        private val KEY_STATION_RULES_JSON = stringPreferencesKey("station_rules_json_v3")
+        private val KEY_STATION_RULES_JSON = stringPreferencesKey("station_rules_json_v4")
 
         private val CHINESE_NUMERALS = mapOf(
             1 to "一",
@@ -301,18 +301,10 @@ class SettingsDataStore(private val context: Context) {
         }
 
         fun defaultStationRules(): List<StationRule> {
-            val defaultStations = listOf(
-                1 to "家属区1号 京东",
-                2 to "家属区2号",
-                3 to "家属区3号",
-                5 to "田径场5号 顺丰",
-                6 to "田径场6号 极兔",
-                7 to "田径场7号 中通"
-            )
-            return defaultStations.map { (num, name) ->
+            return (1..8).map { num ->
                 StationRule(
                     stationNumber = num,
-                    displayName = name,
+                    displayName = "${num}号快递房",
                     keywords = defaultKeywordsForNumber(num),
                     badgeNumber = num
                 )

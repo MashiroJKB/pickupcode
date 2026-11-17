@@ -41,7 +41,8 @@ class PickupRepository(
         rawText: String,
         source: String,
         senderOrPackage: String = "",
-        messageTimestamp: Long = System.currentTimeMillis()
+        messageTimestamp: Long = System.currentTimeMillis(),
+        preferredStationNumber: Int? = null
     ): Int = withContext(Dispatchers.IO) {
         val settings = settingsDataStore.settingsFlow.first()
         val parsedList = PickupMessageParser.parse(
@@ -50,11 +51,30 @@ class PickupRepository(
         )
         if (parsedList.isEmpty()) return@withContext 0
 
+        val preferredRuleName = preferredStationNumber?.let { targetNum ->
+            if (targetNum > 0) {
+                settings.stationRules.firstOrNull { it.stationNumber == targetNum }?.displayName
+                    ?: "${targetNum}号快递房"
+            } else {
+                ""
+            }
+        }
+        val effectiveParsedList = if (preferredStationNumber != null) {
+            parsedList.map { parsed ->
+                parsed.copy(
+                    stationNumber = preferredStationNumber,
+                    stationRawName = preferredRuleName ?: parsed.stationRawName
+                )
+            }
+        } else {
+            parsedList
+        }
+
         ingestMutex.withLock {
             var affectedCount = 0
             val windowStart = System.currentTimeMillis() - RETENTION_SEVEN_DAYS_MILLIS
 
-            for (parsed in parsedList) {
+            for (parsed in effectiveParsedList) {
                 val recentCandidates = pickupDao.findRecentByCode(
                     code = parsed.code,
                     sinceTimestamp = windowStart

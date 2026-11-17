@@ -255,10 +255,6 @@ object PickupShareHelper {
             color = 0xFF475569.toInt()
             textSize = 27f
         }
-        val badgeTextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = 24f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        }
 
         var cursorY = outerPad + headerHeight
         groups.forEach { group ->
@@ -322,16 +318,9 @@ object PickupShareHelper {
 
                 val rowLeft = rowRect.left + 26f
                 val rowRight = rowRect.right - 26f
-                val retentionDays = ((nowMs - item.createdAt) / 3_600_000L / 24L).toInt()
                 val showRemark = includeRemarks && item.productName.isNotBlank()
 
-                var tagWidth = 0f
-                val tagLabel = if (retentionDays >= 1) "已到 $retentionDays 天" else ""
-                if (tagLabel.isNotEmpty()) {
-                    tagWidth = badgeTextPaint.measureText(tagLabel) + 28f + 16f
-                }
-
-                val maxCodeWidth = (rowRight - rowLeft - tagWidth).coerceAtLeast(180f)
+                val maxCodeWidth = (rowRight - rowLeft).coerceAtLeast(180f)
                 val codeText = TextUtils.ellipsize(
                     item.code,
                     codePaint,
@@ -342,23 +331,6 @@ object PickupShareHelper {
                 val codeCenterY = if (showRemark) rowRect.top + 42f else rowRect.centerY()
                 val codeBaseY = codeCenterY - (codePaint.descent() + codePaint.ascent()) / 2f
                 canvas.drawText(codeText, rowLeft, codeBaseY, codePaint)
-
-                if (tagLabel.isNotEmpty()) {
-                    val codeMeasuredW = codePaint.measureText(codeText)
-                    val tagLeft = (rowLeft + codeMeasuredW + 16f).coerceAtMost(rowRight - (tagWidth - 16f))
-                    val tagRect = RectF(
-                        tagLeft,
-                        codeCenterY - 19f,
-                        tagLeft + (tagWidth - 16f),
-                        codeCenterY + 19f
-                    )
-                    val isUrgent = retentionDays >= 2
-                    pillBgPaint.color = if (isUrgent) 0x26FF3B30 else 0x26FF9500
-                    canvas.drawRoundRect(tagRect, 10f, 10f, pillBgPaint)
-                    badgeTextPaint.color = if (isUrgent) 0xFFFF3B30.toInt() else 0xFFFF9500.toInt()
-                    val tBaseY = tagRect.centerY() - (badgeTextPaint.descent() + badgeTextPaint.ascent()) / 2f
-                    canvas.drawText(tagLabel, tagRect.left + 14f, tBaseY, badgeTextPaint)
-                }
 
                 if (showRemark) {
                     val ellipsizedRemark = TextUtils.ellipsize(

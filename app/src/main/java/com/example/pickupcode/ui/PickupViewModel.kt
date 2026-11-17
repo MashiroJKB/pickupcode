@@ -229,12 +229,16 @@ class PickupViewModel(
         }
     }
 
-    fun pasteAndParseSms(rawText: String) {
+    fun pasteAndParseSms(
+        rawText: String,
+        preferredStationNumber: Int? = null
+    ) {
         viewModelScope.launch {
             val count = repository.ingestRawMessage(
                 rawText = rawText,
                 source = PickupItemEntity.SOURCE_MANUAL,
-                senderOrPackage = "clipboard"
+                senderOrPackage = "clipboard",
+                preferredStationNumber = preferredStationNumber
             )
             if (count > 0) {
                 showCapsuleToast("智能解析成功：提取 $count 个取件码")

@@ -454,7 +454,9 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
+                            softWrap = false,
+                            maxLines = 1
                         )
                     }
 
@@ -483,7 +485,9 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
+                            softWrap = false,
+                            maxLines = 1
                         )
                     }
                 }

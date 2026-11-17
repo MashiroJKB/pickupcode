@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -399,13 +402,14 @@ fun EditProductRemarkDialog(
 }
 
 /**
- * 3. 添加取件码弹窗（默认选中「手动输入取件码」，切换标签时高度固定不跳动）
+ * 3. 添加取件码弹窗（支持指定默认快递房直达添加，默认选中「手动输入取件码」，切换标签时高度固定不跳动）
  */
 @Composable
 fun AddOrPastePickupDialog(
     stationRules: List<StationRule>,
+    initialStationNumber: Int? = null,
     onDismiss: () -> Unit,
-    onPasteParse: (String) -> Unit,
+    onPasteParse: (String, Int?) -> Unit,
     onManualAdd: (code: String, stationNumber: Int, productName: String) -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
@@ -413,19 +417,75 @@ fun AddOrPastePickupDialog(
     // 默认 tabIndex = 0 即「手动输入取件码」
     var tabIndex by remember { mutableIntStateOf(0) }
     var manualCode by remember { mutableStateOf("") }
-    var manualStation by remember {
-        mutableIntStateOf(stationRules.firstOrNull()?.stationNumber ?: 1)
+    var manualStation by remember(initialStationNumber, stationRules) {
+        mutableIntStateOf(initialStationNumber ?: stationRules.firstOrNull()?.stationNumber ?: 1)
     }
     var manualProduct by remember { mutableStateOf("") }
     var rawSmsInput by remember { mutableStateOf("") }
 
+    val stationListState = rememberLazyListState()
+    val targetRule = remember(initialStationNumber, stationRules) {
+        initialStationNumber?.let { target ->
+            stationRules.firstOrNull { it.stationNumber == target }
+        }
+    }
+    val targetStationLabel = remember(initialStationNumber, targetRule) {
+        when {
+            initialStationNumber == null -> null
+            initialStationNumber == 0 -> "？ 待分类快递房"
+            targetRule != null -> "${targetRule.circleSymbol} ${targetRule.displayName}"
+            else -> "${PickupItemEntity.stationCircleSymbolFor(initialStationNumber)} ${initialStationNumber}号快递房"
+        }
+    }
+    val targetStationAccent = remember(initialStationNumber, targetRule, isDark) {
+        initialStationNumber?.let { target ->
+            stationAccentColor(targetRule?.badgeNumber ?: target, isDark)
+        } ?: primaryColor
+    }
+
+    LaunchedEffect(initialStationNumber, stationRules) {
+        val target = initialStationNumber ?: return@LaunchedEffect
+        val targetIndex = stationRules.indexOfFirst { it.stationNumber == target }
+        if (targetIndex >= 0) {
+            val scrollIdx = if (initialStationNumber == 0) targetIndex + 1 else targetIndex
+            stationListState.scrollToItem(scrollIdx)
+        }
+    }
+
     SpringGlassDialog(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "添加取件码",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "添加取件码",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    softWrap = false,
+                    maxLines = 1
+                )
+                if (targetStationLabel != null) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .clip(RoundedCornerShape(AppleCorners.Pill))
+                            .background(targetStationAccent.copy(alpha = 0.14f))
+                            .padding(horizontal = 9.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = targetStationLabel,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = targetStationAccent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(
@@ -480,7 +540,7 @@ fun AddOrPastePickupDialog(
                             shape = RoundedCornerShape(AppleCorners.InnerCard),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        if (stationRules.isNotEmpty()) {
+                        if (stationRules.isNotEmpty() || initialStationNumber == 0) {
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
                                 text = "选择快递房：",
@@ -490,13 +550,39 @@ fun AddOrPastePickupDialog(
                                 maxLines = 1
                             )
                             Spacer(modifier = Modifier.height(6.dp))
-                            Row(
+                            LazyRow(
+                                state = stationListState,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                stationRules.forEach { rule ->
+                                if (initialStationNumber == 0) {
+                                    item(key = "station_chip_0") {
+                                        val selected = manualStation == 0
+                                        val accent = stationAccentColor(0, isDark)
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                                                .background(if (selected) accent else accent.copy(alpha = 0.14f))
+                                                .clickable { manualStation = 0 }
+                                                .padding(horizontal = 10.dp, vertical = 7.dp)
+                                        ) {
+                                            Text(
+                                                text = "？ 待分类",
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    fontWeight = FontWeight.Bold
+                                                ),
+                                                color = if (selected) Color.White else accent,
+                                                softWrap = false,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                }
+                                items(
+                                    items = stationRules,
+                                    key = { "station_chip_${it.stationNumber}" }
+                                ) { rule ->
                                     val num = rule.stationNumber
                                     val selected = manualStation == num
                                     val accent = stationAccentColor(rule.badgeNumber ?: num, isDark)
@@ -556,7 +642,11 @@ fun AddOrPastePickupDialog(
                 } else {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "支持多码合并短信，自动拆分为独立记录",
+                            text = if (targetStationLabel != null) {
+                                "粘贴短信解析后将直接归入「$targetStationLabel」"
+                            } else {
+                                "支持多码合并短信，自动拆分为独立记录"
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -589,7 +679,7 @@ fun AddOrPastePickupDialog(
                         Button(
                             enabled = rawSmsInput.isNotBlank(),
                             onClick = {
-                                onPasteParse(rawSmsInput)
+                                onPasteParse(rawSmsInput, initialStationNumber)
                                 onDismiss()
                             },
                             shape = RoundedCornerShape(AppleCorners.InnerCard)
