@@ -91,6 +91,7 @@ fun HomeScreen(
     onEnterShareMode: () -> Unit,
     onExitShareMode: () -> Unit,
     onToggleSelectAllForShare: () -> Unit,
+    onToggleSelectAllForPickup: () -> Unit,
     onToggleShareItem: (PickupItemEntity) -> Unit,
     onRequestSmsPermission: () -> Unit,
     onQuickAddClick: () -> Unit,
@@ -178,14 +179,21 @@ fun HomeScreen(
     ) {
         item(key = "home_header", contentType = "header") {
             val pendingCount = pendingItems.size
-            val activeShareSelectedCount = remember(pendingItems, shareSelectedIds) {
-                val pendingIds = pendingItems.asSequence().map { it.id }.toSet()
+            val pendingIds = remember(pendingItems) {
+                pendingItems.asSequence().map { it.id }.toSet()
+            }
+            val activePickupSelectedCount = remember(pendingIds, selectedItemIds) {
+                selectedItemIds.count { it in pendingIds }
+            }
+            val activeShareSelectedCount = remember(pendingIds, shareSelectedIds) {
                 shareSelectedIds.count { it in pendingIds }
             }
             HomeTopHeader(
                 totalPending = pendingCount,
                 activeStationCount = activeStationCount,
                 hasSmsPermission = hasSmsPermission,
+                pickupSelectedCount = activePickupSelectedCount,
+                allSelectedForPickup = pendingCount > 0 && activePickupSelectedCount == pendingCount,
                 isShareSelectionMode = isShareSelectionMode,
                 shareSelectedCount = activeShareSelectedCount,
                 allSelectedForShare = pendingCount > 0 && activeShareSelectedCount == pendingCount,
@@ -193,6 +201,7 @@ fun HomeScreen(
                 onEnterShareMode = onEnterShareMode,
                 onExitShareMode = onExitShareMode,
                 onToggleSelectAllForShare = onToggleSelectAllForShare,
+                onToggleSelectAllForPickup = onToggleSelectAllForPickup,
                 onRequestSmsPermission = onRequestSmsPermission,
                 isDark = isDark
             )
@@ -251,11 +260,19 @@ fun HomeScreen(
     }
 }
 
+private enum class HomeHeaderMode {
+    NORMAL,
+    PICKUP_SELECT,
+    SHARE_SELECT
+}
+
 @Composable
 private fun HomeTopHeader(
     totalPending: Int,
     activeStationCount: Int,
     hasSmsPermission: Boolean,
+    pickupSelectedCount: Int,
+    allSelectedForPickup: Boolean,
     isShareSelectionMode: Boolean,
     shareSelectedCount: Int,
     allSelectedForShare: Boolean,
@@ -263,12 +280,18 @@ private fun HomeTopHeader(
     onEnterShareMode: () -> Unit,
     onExitShareMode: () -> Unit,
     onToggleSelectAllForShare: () -> Unit,
+    onToggleSelectAllForPickup: () -> Unit,
     onRequestSmsPermission: () -> Unit,
     isDark: Boolean
 ) {
     val haptic = LocalHapticFeedback.current
     val statusAmber = if (isDark) AppleOrangeDark else AppleOrangeLight
     val primaryColor = MaterialTheme.colorScheme.primary
+    val headerMode = when {
+        isShareSelectionMode -> HomeHeaderMode.SHARE_SELECT
+        pickupSelectedCount > 0 -> HomeHeaderMode.PICKUP_SELECT
+        else -> HomeHeaderMode.NORMAL
+    }
 
     Column(
         modifier = Modifier
@@ -276,40 +299,51 @@ private fun HomeTopHeader(
             .padding(horizontal = 2.dp)
     ) {
         AnimatedContent(
-            targetState = isShareSelectionMode,
+            targetState = headerMode,
             transitionSpec = {
                 fadeIn(animationSpec = spring(stiffness = 460f)) togetherWith
                     fadeOut(animationSpec = spring(stiffness = 520f))
             },
             label = "home_header_mode_transition"
-        ) { inShareMode ->
-            if (inShareMode) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(40.dp)
-                ) {
+        ) { mode ->
+            val showSelectAllOnLeft = mode != HomeHeaderMode.NORMAL
+            val isAllSelected = if (mode == HomeHeaderMode.SHARE_SELECT) {
+                allSelectedForShare
+            } else {
+                allSelectedForPickup
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+            ) {
+                if (showSelectAllOnLeft) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .height(36.dp)
                             .clip(RoundedCornerShape(AppleCorners.Pill))
                             .background(
-                                if (allSelectedForShare) primaryColor
+                                if (isAllSelected) primaryColor
                                 else primaryColor.copy(alpha = 0.14f)
                             )
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onToggleSelectAllForShare()
+                                if (mode == HomeHeaderMode.SHARE_SELECT) {
+                                    onToggleSelectAllForShare()
+                                } else {
+                                    onToggleSelectAllForPickup()
+                                }
                             }
                             .padding(horizontal = 14.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.DoneAll,
                             contentDescription = "全选",
-                            tint = if (allSelectedForShare) Color.White else primaryColor,
+                            tint = if (isAllSelected) Color.White else primaryColor,
                             modifier = Modifier.size(17.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -319,48 +353,12 @@ private fun HomeTopHeader(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             ),
-                            color = if (allSelectedForShare) Color.White else primaryColor,
+                            color = if (isAllSelected) Color.White else primaryColor,
                             softWrap = false,
                             maxLines = 1
                         )
                     }
-
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .height(36.dp)
-                            .clip(RoundedCornerShape(AppleCorners.Pill))
-                            .background(
-                                MaterialTheme.colorScheme.onSurface.copy(
-                                    alpha = if (isDark) 0.14f else 0.08f
-                                )
-                            )
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onExitShareMode()
-                            }
-                            .padding(horizontal = 16.dp)
-                    ) {
-                        Text(
-                            text = "取消",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            softWrap = false,
-                            maxLines = 1
-                        )
-                    }
-                }
-            } else {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(40.dp)
-                ) {
+                } else {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
@@ -402,9 +400,39 @@ private fun HomeTopHeader(
                             }
                         }
                     }
+                }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
+                if (mode == HomeHeaderMode.SHARE_SELECT) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(AppleCorners.Pill))
+                            .background(
+                                MaterialTheme.colorScheme.onSurface.copy(
+                                    alpha = if (isDark) 0.14f else 0.08f
+                                )
+                            )
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onExitShareMode()
+                            }
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        Text(
+                            text = "取消",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                    }
+                } else {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -467,6 +495,8 @@ private fun HomeTopHeader(
             text = when {
                 isShareSelectionMode ->
                     "已选 $shareSelectedCount / $totalPending 件 · 点击卡片或「全选」"
+                pickupSelectedCount > 0 ->
+                    "已选 $pickupSelectedCount / $totalPending 件 · 点击「全选」或底部操作"
                 totalPending > 0 && activeStationCount > 0 ->
                     "当前 $totalPending 件待取 · 分布在 $activeStationCount 个快递房"
                 totalPending > 0 ->

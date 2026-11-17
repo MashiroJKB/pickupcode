@@ -1,7 +1,6 @@
 package com.example.pickupcode.util
 
 import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -12,7 +11,6 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
-import android.net.Uri
 import android.text.TextPaint
 import android.text.TextUtils
 import androidx.compose.ui.graphics.toArgb
@@ -80,69 +78,17 @@ object PickupShareHelper {
             }
     }
 
-    fun buildShareText(
-        items: List<PickupItemEntity>,
-        stationRules: List<StationRule>
-    ): String {
-        val groups = groupItemsForShare(items, stationRules)
-        if (groups.isEmpty()) return ""
-        val total = groups.sumOf { it.items.size }
-        return buildString {
-            append("【待取快递清单 · 共 ").append(total).append(" 件】\n")
-            groups.forEachIndexed { idx, group ->
-                if (idx > 0) append('\n')
-                append('\n').append(group.circleSymbol).append(' ').append(group.displayName)
-                group.items.forEach { item ->
-                    append("\n  • ").append(item.code)
-                    if (item.productName.isNotBlank()) {
-                        append("（").append(item.productName).append('）')
-                    }
-                    val retentionDays = ((System.currentTimeMillis() - item.createdAt) / 3_600_000L / 24L).toInt()
-                    if (retentionDays >= 1) {
-                        append(" [已到 ").append(retentionDays).append(" 天]")
-                    }
-                }
-            }
-        }
-    }
-
-    fun copyTextToClipboard(context: Context, text: String) {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-        clipboard?.setPrimaryClip(ClipData.newPlainText("取件码清单", text))
-    }
-
-    fun launchTextShare(
-        context: Context,
-        items: List<PickupItemEntity>,
-        stationRules: List<StationRule>
-    ): Boolean {
-        val text = buildShareText(items, stationRules)
-        if (text.isBlank()) return false
-        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
-        val chooser = Intent.createChooser(sendIntent, "分享取件码").apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        return try {
-            context.startActivity(chooser)
-            true
-        } catch (_: Exception) {
-            false
-        }
-    }
-
     suspend fun launchImageShare(
         context: Context,
         items: List<PickupItemEntity>,
-        stationRules: List<StationRule>
+        stationRules: List<StationRule>,
+        includeRemarks: Boolean
     ): Boolean = withContext(Dispatchers.IO) {
         val groups = groupItemsForShare(items, stationRules)
         if (groups.isEmpty()) return@withContext false
 
         val uri = try {
-            val bitmap = renderShareBitmap(groups)
+            val bitmap = renderShareBitmap(groups, includeRemarks = includeRemarks)
             val cacheDir = File(context.cacheDir, "shared_images").apply {
                 mkdirs()
                 listFiles()?.forEach { oldFile ->
@@ -179,7 +125,10 @@ object PickupShareHelper {
         }
     }
 
-    private fun renderShareBitmap(groups: List<ShareStationGroup>): Bitmap {
+    private fun renderShareBitmap(
+        groups: List<ShareStationGroup>,
+        includeRemarks: Boolean
+    ): Bitmap {
         val width = 1080
         val outerPad = 56f
         val cardWidth = width - outerPad * 2f
@@ -196,7 +145,7 @@ object PickupShareHelper {
         val totalCount = groups.sumOf { it.items.size }
 
         fun rowHeightFor(item: PickupItemEntity): Float {
-            return if (item.productName.isNotBlank()) 114f else 76f
+            return if (includeRemarks && item.productName.isNotBlank()) 114f else 76f
         }
 
         var contentHeight = outerPad + headerHeight
@@ -374,6 +323,7 @@ object PickupShareHelper {
                 val rowLeft = rowRect.left + 26f
                 val rowRight = rowRect.right - 26f
                 val retentionDays = ((nowMs - item.createdAt) / 3_600_000L / 24L).toInt()
+                val showRemark = includeRemarks && item.productName.isNotBlank()
 
                 var tagWidth = 0f
                 val tagLabel = if (retentionDays >= 1) "已到 $retentionDays 天" else ""
@@ -389,7 +339,7 @@ object PickupShareHelper {
                     TextUtils.TruncateAt.END
                 ).toString()
 
-                val codeCenterY = if (item.productName.isNotBlank()) rowRect.top + 42f else rowRect.centerY()
+                val codeCenterY = if (showRemark) rowRect.top + 42f else rowRect.centerY()
                 val codeBaseY = codeCenterY - (codePaint.descent() + codePaint.ascent()) / 2f
                 canvas.drawText(codeText, rowLeft, codeBaseY, codePaint)
 
@@ -410,7 +360,7 @@ object PickupShareHelper {
                     canvas.drawText(tagLabel, tagRect.left + 14f, tBaseY, badgeTextPaint)
                 }
 
-                if (item.productName.isNotBlank()) {
+                if (showRemark) {
                     val ellipsizedRemark = TextUtils.ellipsize(
                         item.productName,
                         remarkPaint,

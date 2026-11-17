@@ -53,9 +53,9 @@ object PickupMessageParser {
         """(?<![A-Za-z0-9-])(?:[A-Za-z0-9]{1,5}-\d{1,4}-\d{1,6}|[A-Za-z]{1,3}\d{0,3}-\d{3,6}|\d{1,4}-\d{3,6})(?![A-Za-z0-9-])"""
     )
 
-    // 紧跟在取件码关键词后的单码或多码片段
+    // 紧跟在取件码关键词后的单码或多码片段（允许换行后直接接取件码，并在非码字符或换行处自然结束）
     private val CONTEXTUAL_BLOCK_REGEX = Regex(
-        """(?:取件码|提货码|取货码|取件编号|包裹码|开箱码|取件密码|凭码|凭)\s*(?:为|是)?\s*[:：]?\s*([A-Za-z0-9\-、,，/或及和与\s]{3,80}?)(?=到|至|前往|去|在|来|取件|提货|取货|领取|，|。|；|！|\(|（|请|及时|详询|联系|$)"""
+        """(?:取件码|提货码|取货码|取件编号|包裹码|开箱码|取件密码|凭码|凭)\s*(?:为|是)?\s*[:：]?\s*([A-Za-z0-9\-、,，/或及和与 \t]{3,80})(?=[^A-Za-z0-9\-]|$)"""
     )
 
     // 拆分多码连接符
@@ -125,6 +125,71 @@ object PickupMessageParser {
                 rawMessage = text
             )
         }
+    }
+
+    /**
+     * 针对截图 OCR 文本的兼容解析：
+     * 1. 规整全角数字、长短横线及空格（如 `1 - 2 - 3045` -> `1-2-3045`）。
+     * 2. 按行剔除验证码与页面底部干扰广告词，避免整张截图被误过滤。
+     * 3. 当包含强特征词或匹配到用户配置快递房规则时，提取有效取件码并生成待取记录。
+     */
+    fun parseFromOcr(
+        rawOcrText: String,
+        stationRules: List<StationRule>
+    ): List<ParsedPickupResult> {
+        val normalized = normalizeOcrText(rawOcrText)
+        if (normalized.length < 4) return emptyList()
+
+        // 逐行剔除验证码干扰行，同时保留其余正文上下文
+        val filteredLines = normalized
+            .lines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .filterNot { line ->
+                EXCLUDE_VERIFICATION_KEYWORDS.any { line.contains(it, ignoreCase = true) } ||
+                    EXCLUDE_MARKETING_OR_DONE_KEYWORDS.any { line.contains(it, ignoreCase = true) }
+            }
+
+        val cleanedText = filteredLines.joinToString("\n").trim()
+        if (cleanedText.length < 4) return emptyList()
+
+        val (stationNumber, stationRawName) = matchStation(cleanedText, stationRules)
+        val hasPickupSignal = STRONG_PICKUP_KEYWORDS.any { cleanedText.contains(it, ignoreCase = true) } ||
+            stationNumber > 0 ||
+            HYPHENATED_CODE_REGEX.containsMatchIn(cleanedText)
+
+        if (!hasPickupSignal) return emptyList()
+
+        val codes = extractPickupCodes(cleanedText)
+        if (codes.isEmpty()) return emptyList()
+
+        val productName = extractProductName(cleanedText)
+        return codes.map { code ->
+            ParsedPickupResult(
+                code = code,
+                stationNumber = stationNumber,
+                stationRawName = stationRawName,
+                productName = productName,
+                rawMessage = cleanedText
+            )
+        }
+    }
+
+    private fun normalizeOcrText(raw: String): String {
+        val sb = StringBuilder(raw.length)
+        for (ch in raw) {
+            when (ch) {
+                in '０'..'９' -> sb.append(('0'.code + (ch.code - '０'.code)).toChar())
+                in 'Ａ'..'Ｚ' -> sb.append(('A'.code + (ch.code - 'Ａ'.code)).toChar())
+                in 'ａ'..'ｚ' -> sb.append(('a'.code + (ch.code - 'ａ'.code)).toChar())
+                '－', '—', '–', '−' -> sb.append('-')
+                '：' -> sb.append(':')
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString()
+            .replace(Regex("""(?<=[A-Za-z0-9])\s*-\s*(?=[A-Za-z0-9])"""), "-")
+            .trim()
     }
 
     /**

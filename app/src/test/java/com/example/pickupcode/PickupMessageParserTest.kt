@@ -116,7 +116,31 @@ class PickupMessageParserTest {
     }
 
     @Test
-    fun `formats grouped pickup items cleanly for sharing`() {
+    fun `parses pickup codes cleanly from noisy ocr screenshot text`() {
+        val ocrText = """
+            菜鸟驿站 待取件
+            家属区1号站
+            取件码：１ - ２ - ３０４５
+            凭取件码 A12 - 3098 到2号房领取
+            限时领取双11优惠券
+        """.trimIndent()
+
+        val results = PickupMessageParser.parseFromOcr(ocrText, defaultRules)
+
+        assertEquals(listOf("1-2-3045", "A12-3098"), results.map { it.code })
+
+        val lockerOcrText = """
+            丰巢快递柜
+            取件码
+            839201
+            凭此码开箱取件
+        """.trimIndent()
+        val lockerResults = PickupMessageParser.parseFromOcr(lockerOcrText, defaultRules)
+        assertEquals(listOf("839201"), lockerResults.map { it.code })
+    }
+
+    @Test
+    fun `groups and naturally sorts pickup items for share image export`() {
         val now = System.currentTimeMillis()
         val items = listOf(
             com.example.pickupcode.data.local.PickupItemEntity(
@@ -134,13 +158,21 @@ class PickupMessageParserTest {
                 productName = "",
                 rawMessage = "",
                 createdAt = now
+            ),
+            com.example.pickupcode.data.local.PickupItemEntity(
+                id = 3L,
+                code = "8-1-1",
+                stationNumber = 1,
+                isPickedUp = true,
+                rawMessage = "",
+                createdAt = now
             )
         )
-        val text = com.example.pickupcode.util.PickupShareHelper.buildShareText(items, defaultRules)
+        val groups = com.example.pickupcode.util.PickupShareHelper.groupItemsForShare(items, defaultRules)
 
-        assertTrue(text.contains("共 2 件"))
-        assertTrue(text.contains("① 家属区1号 京东"))
-        assertTrue(text.indexOf("2-1-5") < text.indexOf("10-1-2"))
-        assertTrue(text.contains("10-1-2（数据线）"))
+        assertEquals(1, groups.size)
+        assertEquals("① 家属区1号 京东", "${groups[0].circleSymbol} ${groups[0].displayName}")
+        assertEquals(listOf("2-1-5", "10-1-2"), groups[0].items.map { it.code })
+        assertEquals("数据线", groups[0].items[1].productName)
     }
 }
