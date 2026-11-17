@@ -114,4 +114,33 @@ class PickupMessageParserTest {
 
         assertEquals(listOf("1-4-10", "2-1-5", "30-3-2", "94-3-2", "100-1-1"), sortedCodes)
     }
+
+    @Test
+    fun `formats grouped pickup items cleanly for sharing`() {
+        val now = System.currentTimeMillis()
+        val items = listOf(
+            com.example.pickupcode.data.local.PickupItemEntity(
+                id = 1L,
+                code = "10-1-2",
+                stationNumber = 1,
+                productName = "数据线",
+                rawMessage = "",
+                createdAt = now
+            ),
+            com.example.pickupcode.data.local.PickupItemEntity(
+                id = 2L,
+                code = "2-1-5",
+                stationNumber = 1,
+                productName = "",
+                rawMessage = "",
+                createdAt = now
+            )
+        )
+        val text = com.example.pickupcode.util.PickupShareHelper.buildShareText(items, defaultRules)
+
+        assertTrue(text.contains("共 2 件"))
+        assertTrue(text.contains("① 家属区1号 京东"))
+        assertTrue(text.indexOf("2-1-5") < text.indexOf("10-1-2"))
+        assertTrue(text.contains("10-1-2（数据线）"))
+    }
 }

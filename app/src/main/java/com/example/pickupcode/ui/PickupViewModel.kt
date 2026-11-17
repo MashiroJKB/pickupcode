@@ -190,6 +190,21 @@ class PickupViewModel(
         }
     }
 
+    /**
+     * 批量删除当前选中的待取件记录
+     */
+    fun deleteSelectedItems() {
+        val pendingIds = itemsState.value.asSequence().filter { !it.isPickedUp }.map { it.id }.toSet()
+        val idsToDelete = _selectedItemIds.value.filter { it in pendingIds }
+        if (idsToDelete.isEmpty()) return
+
+        _selectedItemIds.value = emptySet()
+        viewModelScope.launch {
+            repository.deleteItemsBatch(idsToDelete)
+            showCapsuleToast("已删除 ${idsToDelete.size} 条取件码")
+        }
+    }
+
     fun pasteAndParseSms(rawText: String) {
         viewModelScope.launch {
             val count = repository.ingestRawMessage(

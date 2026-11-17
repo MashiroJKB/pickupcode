@@ -129,6 +129,7 @@ fun StationGroupCard(
     stationDisplayName: String,
     items: List<PickupItemEntity>,
     selectedItemIds: Set<Long>,
+    isShareSelectionMode: Boolean = false,
     activeSwipedItemId: Long?,
     onSwipeOpenChange: (Long, Boolean) -> Unit,
     onToggleSelectItem: (PickupItemEntity) -> Unit,
@@ -230,6 +231,7 @@ fun StationGroupCard(
                     SwipeablePickupItemCard(
                         item = item,
                         isSelected = item.id in selectedItemIds,
+                        isShareSelectionMode = isShareSelectionMode,
                         isSwipedOpen = activeSwipedItemId == item.id,
                         onSwipeOpenChange = { open -> onSwipeOpenChange(item.id, open) },
                         accentColor = accentColor,
@@ -254,6 +256,7 @@ fun StationGroupCard(
 fun SwipeablePickupItemCard(
     item: PickupItemEntity,
     isSelected: Boolean,
+    isShareSelectionMode: Boolean = false,
     isSwipedOpen: Boolean,
     onSwipeOpenChange: (Boolean) -> Unit,
     accentColor: Color,
@@ -277,9 +280,11 @@ fun SwipeablePickupItemCard(
     val openRevealPx = remember(density) { with(density) { 140.dp.toPx() } }
     val offsetX = remember { Animatable(0f) }
 
-    // 当其他卡片左滑打开或列表开始滚动时，平滑收起当前卡片
-    LaunchedEffect(isSwipedOpen) {
-        if (!isSwipedOpen && offsetX.value < -0.5f) {
+    val activeCheckColor = if (isShareSelectionMode) MaterialTheme.colorScheme.primary else checkGreen
+
+    // 当其他卡片左滑打开、列表滚动或进入分享选择模式时，平滑收起当前卡片
+    LaunchedEffect(isSwipedOpen, isShareSelectionMode) {
+        if ((!isSwipedOpen || isShareSelectionMode) && offsetX.value < -0.5f) {
             offsetX.animateTo(
                 targetValue = 0f,
                 animationSpec = spring(
@@ -444,11 +449,12 @@ fun SwipeablePickupItemCard(
                 .liquidGlassInnerCard(
                     cornerRadius = AppleCorners.InnerCard,
                     isPickedUp = false,
-                    accentTint = if (isSelected) checkGreen else accentColor
+                    accentTint = if (isSelected) activeCheckColor else accentColor
                 )
                 .draggable(
                     state = draggableState,
                     orientation = Orientation.Horizontal,
+                    enabled = !isShareSelectionMode,
                     onDragStopped = { velocity ->
                         scope.launch {
                             val shouldOpen = when {
@@ -471,7 +477,10 @@ fun SwipeablePickupItemCard(
                 )
                 .combinedClickable(
                     onClick = {
-                        if (offsetX.value < -8f) {
+                        if (isShareSelectionMode) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleSelect()
+                        } else if (offsetX.value < -8f) {
                             onSwipeOpenChange(false)
                             scope.launch {
                                 offsetX.animateTo(
@@ -485,20 +494,25 @@ fun SwipeablePickupItemCard(
                         }
                     },
                     onLongClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (offsetX.value < -8f) {
-                            onSwipeOpenChange(false)
-                            scope.launch {
-                                offsetX.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = 0.86f,
-                                        stiffness = 460f
+                        if (isShareSelectionMode) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleSelect()
+                        } else {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (offsetX.value < -8f) {
+                                onSwipeOpenChange(false)
+                                scope.launch {
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = 0.86f,
+                                            stiffness = 460f
+                                        )
                                     )
-                                )
+                                }
                             }
+                            onLongPress()
                         }
-                        onLongPress()
                     }
                 )
                 .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
@@ -510,10 +524,10 @@ fun SwipeablePickupItemCard(
                     .scale(checkScale)
                     .size(28.dp)
                     .clip(CircleShape)
-                    .background(if (isSelected) checkGreen else Color.Transparent)
+                    .background(if (isSelected) activeCheckColor else Color.Transparent)
                     .border(
                         width = 2.dp,
-                        color = if (isSelected) checkGreen else accentColor.copy(alpha = 0.65f),
+                        color = if (isSelected) activeCheckColor else accentColor.copy(alpha = 0.65f),
                         shape = CircleShape
                     )
                     .clickable {

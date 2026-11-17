@@ -39,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -64,12 +65,15 @@ import com.example.pickupcode.ui.home.HomeScreen
 import com.example.pickupcode.ui.home.LongPressQuickActionDialog
 import com.example.pickupcode.ui.home.NotificationAndBadgePermissionDialog
 import com.example.pickupcode.ui.home.RawMessageDetailDialog
+import com.example.pickupcode.ui.home.SharePickupMethodDialog
 import com.example.pickupcode.ui.settings.SettingsScreen
 import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.LiquidGlassBackdrop
 import com.example.pickupcode.ui.theme.PickupCodeTheme
 import com.example.pickupcode.ui.theme.liquidGlass
+import com.example.pickupcode.util.PickupShareHelper
 import com.example.pickupcode.widget.PickupWidgetProvider
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -158,12 +162,21 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     val capsuleToast by viewModel.capsuleToastMessage.collectAsState()
     val latestItems by rememberUpdatedState(items)
 
+    val coroutineScope = rememberCoroutineScope()
     var showSettingsScreen by remember { mutableStateOf(false) }
+    var isShareSelectionMode by remember { mutableStateOf(false) }
+    var shareSelectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var showShareMethodDialog by remember { mutableStateOf(false) }
+    var isGeneratingShareImage by remember { mutableStateOf(false) }
     val homeListState = rememberLazyListState()
     val settingsListState = rememberLazyListState()
 
     BackHandler(enabled = showSettingsScreen) {
         showSettingsScreen = false
+    }
+    BackHandler(enabled = !showSettingsScreen && isShareSelectionMode) {
+        isShareSelectionMode = false
+        shareSelectedIds = emptySet()
     }
 
     var hasSmsPermission by remember {
@@ -305,9 +318,25 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         PickupWidgetProvider.notifyWidgetDataChanged(context)
     }
 
-    val activeSelectedCount = remember(items, selectedItemIds) {
-        val pendingIds = items.asSequence().filter { !it.isPickedUp }.map { it.id }.toSet()
+    val pendingItems = remember(items) {
+        items.filter { !it.isPickedUp }
+    }
+
+    LaunchedEffect(pendingItems, isShareSelectionMode) {
+        if (isShareSelectionMode && pendingItems.isEmpty()) {
+            isShareSelectionMode = false
+            shareSelectedIds = emptySet()
+            showShareMethodDialog = false
+        }
+    }
+
+    val activeSelectedCount = remember(pendingItems, selectedItemIds) {
+        val pendingIds = pendingItems.asSequence().map { it.id }.toSet()
         selectedItemIds.count { it in pendingIds }
+    }
+
+    val activeShareSelectedItems = remember(pendingItems, shareSelectedIds) {
+        pendingItems.filter { it.id in shareSelectedIds }
     }
 
     val settingsProgress by animateFloatAsState(
@@ -336,12 +365,41 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         items = items,
                         stationRules = settings.stationRules,
                         selectedItemIds = selectedItemIds,
+                        isShareSelectionMode = isShareSelectionMode,
+                        shareSelectedIds = shareSelectedIds,
                         showTaobaoIdentityBanner = settings.showTaobaoIdentityBanner,
                         showCainiaoIdentityBanner = settings.showCainiaoIdentityBanner,
                         showPinduoduoIdentityBanner = settings.showPinduoduoIdentityBanner,
                         hasSmsPermission = hasSmsPermission,
                         onOpenSettings = {
                             if (!showSettingsScreen) showSettingsScreen = true
+                        },
+                        onEnterShareMode = {
+                            if (pendingItems.isEmpty()) {
+                                viewModel.showCapsuleToast("暂无待取快递可分享")
+                            } else {
+                                shareSelectedIds = emptySet()
+                                isShareSelectionMode = true
+                            }
+                        },
+                        onExitShareMode = {
+                            isShareSelectionMode = false
+                            shareSelectedIds = emptySet()
+                        },
+                        onToggleSelectAllForShare = {
+                            val allIds = pendingItems.asSequence().map { it.id }.toSet()
+                            shareSelectedIds = if (allIds.isNotEmpty() && allIds.all { it in shareSelectedIds }) {
+                                emptySet()
+                            } else {
+                                allIds
+                            }
+                        },
+                        onToggleShareItem = { item ->
+                            shareSelectedIds = if (item.id in shareSelectedIds) {
+                                shareSelectedIds - item.id
+                            } else {
+                                shareSelectedIds + item.id
+                            }
                         },
                         onRequestSmsPermission = requestSmsPermissions,
                         onQuickAddClick = { showAddOrPasteDialog = true },
@@ -358,9 +416,17 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                     HomeBottomFloatingBar(
                         selectedCount = activeSelectedCount,
                         canUndo = undoableItemIds.isNotEmpty(),
+                        isShareSelectionMode = isShareSelectionMode,
+                        shareSelectedCount = activeShareSelectedItems.size,
                         onConfirmPickedUp = viewModel::confirmSelectedPickedUp,
+                        onDeleteSelected = viewModel::deleteSelectedItems,
                         onUndoPickedUp = viewModel::undoRecentPickedUp,
                         onQuickAddClick = { showAddOrPasteDialog = true },
+                        onConfirmShareClick = {
+                            if (activeShareSelectedItems.isNotEmpty()) {
+                                showShareMethodDialog = true
+                            }
+                        },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
@@ -505,6 +571,59 @@ fun PickupMainApp(viewModel: PickupViewModel) {
             onOpenBadgeSettings = {
                 viewModel.markBadgePermissionPrompted()
                 AppBadgeManager.openNotificationAndBadgeSettings(context)
+            }
+        )
+    }
+
+    // 6. 分享取件码方式选择弹窗
+    if (showShareMethodDialog && activeShareSelectedItems.isNotEmpty()) {
+        SharePickupMethodDialog(
+            selectedCount = activeShareSelectedItems.size,
+            isGeneratingImage = isGeneratingShareImage,
+            onDismiss = { showShareMethodDialog = false },
+            onShareAsImage = {
+                if (isGeneratingShareImage) return@SharePickupMethodDialog
+                isGeneratingShareImage = true
+                coroutineScope.launch {
+                    val launched = PickupShareHelper.launchImageShare(
+                        context = context,
+                        items = activeShareSelectedItems,
+                        stationRules = settings.stationRules
+                    )
+                    isGeneratingShareImage = false
+                    showShareMethodDialog = false
+                    if (launched) {
+                        isShareSelectionMode = false
+                        shareSelectedIds = emptySet()
+                    } else {
+                        viewModel.showCapsuleToast("暂无可调用的图片分享应用")
+                    }
+                }
+            },
+            onShareAsText = {
+                val launched = PickupShareHelper.launchTextShare(
+                    context = context,
+                    items = activeShareSelectedItems,
+                    stationRules = settings.stationRules
+                )
+                showShareMethodDialog = false
+                if (launched) {
+                    isShareSelectionMode = false
+                    shareSelectedIds = emptySet()
+                } else {
+                    viewModel.showCapsuleToast("暂无可调用的文本分享应用")
+                }
+            },
+            onCopyText = {
+                val text = PickupShareHelper.buildShareText(
+                    items = activeShareSelectedItems,
+                    stationRules = settings.stationRules
+                )
+                PickupShareHelper.copyTextToClipboard(context, text)
+                showShareMethodDialog = false
+                isShareSelectionMode = false
+                shareSelectedIds = emptySet()
+                viewModel.showCapsuleToast("已复制 ${activeShareSelectedItems.size} 条取件码")
             }
         )
     }

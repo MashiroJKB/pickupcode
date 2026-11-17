@@ -26,10 +26,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -833,6 +838,186 @@ private fun PermissionGuideItemRow(
                 color = statusColor,
                 softWrap = false,
                 maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * 6. 分享取件码方式选择弹窗（支持图片分享、纯文本分享及一键复制）
+ */
+@Composable
+fun SharePickupMethodDialog(
+    selectedCount: Int,
+    isGeneratingImage: Boolean,
+    onDismiss: () -> Unit,
+    onShareAsImage: () -> Unit,
+    onShareAsText: () -> Unit,
+    onCopyText: () -> Unit
+) {
+    val isDark = isSystemInDarkTheme()
+    val imageAccent = MaterialTheme.colorScheme.primary
+    val textAccent = if (isDark) AppleGreenDark else AppleGreenLight
+
+    SpringGlassDialog(onDismissRequest = { if (!isGeneratingImage) onDismiss() }) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(imageAccent.copy(alpha = 0.14f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Share,
+                            contentDescription = null,
+                            tint = imageAccent,
+                            modifier = Modifier.size(21.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "分享取件码",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "已选 $selectedCount 件 · 可分享到微信等应用",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                IconButton(
+                    enabled = !isGeneratingImage,
+                    onClick = onDismiss
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "关闭",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            ShareOptionCard(
+                icon = Icons.Rounded.Image,
+                title = if (isGeneratingImage) "正在生成清单图片..." else "以图片分享",
+                subtitle = "生成高清分组清单长图，适合微信直接发送",
+                accent = imageAccent,
+                enabled = !isGeneratingImage,
+                onClick = onShareAsImage
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            ShareOptionCard(
+                icon = Icons.AutoMirrored.Rounded.Notes,
+                title = "以文本分享",
+                subtitle = "按快递房与货架顺序整理为纯文本发送",
+                accent = textAccent,
+                enabled = !isGeneratingImage,
+                onClick = onShareAsText
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                TextButton(
+                    enabled = !isGeneratingImage,
+                    onClick = onCopyText
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text("仅复制文本", fontWeight = FontWeight.SemiBold)
+                }
+
+                TextButton(
+                    enabled = !isGeneratingImage,
+                    onClick = onDismiss
+                ) {
+                    Text("取消")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShareOptionCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    accent: Color,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlassInnerCard(
+                cornerRadius = AppleCorners.InnerCard,
+                accentTint = accent
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 13.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                .background(accent.copy(alpha = 0.16f))
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(21.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

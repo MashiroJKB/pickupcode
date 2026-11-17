@@ -83,6 +83,9 @@ interface PickupDao {
     @Query("DELETE FROM pickup_items WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM pickup_items WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     /**
      * 自动清理超过 7 天的已取件记录
      */

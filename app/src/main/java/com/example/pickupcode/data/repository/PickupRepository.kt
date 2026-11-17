@@ -337,6 +337,11 @@ class PickupRepository(
         pickupDao.deleteById(id)
     }
 
+    suspend fun deleteItemsBatch(ids: List<Long>) = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext
+        pickupDao.deleteByIds(ids)
+    }
+
     companion object {
         // 已取件记录与扫描去重统一保留 7 天
         const val RETENTION_SEVEN_DAYS_MILLIS = 7L * 24L * 60L * 60L * 1000L

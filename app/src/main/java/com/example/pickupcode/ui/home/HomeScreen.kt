@@ -1,6 +1,11 @@
 package com.example.pickupcode.ui.home
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
@@ -40,10 +46,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pickupcode.data.local.PickupItemEntity
@@ -69,11 +81,17 @@ fun HomeScreen(
     items: List<PickupItemEntity>,
     stationRules: List<StationRule>,
     selectedItemIds: Set<Long>,
+    isShareSelectionMode: Boolean,
+    shareSelectedIds: Set<Long>,
     showTaobaoIdentityBanner: Boolean,
     showCainiaoIdentityBanner: Boolean,
     showPinduoduoIdentityBanner: Boolean,
     hasSmsPermission: Boolean,
     onOpenSettings: () -> Unit,
+    onEnterShareMode: () -> Unit,
+    onExitShareMode: () -> Unit,
+    onToggleSelectAllForShare: () -> Unit,
+    onToggleShareItem: (PickupItemEntity) -> Unit,
     onRequestSmsPermission: () -> Unit,
     onQuickAddClick: () -> Unit,
     onToggleSelectItem: (PickupItemEntity) -> Unit,
@@ -159,11 +177,22 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item(key = "home_header", contentType = "header") {
+            val pendingCount = pendingItems.size
+            val activeShareSelectedCount = remember(pendingItems, shareSelectedIds) {
+                val pendingIds = pendingItems.asSequence().map { it.id }.toSet()
+                shareSelectedIds.count { it in pendingIds }
+            }
             HomeTopHeader(
-                totalPending = pendingItems.size,
+                totalPending = pendingCount,
                 activeStationCount = activeStationCount,
                 hasSmsPermission = hasSmsPermission,
+                isShareSelectionMode = isShareSelectionMode,
+                shareSelectedCount = activeShareSelectedCount,
+                allSelectedForShare = pendingCount > 0 && activeShareSelectedCount == pendingCount,
                 onOpenSettings = onOpenSettings,
+                onEnterShareMode = onEnterShareMode,
+                onExitShareMode = onExitShareMode,
+                onToggleSelectAllForShare = onToggleSelectAllForShare,
                 onRequestSmsPermission = onRequestSmsPermission,
                 isDark = isDark
             )
@@ -198,12 +227,13 @@ fun HomeScreen(
                     badgeNumber = section.badgeNumber,
                     stationDisplayName = section.displayName,
                     items = section.items,
-                    selectedItemIds = selectedItemIds,
+                    selectedItemIds = if (isShareSelectionMode) shareSelectedIds else selectedItemIds,
+                    isShareSelectionMode = isShareSelectionMode,
                     activeSwipedItemId = activeSwipedItemId,
                     onSwipeOpenChange = { id, open ->
                         activeSwipedItemId = if (open) id else if (activeSwipedItemId == id) null else activeSwipedItemId
                     },
-                    onToggleSelectItem = onToggleSelectItem,
+                    onToggleSelectItem = if (isShareSelectionMode) onToggleShareItem else onToggleSelectItem,
                     onQuickMarkPickedUp = onQuickMarkPickedUp,
                     onQuickDeleteItem = onQuickDeleteItem,
                     onLongPressItem = onLongPressItem,
@@ -226,93 +256,217 @@ private fun HomeTopHeader(
     totalPending: Int,
     activeStationCount: Int,
     hasSmsPermission: Boolean,
+    isShareSelectionMode: Boolean,
+    shareSelectedCount: Int,
+    allSelectedForShare: Boolean,
     onOpenSettings: () -> Unit,
+    onEnterShareMode: () -> Unit,
+    onExitShareMode: () -> Unit,
+    onToggleSelectAllForShare: () -> Unit,
     onRequestSmsPermission: () -> Unit,
     isDark: Boolean
 ) {
     val haptic = LocalHapticFeedback.current
     val statusAmber = if (isDark) AppleOrangeDark else AppleOrangeLight
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 2.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(40.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "取件码",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                if (!hasSmsPermission) {
-                    Spacer(modifier = Modifier.width(10.dp))
+        AnimatedContent(
+            targetState = isShareSelectionMode,
+            transitionSpec = {
+                fadeIn(animationSpec = spring(stiffness = 460f)) togetherWith
+                    fadeOut(animationSpec = spring(stiffness = 520f))
+            },
+            label = "home_header_mode_transition"
+        ) { inShareMode ->
+            if (inShareMode) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
+                            .height(36.dp)
                             .clip(RoundedCornerShape(AppleCorners.Pill))
-                            .background(statusAmber.copy(alpha = 0.15f))
-                            .clickable(onClick = onRequestSmsPermission)
-                            .padding(horizontal = 9.dp, vertical = 4.dp)
+                            .background(
+                                if (allSelectedForShare) primaryColor
+                                else primaryColor.copy(alpha = 0.14f)
+                            )
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onToggleSelectAllForShare()
+                            }
+                            .padding(horizontal = 14.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(statusAmber)
+                        Icon(
+                            imageVector = Icons.Rounded.DoneAll,
+                            contentDescription = "全选",
+                            tint = if (allSelectedForShare) Color.White else primaryColor,
+                            modifier = Modifier.size(17.dp)
                         )
-                        Spacer(modifier = Modifier.width(5.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "点击授权短信读取",
+                            text = "全选",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
+                                fontSize = 14.sp
                             ),
-                            color = statusAmber,
+                            color = if (allSelectedForShare) Color.White else primaryColor,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                    }
+
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(AppleCorners.Pill))
+                            .background(
+                                MaterialTheme.colorScheme.onSurface.copy(
+                                    alpha = if (isDark) 0.14f else 0.08f
+                                )
+                            )
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onExitShareMode()
+                            }
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        Text(
+                            text = "取消",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
                             softWrap = false,
                             maxLines = 1
                         )
                     }
                 }
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(AppleCorners.Pill))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
-                    .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onOpenSettings()
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "取件码",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                        if (!hasSmsPermission) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(AppleCorners.Pill))
+                                    .background(statusAmber.copy(alpha = 0.15f))
+                                    .clickable(onClick = onRequestSmsPermission)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(statusAmber)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "授权短信",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp
+                                    ),
+                                    color = statusAmber,
+                                    softWrap = false,
+                                    maxLines = 1
+                                )
+                            }
+                        }
                     }
-                    .padding(horizontal = 13.dp, vertical = 7.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Settings,
-                    contentDescription = "设置",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(17.dp)
-                )
-                Spacer(modifier = Modifier.width(5.dp))
-                Text(
-                    text = "设置",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    ),
-                    color = MaterialTheme.colorScheme.primary
-                )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // 转发图标 + 分享取件码按钮
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(AppleCorners.Pill))
+                                .background(primaryColor.copy(alpha = 0.14f))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onEnterShareMode()
+                                }
+                                .padding(horizontal = 12.dp)
+                        ) {
+                            ForwardArrowIcon(
+                                tint = primaryColor,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "分享取件码",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                ),
+                                color = primaryColor,
+                                softWrap = false,
+                                maxLines = 1
+                            )
+                        }
+
+                        // 极简设置齿轮圆形图标按钮
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(primaryColor.copy(alpha = 0.14f))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onOpenSettings()
+                                }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = "设置",
+                                tint = primaryColor,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
 
         Text(
             text = when {
+                isShareSelectionMode ->
+                    "已选 $shareSelectedCount / $totalPending 件 · 点击卡片或「全选」"
                 totalPending > 0 && activeStationCount > 0 ->
                     "当前 $totalPending 件待取 · 分布在 $activeStationCount 个快递房"
                 totalPending > 0 ->
@@ -322,8 +476,44 @@ private fun HomeTopHeader(
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 2.dp)
         )
+    }
+}
+
+@Composable
+private fun ForwardArrowIcon(
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val tipX = w * 0.88f
+        val tipY = h * 0.38f
+
+        val stem = Path().apply {
+            moveTo(w * 0.12f, h * 0.84f)
+            cubicTo(
+                w * 0.14f, h * 0.44f,
+                w * 0.42f, tipY,
+                tipX, tipY
+            )
+        }
+        val head = Path().apply {
+            moveTo(w * 0.58f, h * 0.14f)
+            lineTo(tipX, tipY)
+            lineTo(w * 0.58f, h * 0.62f)
+        }
+        val stroke = Stroke(
+            width = 1.9.dp.toPx(),
+            cap = StrokeCap.Round,
+            join = StrokeJoin.Round
+        )
+        drawPath(path = stem, color = tint, style = stroke)
+        drawPath(path = head, color = tint, style = stroke)
     }
 }
 
