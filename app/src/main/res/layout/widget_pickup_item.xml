@@ -2,17 +2,17 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_item_root"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="56dp"
     android:background="@drawable/widget_row_bg"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingHorizontal="12dp"
-    android:paddingVertical="8dp">
+    android:paddingHorizontal="12dp">
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
+        android:gravity="center_vertical"
         android:orientation="vertical">
 
         <LinearLayout
@@ -25,31 +25,39 @@
                 android:id="@+id/widget_item_station"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
                 android:text="① 1号快递房"
                 android:textColor="@color/widget_accent_blue"
-                android:textSize="11sp"
+                android:textSize="11dp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_item_product"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
+                android:layout_weight="1"
                 android:ellipsize="end"
+                android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="@color/widget_text_secondary"
-                android:textSize="11sp" />
+                android:textSize="11dp" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/widget_item_code"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
             android:fontFamily="monospace"
+            android:includeFontPadding="false"
+            android:maxLines="1"
             android:text="1-2-3045"
             android:textColor="@color/widget_text_primary"
-            android:textSize="17sp"
+            android:textSize="17dp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -57,12 +65,15 @@
         android:id="@+id/widget_item_btn_done"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
         android:background="@drawable/widget_btn_done"
+        android:includeFontPadding="false"
+        android:maxLines="1"
         android:paddingHorizontal="10dp"
-        android:paddingVertical="5dp"
+        android:paddingVertical="6dp"
         android:text="已取"
         android:textColor="#FFFFFFFF"
-        android:textSize="11sp"
+        android:textSize="11dp"
         android:textStyle="bold" />
 
 </LinearLayout>

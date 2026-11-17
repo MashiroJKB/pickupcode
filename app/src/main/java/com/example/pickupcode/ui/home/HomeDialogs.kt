@@ -445,10 +445,13 @@ fun AddOrPastePickupDialog(
 
     LaunchedEffect(initialStationNumber, stationRules) {
         val target = initialStationNumber ?: return@LaunchedEffect
-        val targetIndex = stationRules.indexOfFirst { it.stationNumber == target }
-        if (targetIndex >= 0) {
-            val scrollIdx = if (initialStationNumber == 0) targetIndex + 1 else targetIndex
-            stationListState.scrollToItem(scrollIdx)
+        if (target == 0) {
+            stationListState.scrollToItem(0)
+        } else {
+            val targetIndex = stationRules.indexOfFirst { it.stationNumber == target }
+            if (targetIndex >= 0) {
+                stationListState.scrollToItem(targetIndex)
+            }
         }
     }
 

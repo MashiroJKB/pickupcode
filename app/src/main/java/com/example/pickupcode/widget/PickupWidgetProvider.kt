@@ -6,9 +6,15 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.util.SizeF
+import android.util.TypedValue
 import android.widget.RemoteViews
 import android.widget.Toast
+import androidx.core.os.BundleCompat
 import com.example.pickupcode.MainActivity
 import com.example.pickupcode.PickupApplication
 import com.example.pickupcode.R
@@ -38,6 +44,18 @@ class PickupWidgetProvider : AppWidgetProvider() {
         for (appWidgetId in appWidgetIds) {
             updateAppWidget(context, appWidgetManager, appWidgetId)
         }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        updateAppWidget(context, appWidgetManager, appWidgetId)
+        @Suppress("DEPRECATION")
+        appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_list_view)
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -112,8 +130,6 @@ class PickupWidgetProvider : AppWidgetProvider() {
             appWidgetManager: AppWidgetManager,
             appWidgetId: Int
         ) {
-            val views = RemoteViews(context.packageName, R.layout.widget_pickup_code)
-
             val pendingCount = try {
                 val app = context.applicationContext as? PickupApplication
                 if (app != null) {
@@ -125,7 +141,65 @@ class PickupWidgetProvider : AppWidgetProvider() {
                 0
             }
 
+            val taobaoBmp = loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.TAOBAO, 72)
+            val cainiaoBmp = loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.CAINIAO, 72)
+            val pddBmp = loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.PINDUODUO, 72)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+                val reportedSizes = BundleCompat.getParcelableArrayList(
+                    options,
+                    AppWidgetManager.OPTION_APPWIDGET_SIZES,
+                    SizeF::class.java
+                )
+                val targetSizes = if (!reportedSizes.isNullOrEmpty()) {
+                    reportedSizes.distinct().take(4)
+                } else {
+                    listOf(
+                        SizeF(180f, 110f),
+                        SizeF(250f, 160f),
+                        SizeF(250f, 300f),
+                        SizeF(320f, 440f)
+                    )
+                }
+                val viewMapping = targetSizes.associateWith {
+                    buildWidgetRemoteViews(
+                        context = context,
+                        appWidgetId = appWidgetId,
+                        pendingCount = pendingCount,
+                        taobaoBmp = taobaoBmp,
+                        cainiaoBmp = cainiaoBmp,
+                        pddBmp = pddBmp
+                    )
+                }
+                appWidgetManager.updateAppWidget(appWidgetId, RemoteViews(viewMapping))
+            } else {
+                val views = buildWidgetRemoteViews(
+                    context = context,
+                    appWidgetId = appWidgetId,
+                    pendingCount = pendingCount,
+                    taobaoBmp = taobaoBmp,
+                    cainiaoBmp = cainiaoBmp,
+                    pddBmp = pddBmp
+                )
+                appWidgetManager.updateAppWidget(appWidgetId, views)
+            }
+        }
+
+        private fun buildWidgetRemoteViews(
+            context: Context,
+            appWidgetId: Int,
+            pendingCount: Int,
+            taobaoBmp: Bitmap,
+            cainiaoBmp: Bitmap,
+            pddBmp: Bitmap
+        ): RemoteViews {
+            val views = RemoteViews(context.packageName, R.layout.widget_pickup_code)
+
+            views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_DIP, 16f)
             views.setTextViewText(R.id.widget_pending_count, "待取 $pendingCount 件")
+            views.setTextViewTextSize(R.id.widget_pending_count, TypedValue.COMPLEX_UNIT_DIP, 12f)
+            views.setTextViewTextSize(R.id.widget_empty_view, TypedValue.COMPLEX_UNIT_DIP, 13f)
 
             // 点击左侧标题打开主应用
             val openAppIntent = Intent(context, MainActivity::class.java)
@@ -139,18 +213,9 @@ class PickupWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_empty_view, openAppPendingIntent)
 
             // 顶部原生苹果圆角应用图标（淘宝 / 菜鸟 / 拼多多）
-            views.setImageViewBitmap(
-                R.id.widget_btn_taobao,
-                loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.TAOBAO, 96)
-            )
-            views.setImageViewBitmap(
-                R.id.widget_btn_cainiao,
-                loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.CAINIAO, 96)
-            )
-            views.setImageViewBitmap(
-                R.id.widget_btn_pdd,
-                loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.PINDUODUO, 96)
-            )
+            views.setImageViewBitmap(R.id.widget_btn_taobao, taobaoBmp)
+            views.setImageViewBitmap(R.id.widget_btn_cainiao, cainiaoBmp)
+            views.setImageViewBitmap(R.id.widget_btn_pdd, pddBmp)
 
             views.setOnClickPendingIntent(
                 R.id.widget_btn_taobao,
@@ -207,7 +272,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
             )
             views.setPendingIntentTemplate(R.id.widget_list_view, itemClickPendingIntent)
 
-            appWidgetManager.updateAppWidget(appWidgetId, views)
+            return views
         }
 
         private fun createDirectLaunchOrFallbackPendingIntent(

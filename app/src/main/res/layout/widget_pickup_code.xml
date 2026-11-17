@@ -27,9 +27,11 @@
                 android:id="@+id/widget_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:maxLines="1"
                 android:text="取件码"
                 android:textColor="@color/widget_text_primary"
-                android:textSize="16sp"
+                android:textSize="16dp"
                 android:textStyle="bold" />
 
             <TextView
@@ -37,9 +39,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
                 android:text="待取 0 件"
                 android:textColor="@color/widget_accent_blue"
-                android:textSize="12sp"
+                android:textSize="12dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -48,7 +53,7 @@
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:contentDescription="淘宝身份码"
-            android:scaleType="fitXY" />
+            android:scaleType="fitCenter" />
 
         <ImageView
             android:id="@+id/widget_btn_cainiao"
@@ -56,7 +61,7 @@
             android:layout_height="28dp"
             android:layout_marginStart="8dp"
             android:contentDescription="菜鸟身份码"
-            android:scaleType="fitXY" />
+            android:scaleType="fitCenter" />
 
         <ImageView
             android:id="@+id/widget_btn_pdd"
@@ -64,29 +69,32 @@
             android:layout_height="28dp"
             android:layout_marginStart="8dp"
             android:contentDescription="拼多多取件码"
-            android:scaleType="fitXY" />
+            android:scaleType="fitCenter" />
     </LinearLayout>
 
-    <!-- 待取件滚动列表 -->
-    <ListView
-        android:id="@+id/widget_list_view"
+    <!-- 列表容器：拉伸组件高度时仅扩展可视列表行区域，绝不缩放单条卡片与字号 -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="@android:color/transparent"
-        android:dividerHeight="6dp"
-        android:scrollbars="none" />
+        android:layout_weight="1">
 
-    <!-- 空状态提示 -->
-    <TextView
-        android:id="@+id/widget_empty_view"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="暂无待取快递"
-        android:textColor="@color/widget_text_secondary"
-        android:textSize="13sp"
-        android:visibility="gone" />
+        <ListView
+            android:id="@+id/widget_list_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="@android:color/transparent"
+            android:dividerHeight="6dp"
+            android:scrollbars="none" />
+
+        <TextView
+            android:id="@+id/widget_empty_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="暂无待取快递"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="13dp"
+            android:visibility="gone" />
+    </FrameLayout>
 
 </LinearLayout>

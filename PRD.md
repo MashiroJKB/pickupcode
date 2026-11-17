@@ -1,6 +1,6 @@
 # 「取件码」（`PickupCode`）Android 原生应用完整产品与技术规范文档（PRD）
 
-> **目标版本**：`2.3.2`（`versionCode = 19`）  
+> **目标版本**：`2.3.3`（`versionCode = 20`）  
 > **文档定位**：本文档为面向 AI 编码引擎与原生 Android 工程师的**1:1 复现级完整工程规格说明书**，完整沉淀了产品定位、视觉规范、交互细节、动画参数、解析引擎、桌面生态及全部已知避坑约束，阅读本文档即可从零完整重构出一模一样的应用程序。
 
 ---
@@ -40,7 +40,7 @@
 
 ### 2.1 SDK 与核心依赖版本
 - **包名（`applicationId` / `namespace`）**：`com.example.pickupcode`
-- **版本配置**：`versionCode = 19`，`versionName = "2.3.2"`
+- **版本配置**：`versionCode = 20`，`versionName = "2.3.3"`
 - **SDK 配置**：`minSdk = 29`（Android 10）、`targetSdk = 35`、`compileSdk = 37`、`buildToolsVersion = "36.0.0"`、`JavaVersion.VERSION_17`
 - **Gradle 与插件版本**（`gradle/libs.versions.toml`）：
   - AGP：`9.5.1`（`com.android.application`）
@@ -66,6 +66,7 @@ app/src/main/
 ├── AndroidManifest.xml
 ├── res/
 │   ├── drawable/
+│   │   ├── ic_launcher_foreground.xml  # 108dp 等轴测线性快递盒前景矢量图标（跟随夜间模式切黑白）
 │   │   ├── ic_stat_pickup.xml          # 通知小图标
 │   │   ├── widget_btn_done.xml         # 小组件右侧「已取」胶囊背景
 │   │   ├── widget_glass_bg.xml         # 小组件外框 24dp 液态玻璃渐变背景
@@ -77,8 +78,9 @@ app/src/main/
 │   ├── layout/
 │   │   ├── widget_pickup_code.xml      # 桌面小组件整体布局
 │   │   └── widget_pickup_item.xml      # 桌面小组件单条待取件列表行布局
-│   ├── mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png        # 浅色模式正方形 PNG 图标
-│   ├── mipmap-night-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png  # 深色模式正方形 PNG 图标
+│   ├── mipmap-anydpi-v26/
+│   │   ├── ic_launcher.xml             # 自适应矢量桌面图标（含 monochrome 主题图标适配）
+│   │   └── ic_launcher_round.xml       # 圆形自适应矢量桌面图标
 │   ├── values/colors.xml & themes.xml & strings.xml
 │   ├── values-night/colors.xml & themes.xml
 │   └── xml/
@@ -126,25 +128,11 @@ app/src/main/
 
 ---
 
-## 3. 桌面应用图标与主题适配规范（关键避坑）
+## 3. 视觉设计系统（120Hz Liquid Glass & Apple HIG）
 
-### 3.1 桌面应用图标规范（正方形 PNG + `mipmap-night` 反相）
-1. **核心问题（OriginOS / 国产桌面兼容）**：vivo OriginOS 等系统桌面会对浅色背景的 `adaptive-icon` 矢量图标强制套用 `#F0F0F0` 的 2×2 灰白底衬外壳，导致放大或圆角裁切后边缘色差不统一。
-2. **标准解决方案**：**不使用 `<adaptive-icon>` XML，改用全出血正方形不透明 PNG**，分别放置于 `mipmap-mdpi` (`96×96`)、`mipmap-hdpi` (`144×144`)、`mipmap-xhdpi` (`192×192`)、`mipmap-xxhdpi` (`384×384`)、`mipmap-xxxhdpi` (`512×512`)，同时配置对应的 `mipmap-night-*` 目录随系统浅/深色模式自动切换。
-3. **视觉设计**：
-   - 图案内容：居中的等轴测极简立体快递纸箱线条轮廓（正六边形轮廓 + Y 形折痕 + 顶部横向封箱胶带条并在右侧立面向下垂折一截）。
-   - **浅色模式（`mipmap-*`）**：满铺纯白底色（`#FFFFFF`，RGBA `255,255,255,255`）+ 深炭黑线条（约 `#1C1F23`）。
-   - **深色模式（`mipmap-night-*`）**：满铺纯黑底色（`#000000`，RGBA `0,0,0,255`）+ 纯白线条（`#FFFFFF`）。
+应用整体支持跟随系统深/浅色模式自动切换（Compose 入口读取 `isSystemInDarkTheme()` 切换 `PickupCodeTheme`，`themes.xml` 设 `forceDarkAllowed="false"` 与透明状态栏/导航栏）；桌面应用图标采用 `mipmap-anydpi-v26` 自适应矢量图标（`ic_launcher_foreground.xml` 居中极简快递纸箱线稿，浅色白底炭黑线、深色黑底纯白线）。
 
-### 3.2 界面主题与系统深/浅色模式自适应
-- `values/themes.xml`（浅色）与 `values-night/themes.xml`（深色）均设置 `<item name="android:forceDarkAllowed">false</item>`、透明状态栏/导航栏，且 `android:windowBackground` 引用 `@color/app_window_bg`（浅 `#EEF2F9` / 深 `#0B0D13`），避免冷启动白/黑屏闪烁。
-- Compose 入口处读取 `isSystemInDarkTheme()` 动态切换 `PickupCodeTheme(darkTheme = isDark)`，所有卡片、液态玻璃描边、弹窗背景、底栏颜色全部随系统浅/深色自动切换。
-
----
-
-## 4. 视觉设计系统（120Hz Liquid Glass & Apple HIG）
-
-### 4.1 调色板（`Color.kt` & `Theme.kt`）
+### 3.1 调色板（`Color.kt` & `Theme.kt`）
 - **主功能色（Light / Dark）**：
   - Blue：`#007AFF` / `#0A84FF`（Scheme `primary`）
   - Green：`#34C759` / `#30D158`（Scheme `secondary`：勾选「确认已取」与成功态）
@@ -167,7 +155,7 @@ app/src/main/
     6. 霓虹紫：`#9B38D0` / `#BF5AF2`
     7. 珊瑚红：`#E8254D` / `#FF375F`
 
-### 4.2 圆角与 Apple 连续圆角图标（`LiquidGlass.kt` & `AppBrandIcons.kt`）
+### 3.2 圆角与 Apple 连续圆角图标（`LiquidGlass.kt` & `AppBrandIcons.kt`）
 - **同心嵌套圆角规范（`AppleCorners`）**：
   - `OuterCard = 24.dp`（外部主卡片、弹窗容器、紧凑栏）
   - `InnerCard = 16.dp`（取件码内卡片、输入框、普通按钮、紧凑格内嵌卡）
@@ -180,23 +168,23 @@ app/src/main/
     - `k = r * 0.44f`（三次贝塞尔曲线控制点，实现平滑 G2 曲率过渡）
   - 桌面小组件同样调用 `loadAppleRoundedIconBitmapForWidget` 对 `ic_brand_taobao.webp`、`ic_brand_cainiao.png`、`ic_brand_pinduoduo.png` 按 `inSampleSize` 降采样后使用同一套 Squircle 路径裁成高清 `Bitmap`（96px）。
 
-### 4.3 120Hz 高帧率 Liquid Glass 实现原理
+### 3.3 120Hz 高帧率 Liquid Glass 实现原理
 为了保证低/中端及高刷屏上 `LazyColumn` 满帧 120Hz 零卡顿，**禁止**在滑动列表项中使用耗费 GPU 离屏渲染的 `Modifier.blur` 或动态模糊：
 1. **`Modifier.liquidGlass(...)`**：使用 `remember(cornerRadius)` 缓存 `RoundedCornerShape`，使用 `remember(isDark, tintColor, surfaceAlphaMultiplier)` 缓存垂直渐变填色 `Brush`（可选从顶部注入 `0.12f/0.18f` 透明度主色调）与 `0.85.dp` 垂直渐变折射边框（顶部高光白、底部柔和暗边框）。
 2. **`Modifier.liquidGlassInnerCard(...)`**：采用水平渐变填色 + `0.75.dp` 微弱边框，适配子卡片与待取包裹条。
 3. **`LiquidGlassBackdrop`**：使用 `Modifier.drawWithCache` 缓存 4 个静态大半径 `RadialGradient` 光晕画刷，绘制在 `#EEF2F9`（浅） / `#0B0D13`（深）底色之上，零重绘帧率损耗。
 
-### 4.4 排版与防孤儿行规范（`Type.kt`）
+### 3.4 排版与防孤儿行规范（`Type.kt`）
 - 取件码数字样式 `PickupCodeMonospaceStyle`：`FontFamily.Monospace` + `FontWeight.ExtraBold` + `21.sp` + `letterSpacing = 0.6.sp`。卡片展示时依据码长自动调节字号：`>= 14` 字符用 `18.sp`，`>= 11` 用 `20.sp`，其余用 `22.sp`。
 - 全应用所有按钮文字、状态徽章、Tab 标签统一添加 `softWrap = false, maxLines = 1`；长标题、备注、副标题统一 `maxLines = 1, overflow = TextOverflow.Ellipsis`（允许 2 行的引导说明除外），彻底避免出现单字或单标点换行产生的“孤儿行”。
 
 ---
 
-## 5. 首页完整界面、交互与动画规范
+## 4. 首页完整界面、交互与动画规范
 
 主页由 `LiquidGlassBackdrop` 包裹，含顶部栏 `HomeTopHeader`、可选身份码入口区、按快递房分组的待取件列表（只展示 `!isPickedUp` 的待取件）与底部悬浮操作栏 `HomeBottomFloatingBar`。
 
-### 5.1 顶部栏 `HomeTopHeader`（三态设计与无 Bug 动画细节）
+### 4.1 顶部栏 `HomeTopHeader`（三态设计与无 Bug 动画细节）
 顶部主行固定高度 `40.dp`，内部所有胶囊按钮高度均为 `36.dp`，包含三种状态 `HomeHeaderMode`：
 
 | 状态 | 触发条件 | 左上角控件 | 右上角控件 | 下方第二行副标题 |
@@ -212,7 +200,7 @@ app/src/main/
 - 点击顶栏任何操作按钮或切换模式时，自动将首页当前左滑展开卡片状态 `activeSwipedItemId` 置为 `null`。
 - `BackHandler` 优先级：处于设置页时按返回退出设置页；处于 `SHARE_SELECT` 时按返回退出分享模式；处于 `PICKUP_SELECT` 时按返回清空当前普通勾选。
 
-### 5.2 身份码 / 取件码快捷入口（`IdentityCodeBannersSection`）
+### 4.2 身份码 / 取件码快捷入口（`IdentityCodeBannersSection`）
 设置页中有 3 个独立开关：淘宝身份码（默认开启）、菜鸟身份码（默认关闭）、拼多多取件码（默认关闭）。
 1. **开启 0 个**：隐藏入口区块。
 2. **开启 1 个（完整单栏 Banner）**：
@@ -226,7 +214,7 @@ app/src/main/
    - 菜鸟：优先 `tbopen://m.taobao.com/tbopen/index.html?h5Url=https://market.m.taobao.com/app/cn-yz/multi-activity/authCode.html`，失败尝试淘宝地址，指定包名 `com.taobao.taobao`。
    - 拼多多：`pinduoduo://com.xunmeng.pinduoduo/mdkd/package`，指定包名 `com.xunmeng.pinduoduo`（异常再尝试不指定包名调起）。未安装时提示 `"未检测到拼多多客户端，请先安装拼多多后再试"`。
 
-### 5.3 快递房分组卡片与快捷 `+` 添加（`StationGroupCard`）
+### 4.3 快递房分组卡片与快捷 `+` 添加（`StationGroupCard`）
 - **列表分组排序**：所有 `stationNumber == 0` 的待分类记录作为第一组；其余快递房严格遵循用户在设置页调整后的 `stationRules` 顺序排列。空列表时展示 `EmptyPickupStateCard`（有短信权限提示点击 `+` 添加，无权限引导授权短信）。
 - **分组头部布局**：
   - 左侧：`StationBadgeSymbol(22.dp)`（`1..20` 渲染 `①~⑳`，`0` 渲染 `？`，`badgeNumber == null` 渲染 `17.dp` 实心圆）+ 快递房名称（待分类时下方显示小字 `点击右侧竖点按钮指定快递房`）。
@@ -236,7 +224,7 @@ app/src/main/
     - 「手动输入取件码」页签水平条用 `LazyRow` 自动滚动定位并高亮选中该快递房；
     - 切换至「粘贴短信解析」页签粘贴短信并入库时，通过 `preferredStationNumber` 强制将该次解析出的记录直接归入当前快递房。
 
-### 5.4 取件码卡片与优雅左滑手势（`SwipeablePickupItemCard`）
+### 4.4 取件码卡片与优雅左滑手势（`SwipeablePickupItemCard`）
 - **组内排序**：使用 `PickupItemEntity.NaturalCodeComparator` 将取件码内全部连续数字提取为 `Long` 逐段比对（例如 `1-4-10` < `2-1-5` < `30-3-2` < `100-1-1`），确保货架顺序符合线下实际取货路线。
 - **左滑快捷操作物理动效**：
   - 前景卡通过 GPU `graphicsLayer { translationX = offsetX.value }` 横向滑动（120Hz 零重排），最大揭露宽度 `140.dp`；超出 `140.dp` 后进入橡皮筋阻尼（位移乘以 `0.25f`，最远 `1.25 * openRevealPx`）。
@@ -253,7 +241,7 @@ app/src/main/
   3. 右侧 `36.dp` 圆形 `⋮` 竖点按钮（点击弹出 `RawMessageDetailDialog` 查看完整短信与修改归属快递房）。
   - 长按卡片（`onLongClick`）弹出 `LongPressQuickActionDialog` 快捷选择「已取」或「删除」。
 
-### 5.5 底部悬浮交互栏（`HomeBottomFloatingBar`）
+### 4.5 底部悬浮交互栏（`HomeBottomFloatingBar`）
 悬浮于主页底端（距底导航栏 `16.dp`），左右内边距 `20.dp`，圆形按钮统一 `60.dp`，带 `12.dp` 同色投影与 `1.dp` 半透明白边：
 - **默认 / 无勾选且无撤销**：仅右下角展示主题蓝 `+` 圆形按钮。
 - **普通勾选状态（`!isShareSelectionMode && selectedCount > 0`）**：严格呈现**左右对称三按钮布局**：
@@ -263,7 +251,7 @@ app/src/main/
 - **3 秒「撤销已取」态**：无论通过勾选点底部「确认已取」、左滑点绿色「已取」还是长按弹窗点「已取」，已取包裹立即从待取列表移除，同时底部中央同位切换为橙色「撤销已取」胶囊按钮并启动 **3000ms 计时器**，3 秒内点击即可恢复该批包裹并弹出胶囊提示。
 - **分享选择模式（`isShareSelectionMode`）**：隐藏左右圆形按钮；中央未选码时展示液态玻璃提示胶囊 `请勾选要分享的取件码`，已选 ≥ 1 件时展示主题蓝 `分享已选 (N)` 胶囊按钮。
 
-### 5.6 中心弹性弹窗（`HomeDialogs.kt`）
+### 4.6 中心弹性弹窗（`HomeDialogs.kt`）
 全部弹窗外层统一采用 `SpringGlassDialog`：屏幕正中心 `TransformOrigin.Center` 从 `0.90f -> 1f` 无过冲弹簧放大（`DampingRatioNoBouncy, StiffnessMedium`）+ `140ms` 淡入，支持 `imePadding()`。
 
 1. **`RawMessageDetailDialog`**：顶部显示快递房徽章、大字取件码、创建时间与关闭 `×`；中间展示「原始短信全文」文本框及横向滚动的「归属快递房」快速切换胶囊；底部左侧红色「删除」，右侧「备注商品」与「完成」。
@@ -280,7 +268,7 @@ app/src/main/
 
 ---
 
-## 6. 设置页与功能细节（`SettingsScreen.kt`）
+## 5. 设置页与功能细节（`SettingsScreen.kt`）
 
 从主页向右滑动/渐显打开设置页（`tween(180ms, FastOutSlowInEasing)`：主页透明渐隐并左移 `24.dp`，设置页渐显并从右 `32.dp` 归位）。
 
@@ -298,14 +286,14 @@ app/src/main/
 
 ---
 
-## 7. 智能短信解析、数据持久化与去重引擎
+## 6. 智能短信解析、数据持久化与去重引擎
 
-### 7.1 默认 1～8 号识别规则（`SettingsDataStore.kt`）
+### 6.1 默认 1～8 号识别规则（`SettingsDataStore.kt`）
 - 存储键：`KEY_STATION_RULES_JSON = stringPreferencesKey("station_rules_json_v4")`。
 - **`defaultStationRules()`**：默认生成编号 **`1..8`** 共 8 个快递房，名称固定为 **`1号快递房` ~ `8号快递房`**，`badgeNumber = 1..8`，并自动预置匹配关键词（以 `num` 为例）：
   `["${num}号快递房", "${num}号房", "${num}号驿站", "${num}号快递站", "${num}号菜鸟"]` + 中文数字（一～十）`["${cn}号快递房", "${cn}号房", "${cn}号驿站"]`。
 
-### 7.2 短信解析流程（`PickupMessageParser.kt`）
+### 6.2 短信解析流程（`PickupMessageParser.kt`）
 1. **前置过滤（`passesPreFilter`）**：
    - 长度 `< 6` 直接丢弃。
    - 命中验证码黑名单（`验证码`、`动态码`、`校验码`、`请勿泄露`、`登录密码`、`修改密码`、`安全码`、`身份验证`）或已完成/营销黑名单（`已签收`、`已出库`、`已代收完成`、`已取件`、`已被取走`、`超时收费`、`退换货`、`优惠券`、`直播间`、`直播中`）直接丢弃。
@@ -320,7 +308,7 @@ app/src/main/
    - 未命中关键词则走内置号房兜底正则（支持 `(\d{1,2}|[一-十]) 号 快递房/房/驿站/快递站/菜鸟/快递柜/丰巢/点/门` 及反向写法），且**仅匹配当前规则中已启用（存在于 `stationRules` 列表内）的编号（按 `badgeNumber` 或 `stationNumber` 查表）**——若用户删除了某号房，该号房即归为 `0`（待分类）而非误归类。
 5. **商品备注提取（`extractProductName`）**：仅提取明确如 `您购买的【...】`、`订单商品「...」`、`商品名称：...` 的商品描述，绝不提取快递品牌或站点名。
 
-### 7.3 仓储去重、7 天生命周期与并发安全（`PickupRepository.kt`）
+### 6.3 仓储去重、7 天生命周期与并发安全（`PickupRepository.kt`）
 - **历史扫描与定时清理**：每次冷/热启动主页 `ON_RESUME` 时，若有短信权限即查询 `Telephony.Sms.Inbox.CONTENT_URI` 最近 7 天短信（`DEFAULT_SMS_SCAN_DAYS = 7`），同时清理早期遗留示例数据（`deleteLegacyDemoItems`）并物理删除 `pickedUpAt`（兜底 `updatedAt`/`createdAt`）早于 **7 天（`7 * 24h`）** 的已取记录（`deleteExpiredPickedUp`）。
 - **并发与幂等去重**：`ingestRawMessage` 全程包裹在 `Mutex`（`ingestMutex.withLock`）中执行，以 `code` 不区分大小写查询近 7 天已有记录：
   - 若已有同号房记录、或任一方为待分类 `0` 号：
@@ -330,15 +318,15 @@ app/src/main/
 
 ---
 
-## 8. 首次启动权限流水线、桌面角标与桌面小组件
+## 7. 首次启动权限流水线、桌面角标与桌面小组件
 
-### 8.1 权限引导流水线（`MainActivity.kt`）
+### 7.1 权限引导流水线（`MainActivity.kt`）
 1. 等待 `SettingsDataStore` 加载完成（`isSettingsLoaded == true`）后仅触发一次：
 2. 检查缺失权限：未授予 `READ_SMS` 则加入 `READ_SMS`、`RECEIVE_SMS`；Android 13+（`TIRAMISU`）未授予 `POST_NOTIFICATIONS` 且（尚无短信权限或尚未引导过角标）则加入 `POST_NOTIFICATIONS`；一次性调起系统权限授权弹窗 `startupPermissionLauncher`。
 3. 授权流程结束后，若 `!settings.badgePermissionPrompted`，自动弹出 `NotificationAndBadgePermissionDialog` 引导用户确认开启通知与前往系统开启桌面角标权限（点击关闭或跳转均调用 `markBadgePermissionPrompted` 记录完成状态）。
 4. 若未有缺失系统权限且 `!settings.badgePermissionPrompted`，直接弹出 `NotificationAndBadgePermissionDialog`。
 
-### 8.2 多桌面引擎角标（`AppBadgeManager.kt`）
+### 7.2 多桌面引擎角标（`AppBadgeManager.kt`）
 每当 `items` 或 `stationRules` 变化或应用回到前台时，以当前待取件数 `pendingCount` 调用 `updateBadgeCount`：
 - 确保注册低重要度静音无震动通知渠道 `pickup_badge_channel`（`setShowBadge(true)`）。
 - 同时并行派发各大厂商桌面接口（均做 `try-catch` 防兼容性崩溃）：
@@ -348,7 +336,8 @@ app/src/main/
   - **三星 / 通用桌面**：`sendBroadcast("android.intent.action.BADGE_COUNT_UPDATE")`
   - **小米 (HyperOS / MIUI) 与原生 Android**：有 `POST_NOTIFICATIONS` 且 `count > 0` 时发送静音通知（通过反射 `extraNotification.setMessageCount(count)` 适配小米；设 `setNumber(count)` 与 `BADGE_ICON_SMALL`）；`count <= 0` 时立即 `nm.cancel(BADGE_NOTIFICATION_ID)` 清除角标。
 
-### 8.3 桌面液态玻璃小组件（`PickupWidgetProvider` & `PickupWidgetService`）
-- **布局与外观**：`4×3`（`250dp × 160dp`）圆角 `24dp` 磨砂渐变外框（支持浅/深色 `values`/`values-night` 资源），内部每行 `14dp` 浅层卡片展示 `站房圆圈名` + `· 商品备注`（如有）+ `等宽取件码`，右侧为绿色「已取」胶囊按钮。
-- **顶部三枚身份码直达图标**：使用 `loadAppleRoundedIconBitmapForWidget` 生成的三枚 `28dp` 原生苹果连续圆角图标（淘宝、菜鸟、拼多多）。为绕过 **Android 12+ 后台启动 Activity 限制**，优先绑定直接 `PendingIntent.getActivity(...)` + `setPackage(...)` 唤起对应客户端；若未检测到包名，则回退绑定 `PendingIntent.getBroadcast` 在接收器中提示 `"未检测到...客户端"`。
+### 7.3 桌面液态玻璃小组件（`PickupWidgetProvider` & `PickupWidgetService`）
+- **布局与外观**：`4×3`（`250dp × 160dp`，支持水平/垂直拉伸至 `600dp × 900dp`）圆角 `24dp` 磨砂渐变外框（支持浅/深色 `values`/`values-night` 资源），`ListView` 包裹在 `FrameLayout(0dp, weight=1)` 内；内部列表行 `widget_item_root` 采用固定 `56dp` 行高（`14dp` 浅层圆角背景）并统一使用 `dp` 字号（站房 `11dp`、取件码 `17dp`、`已取` 胶囊 `11dp`）及 `TypedValue.COMPLEX_UNIT_DIP` 显式锁定。
+- **防拉伸缩放机制**：实现 `onAppWidgetOptionsChanged` 回调刷新 `RemoteViews` 与 `ListView`；Android 12+（`API >= 31`）使用 `RemoteViews(Map<SizeF, RemoteViews>)` 响应式尺寸映射（读取 `OPTION_APPWIDGET_SIZES` 或默认断点），避免定制桌面在纵向拉伸组件高度时等比放大行高与字号。
+- **顶部三枚身份码直达图标**：使用 `loadAppleRoundedIconBitmapForWidget`（`fitCenter` `72px` 降采样）生成三枚 `28dp` 原生苹果连续圆角图标（淘宝、菜鸟、拼多多）。为绕过 **Android 12+ 后台启动 Activity 限制**，优先绑定直接 `PendingIntent.getActivity(...)` + `setPackage(...)` 唤起对应客户端；若未检测到包名，则回退绑定 `PendingIntent.getBroadcast` 在接收器中提示 `"未检测到...客户端"`。
 - **桌面交互与数据联动**：点击小组件左上角标题区或空视图打开主页面；点击列表行「已取」直接在小组件后台 `goAsync()` 核销该条目并即时同步 `AppBadgeManager` 与刷新全部小组件列表；数据在主页或 `SmsReceiver` 发生任何变更后亦主动调用 `PickupWidgetProvider.notifyWidgetDataChanged(context)`。

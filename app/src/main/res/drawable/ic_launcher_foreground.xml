@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 极简等距快递盒外轮廓与内部 Y 型折边（对齐参考图几何比例） -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,27.5 L76.95,40.75 L76.95,67.25 L54,80.5 L31.05,67.25 L31.05,40.75 Z M31.05,40.75 L54,54 L76.95,40.75 M54,54 L54,80.5"
+        android:strokeColor="@color/launcher_icon_fg"
+        android:strokeLineCap="butt"
+        android:strokeLineJoin="miter"
+        android:strokeWidth="4.0" />
+
+    <!-- 顶面斜跨至右前立面的封箱胶带条（等距透视精准裁切） -->
+    <path
+        android:fillColor="@color/launcher_icon_fg"
+        android:pathData="M40.325,35.396 L44.725,32.855 L67.675,46.105 L67.675,57.605 L63.275,60.146 L63.275,48.646 Z" />
+</vector>

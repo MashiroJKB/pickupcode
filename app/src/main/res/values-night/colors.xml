@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="launcher_icon_bg">#FF000000</color>
+    <color name="launcher_icon_fg">#FFFFFFFF</color>
     <color name="app_window_bg">#FF0B0D13</color>
     <color name="widget_glass_bg_start">#E61E222E</color>
     <color name="widget_glass_bg_end">#D9151821</color>

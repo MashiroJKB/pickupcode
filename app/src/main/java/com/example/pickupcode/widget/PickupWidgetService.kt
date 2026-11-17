@@ -2,6 +2,7 @@ package com.example.pickupcode.widget
 
 import android.content.Context
 import android.content.Intent
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
@@ -97,10 +98,14 @@ private class PickupRemoteViewsFactory(
         val views = RemoteViews(context.packageName, R.layout.widget_pickup_item)
 
         views.setTextViewText(R.id.widget_item_station, row.stationHeaderText)
+        views.setTextViewTextSize(R.id.widget_item_station, TypedValue.COMPLEX_UNIT_DIP, 11f)
         views.setTextViewText(R.id.widget_item_code, row.code)
+        views.setTextViewTextSize(R.id.widget_item_code, TypedValue.COMPLEX_UNIT_DIP, 17f)
+        views.setTextViewTextSize(R.id.widget_item_btn_done, TypedValue.COMPLEX_UNIT_DIP, 11f)
 
         if (row.productName.isNotBlank()) {
             views.setTextViewText(R.id.widget_item_product, "· ${row.productName}")
+            views.setTextViewTextSize(R.id.widget_item_product, TypedValue.COMPLEX_UNIT_DIP, 11f)
             views.setViewVisibility(R.id.widget_item_product, View.VISIBLE)
         } else {
             views.setViewVisibility(R.id.widget_item_product, View.GONE)
