@@ -1,9 +1,5 @@
 package com.example.pickupcode.ui.home
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -31,7 +27,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
@@ -42,7 +37,6 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -405,19 +399,18 @@ fun EditProductRemarkDialog(
 }
 
 /**
- * 3. 添加取件码弹窗（支持手动输入、粘贴短信与系统照片选择器离线截图解析）
+ * 3. 添加取件码弹窗（默认选中「手动输入取件码」，切换标签时高度固定不跳动）
  */
 @Composable
 fun AddOrPastePickupDialog(
     stationRules: List<StationRule>,
     onDismiss: () -> Unit,
     onPasteParse: (String) -> Unit,
-    onManualAdd: (code: String, stationNumber: Int, productName: String) -> Unit,
-    onScanScreenshot: (imageUri: Uri, onComplete: (importedCount: Int, recognizedText: String) -> Unit) -> Unit
+    onManualAdd: (code: String, stationNumber: Int, productName: String) -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
     val primaryColor = MaterialTheme.colorScheme.primary
-    // 默认 tabIndex = 0 即「手动输入」
+    // 默认 tabIndex = 0 即「手动输入取件码」
     var tabIndex by remember { mutableIntStateOf(0) }
     var manualCode by remember { mutableStateOf("") }
     var manualStation by remember {
@@ -425,30 +418,8 @@ fun AddOrPastePickupDialog(
     }
     var manualProduct by remember { mutableStateOf("") }
     var rawSmsInput by remember { mutableStateOf("") }
-    var isScanningScreenshot by remember { mutableStateOf(false) }
-    var lastOcrFailedHint by remember { mutableStateOf(false) }
 
-    val pickScreenshotLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            isScanningScreenshot = true
-            lastOcrFailedHint = false
-            onScanScreenshot(uri) { importedCount, recognizedText ->
-                isScanningScreenshot = false
-                if (importedCount > 0) {
-                    onDismiss()
-                } else if (recognizedText.isNotBlank()) {
-                    rawSmsInput = recognizedText
-                    tabIndex = 1
-                } else {
-                    lastOcrFailedHint = true
-                }
-            }
-        }
-    }
-
-    SpringGlassDialog(onDismissRequest = { if (!isScanningScreenshot) onDismiss() }) {
+    SpringGlassDialog(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = "添加取件码",
@@ -464,7 +435,7 @@ fun AddOrPastePickupDialog(
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
                     .padding(4.dp)
             ) {
-                listOf("手动输入", "粘贴短信", "截图解析").forEachIndexed { idx, title ->
+                listOf("手动输入取件码", "粘贴短信解析").forEachIndexed { idx, title ->
                     val selected = tabIndex == idx
                     Box(
                         contentAlignment = Alignment.Center,
@@ -474,10 +445,7 @@ fun AddOrPastePickupDialog(
                             .background(
                                 if (selected) primaryColor else Color.Transparent
                             )
-                            .clickable(enabled = !isScanningScreenshot) {
-                                tabIndex = idx
-                                if (idx != 2) lastOcrFailedHint = false
-                            }
+                            .clickable { tabIndex = idx }
                             .padding(vertical = 8.dp)
                     ) {
                         Text(
@@ -502,237 +470,131 @@ fun AddOrPastePickupDialog(
                     .fillMaxWidth()
                     .heightIn(min = 248.dp)
             ) {
-                when (tabIndex) {
-                    0 -> {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            OutlinedTextField(
-                                value = manualCode,
-                                onValueChange = { manualCode = it.take(20) },
-                                label = { Text("取件码") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(AppleCorners.InnerCard),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            if (stationRules.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = "选择快递房：",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState())
-                                ) {
-                                    stationRules.forEach { rule ->
-                                        val num = rule.stationNumber
-                                        val selected = manualStation == num
-                                        val accent = stationAccentColor(rule.badgeNumber ?: num, isDark)
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(AppleCorners.SmallElement))
-                                                .background(if (selected) accent else accent.copy(alpha = 0.14f))
-                                                .clickable { manualStation = num }
-                                                .padding(horizontal = 10.dp, vertical = 7.dp)
-                                        ) {
-                                            Text(
-                                                text = "${rule.circleSymbol} ${rule.displayName}",
-                                                style = MaterialTheme.typography.labelMedium.copy(
-                                                    fontWeight = FontWeight.Bold
-                                                ),
-                                                color = if (selected) Color.White else accent,
-                                                softWrap = false,
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                if (tabIndex == 0) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = manualCode,
+                            onValueChange = { manualCode = it.take(20) },
+                            label = { Text("取件码") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(AppleCorners.InnerCard),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (stationRules.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(10.dp))
-                            OutlinedTextField(
-                                value = manualProduct,
-                                onValueChange = { manualProduct = it.take(24) },
-                                label = { Text("商品备注（选填）") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(AppleCorners.InnerCard),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-
-                        Row(
-                            horizontalArrangement = Arrangement.End,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 14.dp)
-                        ) {
-                            TextButton(onClick = onDismiss) { Text("取消") }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Button(
-                                enabled = manualCode.isNotBlank(),
-                                onClick = {
-                                    onManualAdd(manualCode, manualStation, manualProduct)
-                                    onDismiss()
-                                },
-                                shape = RoundedCornerShape(AppleCorners.InnerCard)
-                            ) {
-                                Text("保存取件码", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    1 -> {
-                        Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
-                                text = "支持多码合并短信，自动拆分为独立记录：",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "选择快递房：",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                softWrap = false,
+                                maxLines = 1
                             )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            OutlinedTextField(
-                                value = rawSmsInput,
-                                onValueChange = { rawSmsInput = it },
-                                placeholder = {
-                                    Text("在此粘贴快递短信全文...")
-                                },
-                                minLines = 4,
-                                maxLines = 5,
-                                shape = RoundedCornerShape(AppleCorners.InnerCard),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-
-                        Row(
-                            horizontalArrangement = Arrangement.End,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 14.dp)
-                        ) {
-                            TextButton(onClick = onDismiss) { Text("取消") }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Button(
-                                enabled = rawSmsInput.isNotBlank(),
-                                onClick = {
-                                    onPasteParse(rawSmsInput)
-                                    onDismiss()
-                                },
-                                shape = RoundedCornerShape(AppleCorners.InnerCard)
-                            ) {
-                                Text("智能解析入库", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    else -> {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = "仅读取本次勾选截图，全程离线识别不申请相册权限：",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Box(
-                                contentAlignment = Alignment.Center,
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(152.dp)
-                                    .liquidGlassInnerCard(
-                                        cornerRadius = AppleCorners.InnerCard,
-                                        accentTint = primaryColor
-                                    )
-                                    .clickable(enabled = !isScanningScreenshot) {
-                                        pickScreenshotLauncher.launch(
-                                            PickVisualMediaRequest(
-                                                ActivityResultContracts.PickVisualMedia.ImageOnly
-                                            )
-                                        )
-                                    }
-                                    .padding(horizontal = 16.dp)
+                                    .horizontalScroll(rememberScrollState())
                             ) {
-                                if (isScanningScreenshot) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                stationRules.forEach { rule ->
+                                    val num = rule.stationNumber
+                                    val selected = manualStation == num
+                                    val accent = stationAccentColor(rule.badgeNumber ?: num, isDark)
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                                            .background(if (selected) accent else accent.copy(alpha = 0.14f))
+                                            .clickable { manualStation = num }
+                                            .padding(horizontal = 10.dp, vertical = 7.dp)
                                     ) {
-                                        CircularProgressIndicator(
-                                            color = primaryColor,
-                                            strokeWidth = 3.dp,
-                                            modifier = Modifier.size(30.dp)
-                                        )
                                         Text(
-                                            text = "正在离线识别截图中的取件码...",
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontWeight = FontWeight.SemiBold
-                                            ),
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                } else {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .size(54.dp)
-                                                .clip(CircleShape)
-                                                .background(primaryColor.copy(alpha = 0.14f))
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Add,
-                                                contentDescription = "选择取件码截图",
-                                                tint = primaryColor,
-                                                modifier = Modifier.size(32.dp)
-                                            )
-                                        }
-                                        Text(
-                                            text = "点击上传取件码截图",
-                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                            text = "${rule.circleSymbol} ${rule.displayName}",
+                                            style = MaterialTheme.typography.labelMedium.copy(
                                                 fontWeight = FontWeight.Bold
                                             ),
-                                            color = MaterialTheme.colorScheme.onSurface,
+                                            color = if (selected) Color.White else accent,
                                             softWrap = false,
                                             maxLines = 1
                                         )
-                                        Text(
-                                            text = if (lastOcrFailedHint) {
-                                                "未识别出有效文字，请更换清晰截图重试"
-                                            } else {
-                                                "调用系统照片选择器 · 自动提取并导入待取"
-                                            },
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = if (lastOcrFailedHint) {
-                                                if (isDark) AppleOrangeDark else AppleOrangeLight
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
                                     }
                                 }
                             }
                         }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = manualProduct,
+                            onValueChange = { manualProduct = it.take(24) },
+                            label = { Text("商品备注（选填）") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(AppleCorners.InnerCard),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
-                        Row(
-                            horizontalArrangement = Arrangement.End,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 14.dp)
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 14.dp)
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("取消", softWrap = false, maxLines = 1)
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Button(
+                            enabled = manualCode.isNotBlank(),
+                            onClick = {
+                                onManualAdd(manualCode, manualStation, manualProduct)
+                                onDismiss()
+                            },
+                            shape = RoundedCornerShape(AppleCorners.InnerCard)
                         ) {
-                            TextButton(
-                                enabled = !isScanningScreenshot,
-                                onClick = onDismiss
-                            ) {
-                                Text("取消")
-                            }
+                            Text("保存取件码", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
+                        }
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "支持多码合并短信，自动拆分为独立记录",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = rawSmsInput,
+                            onValueChange = { rawSmsInput = it },
+                            placeholder = {
+                                Text("在此粘贴快递短信全文...")
+                            },
+                            minLines = 4,
+                            maxLines = 5,
+                            shape = RoundedCornerShape(AppleCorners.InnerCard),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 14.dp)
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("取消", softWrap = false, maxLines = 1)
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Button(
+                            enabled = rawSmsInput.isNotBlank(),
+                            onClick = {
+                                onPasteParse(rawSmsInput)
+                                onDismiss()
+                            },
+                            shape = RoundedCornerShape(AppleCorners.InnerCard)
+                        ) {
+                            Text("智能解析入库", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
                     }
                 }
@@ -1062,8 +924,7 @@ fun SharePickupMethodDialog(
 
             ShareOptionCard(
                 icon = Icons.Rounded.Image,
-                title = if (isGeneratingImage) "正在生成清单图片..." else "以图片分享",
-                subtitle = "生成高清分组清单长图，适合微信直接发送",
+                title = if (isGeneratingImage) "正在准备清单图片..." else "以图片分享",
                 accent = imageAccent,
                 enabled = !isGeneratingImage,
                 onClick = { onShareAsImage(includeRemarks) }
@@ -1158,7 +1019,6 @@ fun SharePickupMethodDialog(
 private fun ShareOptionCard(
     icon: ImageVector,
     title: String,
-    subtitle: String,
     accent: Color,
     enabled: Boolean,
     onClick: () -> Unit
@@ -1189,25 +1049,16 @@ private fun ShareOptionCard(
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            ),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
     }
 }

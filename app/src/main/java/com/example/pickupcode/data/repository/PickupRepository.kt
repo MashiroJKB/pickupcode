@@ -41,21 +41,13 @@ class PickupRepository(
         rawText: String,
         source: String,
         senderOrPackage: String = "",
-        messageTimestamp: Long = System.currentTimeMillis(),
-        isOcrText: Boolean = false
+        messageTimestamp: Long = System.currentTimeMillis()
     ): Int = withContext(Dispatchers.IO) {
         val settings = settingsDataStore.settingsFlow.first()
-        val parsedList = if (isOcrText) {
-            PickupMessageParser.parseFromOcr(
-                rawOcrText = rawText,
-                stationRules = settings.stationRules
-            )
-        } else {
-            PickupMessageParser.parse(
-                rawText = rawText,
-                stationRules = settings.stationRules
-            )
-        }
+        val parsedList = PickupMessageParser.parse(
+            rawText = rawText,
+            stationRules = settings.stationRules
+        )
         if (parsedList.isEmpty()) return@withContext 0
 
         ingestMutex.withLock {

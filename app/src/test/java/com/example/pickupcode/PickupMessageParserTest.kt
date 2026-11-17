@@ -116,26 +116,14 @@ class PickupMessageParserTest {
     }
 
     @Test
-    fun `parses pickup codes cleanly from noisy ocr screenshot text`() {
-        val ocrText = """
-            菜鸟驿站 待取件
-            家属区1号站
-            取件码：１ - ２ - ３０４５
-            凭取件码 A12 - 3098 到2号房领取
-            限时领取双11优惠券
-        """.trimIndent()
-
-        val results = PickupMessageParser.parseFromOcr(ocrText, defaultRules)
-
-        assertEquals(listOf("1-2-3045", "A12-3098"), results.map { it.code })
-
-        val lockerOcrText = """
+    fun `parses multiline sms with cross-line locker pickup code`() {
+        val lockerSms = """
             丰巢快递柜
             取件码
             839201
             凭此码开箱取件
         """.trimIndent()
-        val lockerResults = PickupMessageParser.parseFromOcr(lockerOcrText, defaultRules)
+        val lockerResults = PickupMessageParser.parse(lockerSms, defaultRules)
         assertEquals(listOf("839201"), lockerResults.map { it.code })
     }
 

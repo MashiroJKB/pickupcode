@@ -322,18 +322,10 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         items.filter { !it.isPickedUp }
     }
 
-    LaunchedEffect(pendingItems, isShareSelectionMode) {
-        if (isShareSelectionMode && pendingItems.isEmpty()) {
-            isShareSelectionMode = false
-            shareSelectedIds = emptySet()
-            showShareMethodDialog = false
-        }
+    val activeSelectedItems = remember(pendingItems, selectedItemIds) {
+        pendingItems.filter { it.id in selectedItemIds }
     }
-
-    val activeSelectedCount = remember(pendingItems, selectedItemIds) {
-        val pendingIds = pendingItems.asSequence().map { it.id }.toSet()
-        selectedItemIds.count { it in pendingIds }
-    }
+    val activeSelectedCount = activeSelectedItems.size
 
     BackHandler(enabled = !showSettingsScreen && !isShareSelectionMode && activeSelectedCount > 0) {
         viewModel.clearSelection()
@@ -341,6 +333,18 @@ fun PickupMainApp(viewModel: PickupViewModel) {
 
     val activeShareSelectedItems = remember(pendingItems, shareSelectedIds) {
         pendingItems.filter { it.id in shareSelectedIds }
+    }
+
+    val dialogShareItems = if (isShareSelectionMode) activeShareSelectedItems else activeSelectedItems
+
+    LaunchedEffect(pendingItems, isShareSelectionMode, dialogShareItems) {
+        if (isShareSelectionMode && pendingItems.isEmpty()) {
+            isShareSelectionMode = false
+            shareSelectedIds = emptySet()
+            showShareMethodDialog = false
+        } else if (showShareMethodDialog && dialogShareItems.isEmpty() && !isGeneratingShareImage) {
+            showShareMethodDialog = false
+        }
     }
 
     val settingsProgress by animateFloatAsState(
@@ -381,6 +385,8 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         onEnterShareMode = {
                             if (pendingItems.isEmpty()) {
                                 viewModel.showCapsuleToast("暂无待取快递可分享")
+                            } else if (activeSelectedItems.isNotEmpty()) {
+                                showShareMethodDialog = true
                             } else {
                                 shareSelectedIds = emptySet()
                                 isShareSelectionMode = true
@@ -399,6 +405,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                             }
                         },
                         onToggleSelectAllForPickup = viewModel::toggleSelectAllPending,
+                        onClearPickupSelection = viewModel::clearSelection,
                         onToggleShareItem = { item ->
                             shareSelectedIds = if (item.id in shareSelectedIds) {
                                 shareSelectedIds - item.id
@@ -554,16 +561,13 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         )
     }
 
-    // 4. 添加取件码弹窗（支持手动输入、粘贴短信与系统照片选择器离线截图解析）
+    // 4. 添加取件码弹窗（默认手动输入取件码）
     if (showAddOrPasteDialog) {
         AddOrPastePickupDialog(
             stationRules = settings.stationRules,
             onDismiss = { showAddOrPasteDialog = false },
             onPasteParse = viewModel::pasteAndParseSms,
-            onManualAdd = viewModel::addManualPickupCode,
-            onScanScreenshot = { imageUri, onComplete ->
-                viewModel.importPickupFromScreenshotUri(context, imageUri, onComplete)
-            }
+            onManualAdd = viewModel::addManualPickupCode
         )
     }
 
@@ -583,27 +587,33 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         )
     }
 
-    // 6. 分享取件码方式选择弹窗（仅图片分享，可选是否附带备注）
-    if (showShareMethodDialog && activeShareSelectedItems.isNotEmpty()) {
+    // 6. 分享取件码弹窗（仅图片分享，可选是否附带备注）
+    if (showShareMethodDialog && dialogShareItems.isNotEmpty()) {
         SharePickupMethodDialog(
-            selectedCount = activeShareSelectedItems.size,
+            selectedCount = dialogShareItems.size,
             isGeneratingImage = isGeneratingShareImage,
-            onDismiss = { showShareMethodDialog = false },
+            onDismiss = {
+                if (!isGeneratingShareImage) showShareMethodDialog = false
+            },
             onShareAsImage = { includeRemarks ->
                 if (isGeneratingShareImage) return@SharePickupMethodDialog
                 isGeneratingShareImage = true
                 coroutineScope.launch {
                     val launched = PickupShareHelper.launchImageShare(
                         context = context,
-                        items = activeShareSelectedItems,
+                        items = dialogShareItems,
                         stationRules = settings.stationRules,
                         includeRemarks = includeRemarks
                     )
                     isGeneratingShareImage = false
                     showShareMethodDialog = false
                     if (launched) {
-                        isShareSelectionMode = false
-                        shareSelectedIds = emptySet()
+                        if (isShareSelectionMode) {
+                            isShareSelectionMode = false
+                            shareSelectedIds = emptySet()
+                        } else {
+                            viewModel.clearSelection()
+                        }
                     } else {
                         viewModel.showCapsuleToast("暂无可调用的图片分享应用")
                     }

@@ -1,9 +1,14 @@
 package com.example.pickupcode.ui.home
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -92,6 +97,7 @@ fun HomeScreen(
     onExitShareMode: () -> Unit,
     onToggleSelectAllForShare: () -> Unit,
     onToggleSelectAllForPickup: () -> Unit,
+    onClearPickupSelection: () -> Unit,
     onToggleShareItem: (PickupItemEntity) -> Unit,
     onRequestSmsPermission: () -> Unit,
     onQuickAddClick: () -> Unit,
@@ -197,11 +203,30 @@ fun HomeScreen(
                 isShareSelectionMode = isShareSelectionMode,
                 shareSelectedCount = activeShareSelectedCount,
                 allSelectedForShare = pendingCount > 0 && activeShareSelectedCount == pendingCount,
-                onOpenSettings = onOpenSettings,
-                onEnterShareMode = onEnterShareMode,
-                onExitShareMode = onExitShareMode,
-                onToggleSelectAllForShare = onToggleSelectAllForShare,
-                onToggleSelectAllForPickup = onToggleSelectAllForPickup,
+                onOpenSettings = {
+                    activeSwipedItemId = null
+                    onOpenSettings()
+                },
+                onEnterShareMode = {
+                    activeSwipedItemId = null
+                    onEnterShareMode()
+                },
+                onExitShareMode = {
+                    activeSwipedItemId = null
+                    onExitShareMode()
+                },
+                onToggleSelectAllForShare = {
+                    activeSwipedItemId = null
+                    onToggleSelectAllForShare()
+                },
+                onToggleSelectAllForPickup = {
+                    activeSwipedItemId = null
+                    onToggleSelectAllForPickup()
+                },
+                onClearPickupSelection = {
+                    activeSwipedItemId = null
+                    onClearPickupSelection()
+                },
                 onRequestSmsPermission = onRequestSmsPermission,
                 isDark = isDark
             )
@@ -281,6 +306,7 @@ private fun HomeTopHeader(
     onExitShareMode: () -> Unit,
     onToggleSelectAllForShare: () -> Unit,
     onToggleSelectAllForPickup: () -> Unit,
+    onClearPickupSelection: () -> Unit,
     onRequestSmsPermission: () -> Unit,
     isDark: Boolean
 ) {
@@ -292,35 +318,43 @@ private fun HomeTopHeader(
         pickupSelectedCount > 0 -> HomeHeaderMode.PICKUP_SELECT
         else -> HomeHeaderMode.NORMAL
     }
+    val showSelectAllOnLeft = headerMode != HomeHeaderMode.NORMAL
+    val isAllSelected = if (headerMode == HomeHeaderMode.SHARE_SELECT) {
+        allSelectedForShare
+    } else {
+        allSelectedForPickup
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 2.dp)
     ) {
-        AnimatedContent(
-            targetState = headerMode,
-            transitionSpec = {
-                fadeIn(animationSpec = spring(stiffness = 460f)) togetherWith
-                    fadeOut(animationSpec = spring(stiffness = 520f))
-            },
-            label = "home_header_mode_transition"
-        ) { mode ->
-            val showSelectAllOnLeft = mode != HomeHeaderMode.NORMAL
-            val isAllSelected = if (mode == HomeHeaderMode.SHARE_SELECT) {
-                allSelectedForShare
-            } else {
-                allSelectedForPickup
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp)
-            ) {
-                if (showSelectAllOnLeft) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+        ) {
+            AnimatedContent(
+                targetState = showSelectAllOnLeft,
+                transitionSpec = {
+                    (fadeIn(animationSpec = spring(stiffness = 460f)) +
+                        scaleIn(
+                            initialScale = 0.92f,
+                            animationSpec = spring(stiffness = 460f)
+                        )) togetherWith
+                        (fadeOut(animationSpec = spring(stiffness = 520f)) +
+                            scaleOut(
+                                targetScale = 0.92f,
+                                animationSpec = spring(stiffness = 520f)
+                            )) using SizeTransform(clip = false)
+                },
+                label = "home_header_left_transition",
+                modifier = Modifier.weight(1f, fill = false)
+            ) { inSelectAllMode ->
+                if (inSelectAllMode) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -332,7 +366,7 @@ private fun HomeTopHeader(
                             )
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                if (mode == HomeHeaderMode.SHARE_SELECT) {
+                                if (headerMode == HomeHeaderMode.SHARE_SELECT) {
                                     onToggleSelectAllForShare()
                                 } else {
                                     onToggleSelectAllForPickup()
@@ -359,10 +393,7 @@ private fun HomeTopHeader(
                         )
                     }
                 } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "取件码",
                             style = MaterialTheme.typography.headlineLarge,
@@ -401,73 +432,82 @@ private fun HomeTopHeader(
                         }
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-                if (mode == HomeHeaderMode.SHARE_SELECT) {
-                    Box(
-                        contentAlignment = Alignment.Center,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = 0.88f,
+                        stiffness = 460f
+                    )
+                )
+            ) {
+                // 正常与普通勾选状态下均保留「分享取件码」入口；进入专用分享选择模式后底部已有主按钮则自动收起
+                AnimatedVisibility(
+                    visible = headerMode != HomeHeaderMode.SHARE_SELECT,
+                    enter = fadeIn(animationSpec = spring(stiffness = 460f)) +
+                        scaleIn(
+                            initialScale = 0.90f,
+                            animationSpec = spring(stiffness = 460f)
+                        ),
+                    exit = fadeOut(animationSpec = spring(stiffness = 520f)) +
+                        scaleOut(
+                            targetScale = 0.90f,
+                            animationSpec = spring(stiffness = 520f)
+                        )
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .height(36.dp)
                             .clip(RoundedCornerShape(AppleCorners.Pill))
-                            .background(
-                                MaterialTheme.colorScheme.onSurface.copy(
-                                    alpha = if (isDark) 0.14f else 0.08f
-                                )
-                            )
+                            .background(primaryColor.copy(alpha = 0.14f))
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onExitShareMode()
+                                onEnterShareMode()
                             }
-                            .padding(horizontal = 16.dp)
+                            .padding(horizontal = 12.dp)
                     ) {
+                        ForwardArrowIcon(
+                            tint = primaryColor,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = "取消",
+                            text = "分享取件码",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             ),
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = primaryColor,
                             softWrap = false,
                             maxLines = 1
                         )
                     }
-                } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // 转发图标 + 分享取件码按钮
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .height(36.dp)
-                                .clip(RoundedCornerShape(AppleCorners.Pill))
-                                .background(primaryColor.copy(alpha = 0.14f))
-                                .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onEnterShareMode()
-                                }
-                                .padding(horizontal = 12.dp)
-                        ) {
-                            ForwardArrowIcon(
-                                tint = primaryColor,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = "分享取件码",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                ),
-                                color = primaryColor,
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                        }
+                }
 
-                        // 极简设置齿轮圆形图标按钮
+                // 最右侧：普通模式展示极简设置齿轮，勾选/分享选择状态下切换为「取消」以退出勾选状态
+                AnimatedContent(
+                    targetState = headerMode == HomeHeaderMode.NORMAL,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = spring(stiffness = 460f)) +
+                            scaleIn(
+                                initialScale = 0.88f,
+                                animationSpec = spring(stiffness = 460f)
+                            )) togetherWith
+                            (fadeOut(animationSpec = spring(stiffness = 520f)) +
+                                scaleOut(
+                                    targetScale = 0.88f,
+                                    animationSpec = spring(stiffness = 520f)
+                                )) using SizeTransform(clip = false)
+                    },
+                    label = "home_header_trailing_transition"
+                ) { isNormalMode ->
+                    if (isNormalMode) {
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
@@ -486,6 +526,38 @@ private fun HomeTopHeader(
                                 modifier = Modifier.size(19.dp)
                             )
                         }
+                    } else {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(AppleCorners.Pill))
+                                .background(
+                                    MaterialTheme.colorScheme.onSurface.copy(
+                                        alpha = if (isDark) 0.14f else 0.08f
+                                    )
+                                )
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    if (headerMode == HomeHeaderMode.SHARE_SELECT) {
+                                        onExitShareMode()
+                                    } else {
+                                        onClearPickupSelection()
+                                    }
+                                }
+                                .padding(horizontal = 16.dp)
+                        ) {
+                            Text(
+                                text = "取消",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                softWrap = false,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
@@ -496,7 +568,7 @@ private fun HomeTopHeader(
                 isShareSelectionMode ->
                     "已选 $shareSelectedCount / $totalPending 件 · 点击卡片或「全选」"
                 pickupSelectedCount > 0 ->
-                    "已选 $pickupSelectedCount / $totalPending 件 · 点击「全选」或底部操作"
+                    "已选 $pickupSelectedCount / $totalPending 件 · 可底部操作或直接分享"
                 totalPending > 0 && activeStationCount > 0 ->
                     "当前 $totalPending 件待取 · 分布在 $activeStationCount 个快递房"
                 totalPending > 0 ->

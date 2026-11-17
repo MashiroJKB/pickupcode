@@ -2,14 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 严格遵循隐私原则：100% 纯本地离线解析与存储，显式拦截任何三方依赖可能合并的联网权限 -->
-    <uses-permission
-        android:name="android.permission.INTERNET"
-        tools:node="remove" />
-    <uses-permission
-        android:name="android.permission.ACCESS_NETWORK_STATE"
-        tools:node="remove" />
-
+    <!-- 严格遵循隐私原则：100% 纯本地离线解析与存储，绝不声明 INTERNET 权限 -->
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />

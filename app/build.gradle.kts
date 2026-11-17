@@ -13,12 +13,8 @@ android {
         applicationId = "com.example.pickupcode"
         minSdk = 29
         targetSdk = 35
-        versionCode = 17
-        versionName = "2.3.0"
-
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-        }
+        versionCode = 18
+        versionName = "2.3.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -81,9 +77,6 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
-
-    // 离线本地图文识别（仅端侧识别模型，配合无联网权限拦截）
-    implementation(libs.mlkit.text.recognition.chinese)
 
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)

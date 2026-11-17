@@ -10,7 +10,6 @@ import com.example.pickupcode.data.local.AppSettings
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.SettingsDataStore
 import com.example.pickupcode.data.repository.PickupRepository
-import com.example.pickupcode.util.PickupOcrHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -242,40 +241,6 @@ class PickupViewModel(
             } else {
                 showCapsuleToast("未识别到有效新取件码（已排除已取或干扰短信）")
             }
-        }
-    }
-
-    /**
-     * 通过本地离线 OCR 识别用户主动勾选的截图并导入待取列表
-     */
-    fun importPickupFromScreenshotUri(
-        context: Context,
-        imageUri: android.net.Uri,
-        onResult: (importedCount: Int, recognizedText: String) -> Unit
-    ) {
-        viewModelScope.launch {
-            val recognizedText = try {
-                PickupOcrHelper.recognizeTextFromImageUri(context, imageUri).trim()
-            } catch (_: Exception) {
-                ""
-            }
-            if (recognizedText.isBlank()) {
-                showCapsuleToast("未在图片中识别到清晰文字")
-                onResult(0, "")
-                return@launch
-            }
-            val importedCount = repository.ingestRawMessage(
-                rawText = recognizedText,
-                source = PickupItemEntity.SOURCE_MANUAL,
-                senderOrPackage = "ocr_screenshot",
-                isOcrText = true
-            )
-            if (importedCount > 0) {
-                showCapsuleToast("截图识别成功：导入 $importedCount 条取件码")
-            } else {
-                showCapsuleToast("未匹配到新取件码，可核对识别文本后导入")
-            }
-            onResult(importedCount, recognizedText)
         }
     }
 
