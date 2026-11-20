@@ -173,9 +173,9 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.3.5" }
+            info.versionName.orEmpty().ifBlank { "2.3.6" }
         } catch (_: Exception) {
-            "2.3.5"
+            "2.3.6"
         }
     }
 
@@ -199,7 +199,10 @@ fun SettingsScreen(
         }
     }
 
-    val pendingCount = items.count { !it.isPickedUp }
+    val pendingCount = remember(items) { items.count { !it.isPickedUp } }
+    val activeStationCount = remember(items) {
+        items.filter { !it.isPickedUp && it.stationNumber > 0 }.map { it.stationNumber }.distinct().size
+    }
     val pickedUpItems = remember(items) {
         items.filter { it.isPickedUp }
             .sortedByDescending { it.pickedUpAt ?: it.updatedAt }
@@ -336,7 +339,7 @@ fun SettingsScreen(
                     )
                     StatBox(
                         title = "覆盖快递房",
-                        value = "${items.filter { !it.isPickedUp && it.stationNumber > 0 }.map { it.stationNumber }.distinct().size}",
+                        value = "$activeStationCount",
                         unit = "个",
                         accent = TaobaoOrangeStart,
                         modifier = Modifier.weight(1f)
@@ -354,7 +357,8 @@ fun SettingsScreen(
                     subtitle = "授权后自动扫描近 7 天取件短信",
                     accentColor = statusAmber,
                     buttonText = "开启权限",
-                    onClick = onRequestSmsPermission
+                    onClick = onRequestSmsPermission,
+                    modifier = Modifier.animateItem()
                 )
             }
         }
@@ -368,7 +372,8 @@ fun SettingsScreen(
                     subtitle = "开启后在桌面同步待取件数",
                     accentColor = statusAmber,
                     buttonText = "开启通知",
-                    onClick = onRequestNotificationPermission
+                    onClick = onRequestNotificationPermission,
+                    modifier = Modifier.animateItem()
                 )
             }
         }
@@ -377,6 +382,7 @@ fun SettingsScreen(
         item(key = "station_rules_card") {
             Column(
                 modifier = Modifier
+                    .animateItem()
                     .fillMaxWidth()
                     .liquidGlass(cornerRadius = AppleCorners.OuterCard)
                     .padding(18.dp)
@@ -527,6 +533,22 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                if (localRules.isEmpty()) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = "暂无快递房规则，可点击上方添加或重置",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                } else {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     localRules.forEach { rule ->
                         key(rule.stationNumber) {
@@ -683,6 +705,7 @@ fun SettingsScreen(
                         }
                     }
                 }
+                }
             }
         }
 
@@ -690,6 +713,7 @@ fun SettingsScreen(
         item(key = "identity_code_switches_card") {
             Column(
                 modifier = Modifier
+                    .animateItem()
                     .fillMaxWidth()
                     .liquidGlass(cornerRadius = AppleCorners.OuterCard)
                     .padding(18.dp)
@@ -758,7 +782,8 @@ fun SettingsScreen(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     openUrlInDefaultBrowser(context, GITHUB_REPO_URL, onFeedbackMessage)
-                }
+                },
+                modifier = Modifier.animateItem()
             )
         }
 
@@ -773,7 +798,8 @@ fun SettingsScreen(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     openUrlInDefaultBrowser(context, GITHUB_RELEASES_URL, onFeedbackMessage)
-                }
+                },
+                modifier = Modifier.animateItem()
             )
         }
     }
@@ -845,12 +871,13 @@ private fun SettingsLinkCard(
     title: String,
     badgeText: String,
     url: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .liquidGlass(cornerRadius = AppleCorners.OuterCard)
             .clickable(onClick = onClick)
@@ -955,10 +982,11 @@ private fun PermissionStatusCard(
     subtitle: String,
     accentColor: Color,
     buttonText: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .liquidGlass(cornerRadius = AppleCorners.OuterCard)
             .padding(18.dp)

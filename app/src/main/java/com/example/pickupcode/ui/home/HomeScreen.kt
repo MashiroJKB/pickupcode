@@ -295,6 +295,12 @@ private fun HomeTopHeader(
     } else {
         allSelectedForPickup
     }
+    // 退场期间保持「全选」最后一次选中配色，防止点击「取消」时从实心蓝闪烁变回浅蓝
+    val lastAllSelectedHolder = remember { object { var value = false } }
+    if (showSelectAllOnLeft) {
+        lastAllSelectedHolder.value = isAllSelected
+    }
+    val displayedAllSelected = if (showSelectAllOnLeft) isAllSelected else lastAllSelectedHolder.value
 
     Column(
         modifier = Modifier
@@ -322,6 +328,7 @@ private fun HomeTopHeader(
                                 animationSpec = spring(stiffness = 520f)
                             )) using SizeTransform(clip = false)
                 },
+                contentAlignment = Alignment.CenterStart,
                 label = "home_header_left_transition",
                 modifier = Modifier.weight(1f, fill = false)
             ) { inSelectAllMode ->
@@ -332,7 +339,7 @@ private fun HomeTopHeader(
                             .height(36.dp)
                             .clip(RoundedCornerShape(AppleCorners.Pill))
                             .background(
-                                if (isAllSelected) primaryColor
+                                if (displayedAllSelected) primaryColor
                                 else primaryColor.copy(alpha = 0.14f)
                             )
                             .clickable {
@@ -348,7 +355,7 @@ private fun HomeTopHeader(
                         Icon(
                             imageVector = Icons.Rounded.DoneAll,
                             contentDescription = "全选",
-                            tint = if (isAllSelected) Color.White else primaryColor,
+                            tint = if (displayedAllSelected) Color.White else primaryColor,
                             modifier = Modifier.size(17.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -358,7 +365,7 @@ private fun HomeTopHeader(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             ),
-                            color = if (isAllSelected) Color.White else primaryColor,
+                            color = if (displayedAllSelected) Color.White else primaryColor,
                             softWrap = false,
                             maxLines = 1
                         )

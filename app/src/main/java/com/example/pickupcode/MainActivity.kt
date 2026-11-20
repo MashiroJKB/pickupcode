@@ -171,12 +171,11 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     var shareSelectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showShareMethodDialog by remember { mutableStateOf(false) }
     var isGeneratingShareImage by remember { mutableStateOf(false) }
-    var renderedToast by remember { mutableStateOf("") }
-    LaunchedEffect(capsuleToast) {
-        if (capsuleToast != null) {
-            renderedToast = capsuleToast.orEmpty()
-        }
+    val lastToastHolder = remember { object { var text = "" } }
+    if (capsuleToast != null) {
+        lastToastHolder.text = capsuleToast.orEmpty()
     }
+    val renderedToast = capsuleToast ?: lastToastHolder.text
     val homeListState = rememberLazyListState()
     val settingsListState = rememberLazyListState()
 

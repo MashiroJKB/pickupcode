@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,12 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,7 +62,8 @@ private enum class CenterActionMode {
     NONE,
     CONFIRM_PICKED_UP,
     UNDO_PICKED_UP,
-    SHARE_SELECTED
+    SHARE_EMPTY,
+    SHARE_READY
 }
 
 /**
@@ -96,25 +93,37 @@ fun HomeBottomFloatingBar(
     val deleteRed = if (isDark) AppleRedDark else AppleRedLight
 
     val actionMode = when {
-        isShareSelectionMode -> CenterActionMode.SHARE_SELECTED
+        isShareSelectionMode && shareSelectedCount > 0 -> CenterActionMode.SHARE_READY
+        isShareSelectionMode -> CenterActionMode.SHARE_EMPTY
         selectedCount > 0 -> CenterActionMode.CONFIRM_PICKED_UP
         canUndo -> CenterActionMode.UNDO_PICKED_UP
         else -> CenterActionMode.NONE
     }
 
-    // 保留退场动画期间的最后一次有效态与计数，避免胶囊退出时闪现「确认已取 (0)」或缩成空白点
-    var displayedActionMode by remember { mutableStateOf(CenterActionMode.CONFIRM_PICKED_UP) }
-    var displayedSelectedCount by remember { mutableIntStateOf(1) }
-    var displayedShareCount by remember { mutableIntStateOf(0) }
-    LaunchedEffect(actionMode, selectedCount, shareSelectedCount) {
-        if (actionMode != CenterActionMode.NONE) {
-            displayedActionMode = actionMode
+    // 同步记录最后一次有效态与计数：
+    // 1. 入场首帧即展示正确状态，绝不闪现默认态；
+    // 2. 退场期间保留原状态、原计数与原水平安全间距，避免胶囊缩点、闪现 (0) 或被突然挤压。
+    val lastState = remember {
+        object {
+            var mode: CenterActionMode = CenterActionMode.CONFIRM_PICKED_UP
+            var selectedCount: Int = 1
+            var shareCount: Int = 1
         }
-        if (selectedCount > 0) {
-            displayedSelectedCount = selectedCount
-        }
-        displayedShareCount = shareSelectedCount
     }
+    if (actionMode != CenterActionMode.NONE) {
+        lastState.mode = actionMode
+    }
+    if (selectedCount > 0) {
+        lastState.selectedCount = selectedCount
+    }
+    if (shareSelectedCount > 0) {
+        lastState.shareCount = shareSelectedCount
+    }
+    val displayedActionMode = if (actionMode != CenterActionMode.NONE) actionMode else lastState.mode
+    val displayedSelectedCount = if (selectedCount > 0) selectedCount else lastState.selectedCount
+    val displayedShareCount = if (shareSelectedCount > 0) shareSelectedCount else lastState.shareCount
+    val isDisplayingSharePill = displayedActionMode == CenterActionMode.SHARE_EMPTY ||
+        displayedActionMode == CenterActionMode.SHARE_READY
 
     Box(
         modifier = modifier
@@ -155,7 +164,7 @@ fun HomeBottomFloatingBar(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .align(Alignment.Center)
-                .padding(horizontal = if (isShareSelectionMode) 16.dp else 72.dp)
+                .padding(horizontal = if (isDisplayingSharePill) 16.dp else 72.dp)
         ) {
             AnimatedVisibility(
                 visible = actionMode != CenterActionMode.NONE,
@@ -183,6 +192,7 @@ fun HomeBottomFloatingBar(
                                 animationSpec = spring(stiffness = Spring.StiffnessMedium)
                             ) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)))
                     },
+                    contentAlignment = Alignment.Center,
                     label = "confirm_or_undo_transition"
                 ) { mode ->
                     when (mode) {
@@ -210,35 +220,36 @@ fun HomeBottomFloatingBar(
                             )
                         }
 
-                        CenterActionMode.SHARE_SELECTED -> {
-                            if (displayedShareCount > 0) {
-                                CenterActionPill(
-                                    icon = Icons.Rounded.Share,
-                                    text = "分享已选 ($displayedShareCount)",
-                                    accentColor = MaterialTheme.colorScheme.primary,
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onConfirmShareClick()
-                                    }
-                                )
-                            } else {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .liquidGlass(cornerRadius = AppleCorners.Pill)
-                                        .padding(horizontal = 20.dp, vertical = 13.dp)
-                                ) {
-                                    Text(
-                                        text = "请勾选要分享的取件码",
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        softWrap = false,
-                                        maxLines = 1
-                                    )
+                        CenterActionMode.SHARE_READY -> {
+                            CenterActionPill(
+                                icon = Icons.Rounded.Share,
+                                text = "分享已选 ($displayedShareCount)",
+                                accentColor = MaterialTheme.colorScheme.primary,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onConfirmShareClick()
                                 }
+                            )
+                        }
+
+                        CenterActionMode.SHARE_EMPTY -> {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .height(48.dp)
+                                    .liquidGlass(cornerRadius = AppleCorners.Pill)
+                                    .padding(horizontal = 20.dp)
+                            ) {
+                                Text(
+                                    text = "请勾选要分享的取件码",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    softWrap = false,
+                                    maxLines = 1
+                                )
                             }
                         }
 
@@ -327,6 +338,7 @@ private fun CenterActionPill(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
+            .height(48.dp)
             .shadow(
                 elevation = 12.dp,
                 shape = RoundedCornerShape(AppleCorners.Pill),
@@ -341,7 +353,7 @@ private fun CenterActionPill(
                 shape = RoundedCornerShape(AppleCorners.Pill)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .padding(horizontal = 20.dp)
     ) {
         Icon(
             imageVector = icon,

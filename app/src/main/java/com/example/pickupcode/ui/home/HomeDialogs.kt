@@ -7,7 +7,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -178,6 +177,14 @@ fun RawMessageDetailDialog(
     }
     val accent = stationAccentColor(badgeNum ?: item.stationNumber, isDark)
     val dateFormat = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
+    val stationRowState = rememberLazyListState()
+
+    LaunchedEffect(item.id, item.stationNumber, stationRules) {
+        val targetIndex = stationRules.indexOfFirst { it.stationNumber == item.stationNumber }
+        if (targetIndex >= 0) {
+            stationRowState.scrollToItem(targetIndex)
+        }
+    }
 
     SpringGlassDialog(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -262,13 +269,15 @@ fun RawMessageDetailDialog(
                     maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                LazyRow(
+                    state = stationRowState,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    stationRules.forEach { rule ->
+                    items(
+                        items = stationRules,
+                        key = { "detail_station_${it.stationNumber}" }
+                    ) { rule ->
                         val num = rule.stationNumber
                         val selected = item.stationNumber == num
                         val numAccent = stationAccentColor(rule.badgeNumber ?: num, isDark)
@@ -566,7 +575,7 @@ fun AddOrPastePickupDialog(
                 verticalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 248.dp)
+                    .heightIn(min = 276.dp)
             ) {
                 if (tabIndex == 0) {
                     Column(modifier = Modifier.fillMaxWidth()) {
