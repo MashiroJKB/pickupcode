@@ -30,8 +30,8 @@ import kotlinx.coroutines.runBlocking
 
 /**
  * 桌面液态玻璃小组件 Provider：
- * - 严格锁定 4 格宽（targetCellWidth=4, minWidth/minResizeWidth=296dp, resizeMode=vertical），
- *   仅允许从 2 格高度起纵向自由扩展，避免误缩窄导致排版挤压；
+ * - 严格锁定 4×4 尺寸（targetCellWidth=4, targetCellHeight=4, minWidth/minHeight=296dp, resizeMode=none），
+ *   彻底杜绝拖动缩放带来的部件大小变化与排版挤压；
  * - Android 12+ 使用单一灵活 RemoteViews + RemoteCollectionItems 原子更新列表，零跨进程重绘抖动；
  * - 顶部提供高清 Apple 连续圆角裁剪的淘宝 / 菜鸟 / 拼多多图标快捷入口，绕过 Android 12+ 后台启动限制；
  * - 列表按快递房顺序与货架号自然升序排列，支持直接点击「已取」并同步桌面角标。

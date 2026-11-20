@@ -187,9 +187,9 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.5.2" }
+            info.versionName.orEmpty().ifBlank { "2.5.3" }
         } catch (_: Exception) {
-            "2.5.2"
+            "2.5.3"
         }
     }
 
