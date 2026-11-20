@@ -145,10 +145,8 @@ fun SettingsScreen(
     items: List<PickupItemEntity>,
     settings: AppSettings,
     hasSmsPermission: Boolean,
-    hasNotificationPermission: Boolean,
     onBack: () -> Unit,
     onRequestSmsPermission: () -> Unit,
-    onRequestNotificationPermission: () -> Unit,
     onToggleTaobaoBanner: (Boolean) -> Unit,
     onToggleCainiaoBanner: (Boolean) -> Unit,
     onTogglePinduoduoBanner: (Boolean) -> Unit,
@@ -187,9 +185,9 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.5.3" }
+            info.versionName.orEmpty().ifBlank { "2.5.4" }
         } catch (_: Exception) {
-            "2.5.3"
+            "2.5.4"
         }
     }
 
@@ -365,29 +363,15 @@ fun SettingsScreen(
             }
         }
 
-        // 2. 仅当未开启短信权限时展示短信授权卡片
+        // 2. 仅当未开启短信读取权限时展示授权卡片
         if (!hasSmsPermission) {
             item(key = "sms_permission_card") {
                 PermissionStatusCard(
-                    title = "监听短信权限未开启",
+                    title = "短信读取权限未开启",
                     subtitle = "授权后自动扫描近 7 天取件短信",
                     accentColor = statusAmber,
                     buttonText = "开启权限",
                     onClick = onRequestSmsPermission,
-                    modifier = Modifier.animateItem()
-                )
-            }
-        }
-
-        // 2.5 仅当未开启通知与桌面角标权限时展示授权卡片，已授权后自动隐藏
-        if (!hasNotificationPermission) {
-            item(key = "notification_badge_card") {
-                PermissionStatusCard(
-                    title = "通知与桌面角标未开启",
-                    subtitle = "开启后在桌面同步待取件数",
-                    accentColor = statusAmber,
-                    buttonText = "开启通知",
-                    onClick = onRequestNotificationPermission,
                     modifier = Modifier.animateItem()
                 )
             }

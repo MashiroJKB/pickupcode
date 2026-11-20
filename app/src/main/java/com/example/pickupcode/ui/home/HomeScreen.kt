@@ -659,7 +659,7 @@ private fun EmptyPickupStateCard(
             shape = RoundedCornerShape(AppleCorners.InnerCard)
         ) {
             Icon(
-                imageVector = Icons.Rounded.Add,
+                imageVector = if (hasSmsPermission) Icons.Rounded.Add else Icons.Rounded.Security,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )

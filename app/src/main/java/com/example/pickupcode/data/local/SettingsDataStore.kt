@@ -36,14 +36,12 @@ data class StationRule(
 /**
  * 应用全局设置快照
  * - stationCountPrompted: 新安装时是否已询问过学校快递房数量
- * - badgePermissionPrompted: 首次通知与桌面角标授权弹窗是否已引导
  * - showTaobaoIdentityBanner: 是否开启「淘宝身份码」Banner（默认开启）
  * - showCainiaoIdentityBanner: 是否开启「菜鸟身份码」Banner
  * - showPinduoduoIdentityBanner: 是否开启「拼多多取件码」Banner
  */
 data class AppSettings(
     val stationCountPrompted: Boolean = false,
-    val badgePermissionPrompted: Boolean = false,
     val showTaobaoIdentityBanner: Boolean = true,
     val showCainiaoIdentityBanner: Boolean = false,
     val showPinduoduoIdentityBanner: Boolean = false,
@@ -55,7 +53,6 @@ class SettingsDataStore(private val context: Context) {
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
         val rulesJson = prefs[KEY_STATION_RULES_JSON]
         val stationCountPrompted = prefs[KEY_STATION_COUNT_PROMPTED] ?: (rulesJson != null)
-        val badgePermissionPrompted = prefs[KEY_BADGE_PERMISSION_PROMPTED] ?: false
         val showTaobao = prefs[KEY_SHOW_TAOBAO_IDENTITY] ?: true
         val showCainiao = prefs[KEY_SHOW_CAINIAO_IDENTITY] ?: false
         val showPinduoduo = prefs[KEY_SHOW_PINDUODUO_IDENTITY] ?: false
@@ -67,7 +64,6 @@ class SettingsDataStore(private val context: Context) {
 
         AppSettings(
             stationCountPrompted = stationCountPrompted,
-            badgePermissionPrompted = badgePermissionPrompted,
             showTaobaoIdentityBanner = showTaobao,
             showCainiaoIdentityBanner = showCainiao,
             showPinduoduoIdentityBanner = showPinduoduo,
@@ -90,12 +86,6 @@ class SettingsDataStore(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[KEY_STATION_RULES_JSON] = serializeStationRulesJson(rules)
             prefs[KEY_STATION_COUNT_PROMPTED] = true
-        }
-    }
-
-    suspend fun setBadgePermissionPrompted(prompted: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[KEY_BADGE_PERMISSION_PROMPTED] = prompted
         }
     }
 
@@ -286,7 +276,6 @@ class SettingsDataStore(private val context: Context) {
         const val DEFAULT_SMS_SCAN_DAYS = 7
 
         private val KEY_STATION_COUNT_PROMPTED = booleanPreferencesKey("station_count_prompted")
-        private val KEY_BADGE_PERMISSION_PROMPTED = booleanPreferencesKey("badge_permission_prompted")
         private val KEY_SHOW_TAOBAO_IDENTITY = booleanPreferencesKey("show_taobao_identity_banner")
         private val KEY_SHOW_CAINIAO_IDENTITY = booleanPreferencesKey("show_cainiao_identity_banner")
         private val KEY_SHOW_PINDUODUO_IDENTITY = booleanPreferencesKey("show_pinduoduo_identity_banner")

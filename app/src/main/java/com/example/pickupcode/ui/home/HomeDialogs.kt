@@ -1,9 +1,21 @@
 package com.example.pickupcode.ui.home
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,14 +43,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.MarkEmailRead
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material.icons.rounded.Storefront
+import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -61,6 +76,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +99,7 @@ import com.example.pickupcode.ui.theme.PickupCodeMonospaceStyle
 import com.example.pickupcode.ui.theme.liquidGlass
 import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 import com.example.pickupcode.ui.theme.stationAccentColor
+import com.example.pickupcode.util.RomRestrictedGuide
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -846,110 +864,434 @@ fun LongPressQuickActionDialog(
 }
 
 /**
- * 5. 首次打开通知与桌面角标权限引导弹窗
+ * 首次安装/未授权时的分步短信权限引导阶段
+ */
+enum class SmsOnboardingStep {
+    RESTRICTED_SETTINGS,
+    SMS_PERMISSION
+}
+
+/**
+ * 5. 首次打开权限引导弹窗：
+ * - Android 15+ 侧载受限时，先按当前系统 ROM 清晰指引解除「设置限制 / 受限设置」并一键直达应用信息；
+ * - 返回检测到解除后，丝滑过渡至小白友好的「授权短信读取权限」步骤；
+ * - Android 10~14 或无受限状态时直接展示单步短信权限引导。
  */
 @Composable
-fun NotificationAndBadgePermissionDialog(
-    hasNotificationPermission: Boolean,
+fun SmsOnboardingPermissionDialog(
+    step: SmsOnboardingStep,
+    showStepIndicator: Boolean,
+    romGuide: RomRestrictedGuide,
+    returnedWithoutLift: Boolean,
+    hasTriedDirectSmsAfterReturn: Boolean,
+    justUnlockedRestricted: Boolean,
+    isSmsPermanentlyDenied: Boolean,
     onDismiss: () -> Unit,
-    onRequestNotificationPermission: () -> Unit,
-    onOpenBadgeSettings: () -> Unit
+    onOpenAppInfo: () -> Unit,
+    onRequestSmsPermission: () -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
+    val haptic = LocalHapticFeedback.current
+    val primaryColor = MaterialTheme.colorScheme.primary
     val statusGreen = if (isDark) AppleGreenDark else AppleGreenLight
     val statusAmber = if (isDark) AppleOrangeDark else AppleOrangeLight
 
     SpringGlassDialog(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.NotificationsActive,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "开启通知与桌面角标",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "在桌面图标实时显示待取件数",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+            if (showStepIndicator) {
+                OnboardingStepIndicatorRow(
+                    step = step,
+                    primaryColor = primaryColor,
+                    statusGreen = statusGreen
+                )
+                Spacer(modifier = Modifier.height(14.dp))
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            PermissionGuideItemRow(
-                title = "通知权限",
-                subtitle = "允许同步待取件数量",
-                statusText = if (hasNotificationPermission) "已开启" else "点击授权",
-                statusColor = if (hasNotificationPermission) statusGreen else statusAmber,
-                clickable = !hasNotificationPermission,
-                onClick = onRequestNotificationPermission
-            )
-
-            Spacer(modifier = Modifier.height(9.dp))
-
-            PermissionGuideItemRow(
-                title = "桌面图标角标",
-                subtitle = "前往通知管理开启桌面角标",
-                statusText = "去设置",
-                statusColor = MaterialTheme.colorScheme.primary,
-                clickable = true,
-                onClick = onOpenBadgeSettings
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.End,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                TextButton(onClick = onDismiss) {
-                    Text(
-                        text = if (hasNotificationPermission) "完成" else "暂不设置",
-                        softWrap = false,
-                        maxLines = 1
-                    )
-                }
-                Spacer(modifier = Modifier.width(6.dp))
-                Button(
-                    onClick = {
-                        if (!hasNotificationPermission) {
-                            onRequestNotificationPermission()
-                        } else {
-                            onOpenBadgeSettings()
-                            onDismiss()
+            AnimatedContent(
+                targetState = step,
+                transitionSpec = {
+                    val forward = targetState == SmsOnboardingStep.SMS_PERMISSION
+                    val enter = slideInHorizontally(
+                        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                        initialOffsetX = { fullWidth -> if (forward) fullWidth / 5 else -fullWidth / 5 }
+                    ) + fadeIn(animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing))
+                    val exit = slideOutHorizontally(
+                        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                        targetOffsetX = { fullWidth -> if (forward) -fullWidth / 5 else fullWidth / 5 }
+                    ) + fadeOut(animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing))
+                    (enter togetherWith exit).using(
+                        SizeTransform(clip = false) { _, _ ->
+                            spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            )
                         }
-                    },
-                    shape = RoundedCornerShape(AppleCorners.InnerCard)
-                ) {
-                    Text(
-                        text = if (!hasNotificationPermission) "开启通知权限" else "前往开启角标",
-                        fontWeight = FontWeight.Bold,
-                        softWrap = false,
-                        maxLines = 1
                     )
+                },
+                label = "sms_onboarding_step_transition"
+            ) { currentStep ->
+                when (currentStep) {
+                    SmsOnboardingStep.RESTRICTED_SETTINGS -> {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(statusAmber.copy(alpha = 0.15f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.AdminPanelSettings,
+                                            contentDescription = null,
+                                            tint = statusAmber,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "先解除设置限制",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            softWrap = false,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "Android 15+ 侧载安全保护",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            softWrap = false,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = onDismiss,
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = "关闭",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .liquidGlassInnerCard(
+                                        cornerRadius = AppleCorners.InnerCard,
+                                        accentTint = statusAmber
+                                    )
+                                    .padding(horizontal = 14.dp, vertical = 13.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(AppleCorners.Pill))
+                                        .background(primaryColor.copy(alpha = 0.12f))
+                                        .padding(horizontal = 9.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "当前系统 · ${romGuide.romName}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = primaryColor,
+                                        softWrap = false,
+                                        maxLines = 1
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(9.dp))
+
+                                Text(
+                                    text = "通过浏览器或安装包安装的应用\n需先解除系统保护，再开启短信权限",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(0.7.dp)
+                                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    OnboardingNumberStepRow(
+                                        stepNumber = "1",
+                                        text = "点击下方「前往应用信息」",
+                                        accentColor = primaryColor
+                                    )
+                                    OnboardingNumberStepRow(
+                                        stepNumber = "2",
+                                        text = romGuide.stepTwoText,
+                                        accentColor = statusAmber
+                                    )
+                                    OnboardingNumberStepRow(
+                                        stepNumber = "3",
+                                        text = "返回本应用，继续授权短信读取",
+                                        accentColor = statusGreen
+                                    )
+                                }
+                            }
+
+                            AnimatedVisibility(
+                                visible = returnedWithoutLift,
+                                enter = expandVertically(
+                                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                                ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+                                exit = shrinkVertically(
+                                    animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
+                                ) + fadeOut(animationSpec = tween(durationMillis = 120))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 10.dp)
+                                        .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                                        .background(statusAmber.copy(alpha = 0.12f))
+                                        .border(
+                                            width = 0.8.dp,
+                                            color = statusAmber.copy(alpha = 0.30f),
+                                            shape = RoundedCornerShape(AppleCorners.SmallElement)
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 9.dp)
+                                ) {
+                                    Text(
+                                        text = if (hasTriedDirectSmsAfterReturn) {
+                                            "已触发系统安全提示，请点「再次前往」\n在应用信息页解除限制后返回即可"
+                                        } else {
+                                            "暂未检测到解除，若未找到受限设置\n可先点「直接授权」激活后再前往设置"
+                                        },
+                                        style = MaterialTheme.typography.labelMedium.copy(lineHeight = 17.sp),
+                                        color = statusAmber
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(18.dp))
+
+                            Row(
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (returnedWithoutLift) {
+                                    TextButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onRequestSmsPermission()
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "直接授权",
+                                            softWrap = false,
+                                            maxLines = 1
+                                        )
+                                    }
+                                } else {
+                                    TextButton(onClick = onDismiss) {
+                                        Text(
+                                            text = "暂不设置",
+                                            softWrap = false,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(6.dp))
+
+                                Button(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onOpenAppInfo()
+                                    },
+                                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                                ) {
+                                    Text(
+                                        text = if (returnedWithoutLift) "再次前往" else "前往应用信息",
+                                        fontWeight = FontWeight.Bold,
+                                        softWrap = false,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    SmsOnboardingStep.SMS_PERMISSION -> {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(primaryColor.copy(alpha = 0.14f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Sms,
+                                            contentDescription = null,
+                                            tint = primaryColor,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "授权短信读取权限",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            softWrap = false,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (justUnlockedRestricted) {
+                                                "已解除限制 · 开启后自动识别"
+                                            } else {
+                                                "自动整理近 7 天快递取件短信"
+                                            },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (justUnlockedRestricted) {
+                                                statusGreen
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                            softWrap = false,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = onDismiss,
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = "关闭",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                                OnboardingFeatureRow(
+                                    icon = Icons.Rounded.MarkEmailRead,
+                                    title = "自动提取快递取件码",
+                                    subtitle = "扫描近 7 天短信，过滤验证码",
+                                    accentColor = primaryColor
+                                )
+                                OnboardingFeatureRow(
+                                    icon = Icons.Rounded.VerifiedUser,
+                                    title = "纯本地运行，绝不联网",
+                                    subtitle = "无网络权限，短信绝不上传云端",
+                                    accentColor = statusGreen
+                                )
+                            }
+
+                            AnimatedVisibility(
+                                visible = isSmsPermanentlyDenied,
+                                enter = expandVertically(
+                                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                                ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+                                exit = shrinkVertically(
+                                    animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
+                                ) + fadeOut(animationSpec = tween(durationMillis = 120))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 10.dp)
+                                        .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                                        .background(statusAmber.copy(alpha = 0.12f))
+                                        .border(
+                                            width = 0.8.dp,
+                                            color = statusAmber.copy(alpha = 0.30f),
+                                            shape = RoundedCornerShape(AppleCorners.SmallElement)
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 9.dp)
+                                ) {
+                                    Text(
+                                        text = "系统已限制弹窗，请点「前往应用信息」\n在「权限 → 短信」中允许读取即可",
+                                        style = MaterialTheme.typography.labelMedium.copy(lineHeight = 17.sp),
+                                        color = statusAmber
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(18.dp))
+
+                            Row(
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                TextButton(onClick = onDismiss) {
+                                    Text(
+                                        text = "暂不设置",
+                                        softWrap = false,
+                                        maxLines = 1
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Button(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        if (isSmsPermanentlyDenied) {
+                                            onOpenAppInfo()
+                                        } else {
+                                            onRequestSmsPermission()
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                                ) {
+                                    Text(
+                                        text = if (isSmsPermanentlyDenied) "前往应用信息" else "授予短信权限",
+                                        fontWeight = FontWeight.Bold,
+                                        softWrap = false,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -957,31 +1299,201 @@ fun NotificationAndBadgePermissionDialog(
 }
 
 @Composable
-private fun PermissionGuideItemRow(
+private fun OnboardingStepIndicatorRow(
+    step: SmsOnboardingStep,
+    primaryColor: Color,
+    statusGreen: Color
+) {
+    val isStepTwo = step == SmsOnboardingStep.SMS_PERMISSION
+    val mutedCircleBg = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+    val mutedText = MaterialTheme.colorScheme.onSurfaceVariant
+
+    val step1CircleColor by animateColorAsState(
+        targetValue = if (isStepTwo) statusGreen else primaryColor,
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        label = "step1_circle_color"
+    )
+    val step1LabelColor by animateColorAsState(
+        targetValue = if (isStepTwo) statusGreen else MaterialTheme.colorScheme.onSurface,
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        label = "step1_label_color"
+    )
+    val connectorColor by animateColorAsState(
+        targetValue = if (isStepTwo) statusGreen.copy(alpha = 0.55f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        label = "step_connector_color"
+    )
+    val step2CircleColor by animateColorAsState(
+        targetValue = if (isStepTwo) primaryColor else mutedCircleBg,
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        label = "step2_circle_color"
+    )
+    val step2NumColor by animateColorAsState(
+        targetValue = if (isStepTwo) Color.White else mutedText,
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        label = "step2_num_color"
+    )
+    val step2LabelColor by animateColorAsState(
+        targetValue = if (isStepTwo) MaterialTheme.colorScheme.onSurface else mutedText,
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        label = "step2_label_color"
+    )
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(step1CircleColor)
+            ) {
+                if (isStepTwo) {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(13.dp)
+                    )
+                } else {
+                    Text(
+                        text = "1",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        softWrap = false,
+                        maxLines = 1
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (isStepTwo) "已解除限制" else "解除设置限制",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = if (isStepTwo) FontWeight.SemiBold else FontWeight.Bold
+                ),
+                color = step1LabelColor,
+                softWrap = false,
+                maxLines = 1
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 10.dp)
+                .height(1.5.dp)
+                .clip(RoundedCornerShape(AppleCorners.Pill))
+                .background(connectorColor)
+        )
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(step2CircleColor)
+            ) {
+                Text(
+                    text = "2",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = step2NumColor,
+                    softWrap = false,
+                    maxLines = 1
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "授权短信读取",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = if (isStepTwo) FontWeight.Bold else FontWeight.Medium
+                ),
+                color = step2LabelColor,
+                softWrap = false,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnboardingNumberStepRow(
+    stepNumber: String,
+    text: String,
+    accentColor: Color
+) {
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .padding(top = 1.dp)
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(accentColor.copy(alpha = 0.16f))
+        ) {
+            Text(
+                text = stepNumber,
+                style = MaterialTheme.typography.labelSmall,
+                color = accentColor,
+                softWrap = false,
+                maxLines = 1
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface
+            ),
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun OnboardingFeatureRow(
+    icon: ImageVector,
     title: String,
     subtitle: String,
-    statusText: String,
-    statusColor: Color,
-    clickable: Boolean,
-    onClick: () -> Unit
+    accentColor: Color
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
         modifier = Modifier
             .fillMaxWidth()
             .liquidGlassInnerCard(
                 cornerRadius = AppleCorners.InnerCard,
-                accentTint = statusColor
+                accentTint = accentColor
             )
-            .then(if (clickable) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 14.dp, vertical = 11.dp)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                .background(accentColor.copy(alpha = 0.15f))
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier.size(19.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
+                softWrap = false,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -992,23 +1504,6 @@ private fun PermissionGuideItemRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(AppleCorners.Pill))
-                .background(statusColor.copy(alpha = 0.16f))
-                .padding(horizontal = 10.dp, vertical = 5.dp)
-        ) {
-            Text(
-                text = statusText,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = statusColor,
-                softWrap = false,
-                maxLines = 1
             )
         }
     }

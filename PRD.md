@@ -1,27 +1,19 @@
 # 「取件码」（`PickupCode`）Android 原生应用完整产品与技术规范文档（PRD）
 
-> **目标版本**：`2.3.3`（`versionCode = 20`）  
+> **目标版本**：`2.5.4`（`versionCode = 30`）  
 > **文档定位**：本文档为面向 AI 编码引擎与原生 Android 工程师的**1:1 复现级完整工程规格说明书**，完整沉淀了产品定位、视觉规范、交互细节、动画参数、解析引擎、桌面生态及全部已知避坑约束，阅读本文档即可从零完整重构出一模一样的应用程序。
 
 ---
 
 ## 1. 产品定位与核心原则
 
-**「取件码」** 是一款极简、高颜值的 Android 本地取件码管理工具。纯本地离线运行，每次打开自动扫描最近 7 天短信，智能拆分并过滤干扰短信，按快递房顺序与货架号自然排序整理，同时提供淘宝/菜鸟/拼多多身份码快捷直达、批量勾选核销、图片分享清单、桌面角标与桌面液态玻璃小组件。
+**「取件码」** 是一款极简、高颜值的 Android 本地取件码管理工具。纯本地离线运行，每次打开自动扫描最近 7 天短信，智能拆分并过滤干扰短信，按快递房顺序与货架号自然排序整理，同时提供淘宝/菜鸟/拼多多身份码快捷直达、批量勾选核销、图片分享清单与 4×4 桌面液态玻璃小组件。
 
 ### 1.1 绝对隐私与离线约束
-1. **严格零联网权限**：`AndroidManifest.xml` 中**绝不声明** `INTERNET`、`ACCESS_NETWORK_STATE` 或任何网络通信权限；同样不声明任何相册/外部存储读写权限（仅使用 `FileProvider` 在分享图片时授权单次临时只读 URI）。
-2. **仅使用短信与必要系统权限**：
+1. **严格零联网权限**：`AndroidManifest.xml` 中**绝不声明** `INTERNET`、`ACCESS_NETWORK_STATE` 或任何网络通信权限；不声明 `POST_NOTIFICATIONS` 或任何桌面图标角标权限；同样不声明任何相册/外部存储读写权限（仅使用 `FileProvider` 在分享图片时授权单次临时只读 URI，保存支持海报使用 Android 10+ `MediaStore` 分区存储）。
+2. **仅使用短信必需权限**：
    - `android.permission.READ_SMS`
    - `android.permission.RECEIVE_SMS`
-   - `android.permission.POST_NOTIFICATIONS`（Android 13+ 桌面角标通知载体）
-   - 国产厂商桌面角标权限（华为、荣耀、三星、OPPO/一加、vivo）：
-     - `com.huawei.android.launcher.permission.CHANGE_BADGE`
-     - `com.hihonor.android.launcher.permission.CHANGE_BADGE`
-     - `com.sec.android.provider.badge.permission.READ` / `.WRITE`
-     - `com.oppo.launcher.permission.READ_SETTINGS` / `.WRITE_SETTINGS`
-     - `com.oplus.notification.permission.BADGE_DIGITAL`
-     - `com.vivo.notification.permission.BADGE_ICON`
    - 声明 `<uses-feature android:name="android.hardware.telephony" android:required="false" />`。
    - 声明 `<queries>` 包可见性：`com.taobao.taobao`、`com.xunmeng.pinduoduo`。
 3. **禁止展示或识别快递品牌/代收点别名**：不识别、不存储、不显示任何快递品牌（如“中通快递”、“京东快递”）或代收点名称；数据库预留字段 `expressCompany` 始终置空 `""`。
@@ -40,7 +32,7 @@
 
 ### 2.1 SDK 与核心依赖版本
 - **包名（`applicationId` / `namespace`）**：`com.example.pickupcode`
-- **版本配置**：`versionCode = 20`，`versionName = "2.3.3"`
+- **版本配置**：`versionCode = 30`，`versionName = "2.5.4"`
 - **SDK 配置**：`minSdk = 29`（Android 10）、`targetSdk = 35`、`compileSdk = 37`、`buildToolsVersion = "36.0.0"`、`JavaVersion.VERSION_17`
 - **Gradle 与插件版本**（`gradle/libs.versions.toml`）：
   - AGP：`9.5.1`（`com.android.application`）
@@ -67,14 +59,14 @@ app/src/main/
 ├── res/
 │   ├── drawable/
 │   │   ├── ic_launcher_foreground.xml  # 108dp 等轴测线性快递盒前景矢量图标（跟随夜间模式切黑白）
-│   │   ├── ic_stat_pickup.xml          # 通知小图标
 │   │   ├── widget_btn_done.xml         # 小组件右侧「已取」胶囊背景
 │   │   ├── widget_glass_bg.xml         # 小组件外框 24dp 液态玻璃渐变背景
 │   │   └── widget_row_bg.xml           # 小组件内行 14dp 卡片背景
 │   ├── drawable-nodpi/
 │   │   ├── ic_brand_cainiao.png        # 菜鸟应用图标（原生大图）
 │   │   ├── ic_brand_pinduoduo.png      # 拼多多应用图标（原生大图）
-│   │   └── ic_brand_taobao.webp        # 淘宝应用图标（原生大图）
+│   │   ├── ic_brand_taobao.webp        # 淘宝应用图标（原生大图）
+│   │   └── img_support_alipay.jpg      # 设置页「支持」支付宝扫码领红包海报
 │   ├── layout/
 │   │   ├── widget_pickup_code.xml      # 桌面小组件整体布局
 │   │   └── widget_pickup_item.xml      # 桌面小组件单条待取件列表行布局
@@ -85,23 +77,25 @@ app/src/main/
 │   ├── values-night/colors.xml & themes.xml
 │   └── xml/
 │       ├── file_paths.xml              # cache-path: shared_images/ 供图片分享
-│       └── pickup_widget_info.xml      # 4×3（250×160dp）水平垂直可缩放桌面小组件元数据
+│       └── pickup_widget_info.xml      # 严格锁定 4×4（296×296dp, resizeMode=none）桌面小组件元数据
 └── java/com/example/pickupcode/
-    ├── PickupApplication.kt            # 初始化 Room/Settings/Repository，注册角标通知通道与 SmsContentObserver
-    ├── MainActivity.kt                 # 120Hz 刷新率设置、系统深浅色自适应、权限流水线、全局 BackHandler、主页与设置页切换、弹窗调度
+    ├── PickupApplication.kt            # 初始化 Room/Settings/Repository，注册 SmsContentObserver
+    ├── MainActivity.kt                 # 120Hz 刷新率设置、系统深浅色自适应、受限设置与短信权限流水线、全局 BackHandler、主页与设置页切换、弹窗调度
     ├── data/
     │   ├── local/
     │   │   ├── PickupItemEntity.kt     # Room 表 `pickup_items`、圆圈数字符号映射、NaturalCodeComparator 自然排序
-    │   │   ├── PickupDao.kt            # 查询、批量更新、清理过期已取记录
+    │   │   ├── PickupDao.kt            # 查询、批量更新、历史包裹查询
     │   │   ├── PickupDatabase.kt       # `pickup_code_local.db` 单例
     │   │   └── SettingsDataStore.kt    # DataStore 偏好设置、`StationRule`、默认 1~8 号规则、口令导入导出
     │   ├── parser/
     │   │   └── PickupMessageParser.kt  # 前置拦截、干扰数字掩码、双策略多码拆分、站房匹配、商品备注提取
     │   └── repository/
-    │       └── PickupRepository.kt     # 互斥锁防重入、跨来源合并、7天短信全量扫库与清理、`reapplyStationRules`
+    │       └── PickupRepository.kt     # 互斥锁防重入、跨来源合并、7天短信全量扫库、`reapplyStationRules`
     ├── service/
-    │   ├── SmsReceiver.kt              # 短信广播 `SMS_RECEIVED`（支持长短信按发件人拼接）+ `SmsContentObserver`
-    │   └── AppBadgeManager.kt          # 全主流国产桌面未读角标管理器与通知权限状态检测
+    │   └── SmsReceiver.kt              # 短信广播 `SMS_RECEIVED`（支持长短信按发件人拼接）+ `SmsContentObserver`
+    ├── util/
+    │   ├── PickupShareHelper.kt        # 1080px 液态玻璃分组清单长图绘制与 FileProvider 分享
+    │   └── RestrictedSettingsHelper.kt # Android 15/16 受限设置状态检测与多 ROM 解除指引
     ├── ui/
     │   ├── PickupViewModel.kt          # 主 UI 状态管理、勾选全选/清除、3秒撤销计时、轻提示、规则增删改排导入导出
     │   ├── components/
@@ -174,7 +168,6 @@ app/src/main/
    - `ic_launcher_foreground.xml`（`108dp × 108dp`，`viewport 108×108`）：
      - 快递盒外框与 Y 型折线（`strokeColor="@color/launcher_icon_fg"`, `strokeWidth="4.0"`, `butt/miter`）：`M54,27.5 L76.95,40.75 L76.95,67.25 L54,80.5 L31.05,67.25 L31.05,40.75 Z M31.05,40.75 L54,54 L76.95,40.75 M54,54 L54,80.5`
      - 顶部斜跨至右前立面胶带条（`fillColor="@color/launcher_icon_fg"`）：`M40.325,35.396 L44.725,32.855 L67.675,46.105 L67.675,57.605 L63.275,60.146 L63.275,48.646 Z`
-   - 通知小图标 `ic_stat_pickup.xml`（`24dp × 24dp`，纯白描边 `1.9` + 封口胶带）：同比例等轴测纸箱线条。
 2. **自定义 Canvas 矢量图标坐标**：
    - 首页转发图标 `ForwardArrowIcon(15.dp)`：`tipX = 0.88w`、`tipY = 0.38h`；曲线主干从 `(0.12w, 0.84h)` 经控制点 `(0.14w, 0.44h)`、`(0.42w, tipY)` 至 `(tipX, tipY)`；箭头 `(0.58w, 0.14h) -> (tipX, tipY) -> (0.58w, 0.62h)`，圆角线宽 `1.9.dp`。
    - 设置页返回图标（`16.dp` 居中于 `36.dp` 圆圈）：以几何中心 `(0.5w, 0.5h)` 对称绘制 `<`：`(0.68w, 0.16h) -> (0.32w, 0.50h) -> (0.68w, 0.84h)`，圆角线宽 `2.3.dp`。
@@ -271,7 +264,7 @@ app/src/main/
    - 页签 1：输入取件码（限 20 字）、`LazyRow` 选择快递房（自动滚动至预设快递房；若从待分类打开则首项附带 `？ 待分类`）、选填商品备注（限 24 字）。
    - 页签 2：输入/粘贴短信全文（`4~5` 行高）；入库时若有 `preferredStationNumber`，直接覆盖归入该快递房。
 4. **`LongPressQuickActionDialog`**：居中大字展示取件码与备注（如有），下方并排等宽绿色「已取」与红色「删除」大按钮。
-5. **`NotificationAndBadgePermissionDialog`**：首次引导弹窗，展示「通知权限（开启通知）」与「桌面图标角标（去设置）」状态行与行动按钮。
+5. **`SmsOnboardingPermissionDialog`**：首次打开分步权限引导弹窗。Android 15/16 侧载触发受限设置时，先根据当前系统 ROM（OriginOS / HyperOS / ColorOS / MagicOS / HarmonyOS / One UI / Flyme / Android）展示清晰操作步骤并一键跳转系统应用信息页；返回检测到解除后通过 `AnimatedContent` 丝滑过渡到第 2 步小白友好短信读取权限说明并触发授权；若已授予短信权限则永不再弹出。
 6. **`SharePickupMethodDialog`**：
    - **仅保留「以图片分享」卡片**，标题为 `以图片分享`（加载时显示 `正在准备清单图片...`），**卡片内不再展示下方的「生成高清分组清单长图……」这行小字**。
    - 卡片下方紧接一行可勾选开关按钮：左侧 `22.dp` 圆形复选框，未勾选时（默认）显示 **`不分享备注`**（右侧灰字 `图片中不附带备注`），勾选后显示 **`分享备注`**（右侧灰字 `图片中附带商品备注`）。
@@ -288,7 +281,7 @@ app/src/main/
 2. **统计与本地隐私卡片**：
    - 顶部绿色锁头图标 + `100% 纯本地离线存储 · 零联网权限`。
    - 下方 3 格统计卡：**待取包裹**、**7天内已取**（可点击弹出 `PickedUpHistoryDialog` 列表，按取件时间倒序展示，每条支持「恢复」回待取列表或彻底「删除」）、**覆盖快递房**。
-3. **权限卡片**：未开短信权限时展示「监听短信权限未开启 -> 开启权限」；另常驻通知与角标状态卡片（未开启显示「开启通知」，已就绪显示「管理角标」一键跳转系统应用通知管理页面）。
+3. **权限卡片**：未开短信读取权限时展示「短信读取权限未开启 -> 开启权限」（已授权后自动隐藏；无通知与桌面角标权限卡片）。
 4. **识别规则卡片（支持默认 1～8 号、长按拖动排序与口令分享）**：
    - 标题栏右侧提供 `添加快递房` 蓝胶囊与 `重置` 灰胶囊（重置即清除 DataStore 恢复默认 1～8 号）。
    - 下方提供并排 `导出规则口令` / `导入规则口令`（导出格式为 `【取件码识别规则】` + JSON 数组并自动写入系统剪贴板；导入支持识别并校验任意含 JSON 数组的口令文本）。
@@ -303,7 +296,7 @@ app/src/main/
 ### 6.1 数据模型与默认 1～8 号识别规则（`PickupItemEntity.kt` & `SettingsDataStore.kt`）
 - **Room 数据库（`pickup_code_local.db`, `version = 1`）**：表名 `pickup_items`，建索引 `(code, station_number, created_at)` 与 `(is_picked_up, created_at)`，字段包括 `id`、`code`、`station_number`（`0` 为待分类，`1..100` 为站点编号）、`station_raw_name`、`express_company`（始终为空 `""`）、`product_name`、`is_custom_remark`、`raw_message`、`source`（`"SMS"` | `"MANUAL"`）、`sender_or_package`、`is_picked_up`、`picked_up_at`、`created_at`、`updated_at`。
 - **DataStore 偏好键（`pickup_settings`）**：
-  - `badge_permission_prompted`（默认 `false`）
+  - `station_count_prompted`（默认 `false`）
   - `show_taobao_identity_banner`（默认 `true`）
   - `show_cainiao_identity_banner`（默认 `false`）
   - `show_pinduoduo_identity_banner`（默认 `false`）
@@ -336,26 +329,19 @@ app/src/main/
 
 ---
 
-## 7. 首次启动权限流水线、桌面角标与桌面小组件
+## 7. 首次启动权限流水线与桌面小组件
 
-### 7.1 权限引导流水线（`MainActivity.kt`）
+### 7.1 受限设置与短信权限引导流水线（`MainActivity.kt` & `RestrictedSettingsHelper.kt`）
 1. 等待 `SettingsDataStore` 加载完成（`isSettingsLoaded == true`）后仅触发一次：
-2. 检查缺失权限：未授予 `READ_SMS` 则加入 `READ_SMS`、`RECEIVE_SMS`；Android 13+（`TIRAMISU`）未授予 `POST_NOTIFICATIONS` 且（尚无短信权限或尚未引导过角标）则加入 `POST_NOTIFICATIONS`；一次性调起系统权限授权弹窗 `startupPermissionLauncher`。
-3. 授权流程结束后，若 `!settings.badgePermissionPrompted`，自动弹出 `NotificationAndBadgePermissionDialog` 引导用户确认开启通知与前往系统开启桌面角标权限（点击关闭或跳转均调用 `markBadgePermissionPrompted` 记录完成状态）。
-4. 若未有缺失系统权限且 `!settings.badgePermissionPrompted`，直接弹出 `NotificationAndBadgePermissionDialog`。
+2. 若已拥有 `READ_SMS` 权限：绝不弹出权限引导弹窗；仅在 `!settings.stationCountPrompted` 时弹出 `StationCountSetupDialog`。
+3. 若尚未拥有 `READ_SMS` 权限：通过 `RestrictedSettingsHelper.checkRestrictedSettingsState(context)`（查询 `AppOpsManager` 的 `android:access_restricted_settings` 并结合 Android 15+ 安装来源判断）判定当前是否受系统受限设置保护：
+   - **受限状态**：展示 `SmsOnboardingPermissionDialog` 第 1 步「先解除设置限制」，根据当前系统 ROM 给出具体操作路径，点击「前往应用信息」跳转 `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`；
+   - **返回检测（`ON_RESUME`）**：若用户已在应用信息页直接授予短信权限，则立即关闭弹窗并扫描短信；若检测到受限设置已解除（`MODE_ALLOWED`），则原弹窗内通过水平平滑过渡动画衔接第 2 步「授权短信读取权限」；若暂未检测到解除，则展开友好提示并提供「直接授权」与「再次前往」避免死路；
+   - **非受限状态（Android 10~14 或已解除）**：直接展示单步小白友好的「授权短信读取权限」引导弹窗。
+4. 完成授权或点击「暂不设置」后，若 `!settings.stationCountPrompted`，自动衔接展示 `StationCountSetupDialog`。
 
-### 7.2 多桌面引擎角标（`AppBadgeManager.kt`）
-每当 `items` 或 `stationRules` 变化或应用回到前台时，以当前待取件数 `pendingCount` 调用 `updateBadgeCount`：
-- 确保注册低重要度静音无震动通知渠道 `pickup_badge_channel`（`setShowBadge(true)`）。
-- 同时并行派发各大厂商桌面接口（均做 `try-catch` 防兼容性崩溃）：
-  - **华为 / 荣耀**：`ContentResolver.call(content://com.huawei|hihonor.android.launcher.settings/badge/, "change_badge", bundle)`
-  - **vivo (OriginOS)**：`sendBroadcast("launcher.action.CHANGE_APPLICATION_NOTIFICATION_NUM")`（带 `FLAG_RECEIVER_INCLUDE_BACKGROUND = 0x01000000`）
-  - **OPPO (ColorOS)**：`ContentResolver.call(content://com.android.badge/badge, "setAppBadgeCount")`
-  - **三星 / 通用桌面**：`sendBroadcast("android.intent.action.BADGE_COUNT_UPDATE")`
-  - **小米 (HyperOS / MIUI) 与原生 Android**：有 `POST_NOTIFICATIONS` 且 `count > 0` 时发送静音通知（通过反射 `extraNotification.setMessageCount(count)` 适配小米；设 `setNumber(count)` 与 `BADGE_ICON_SMALL`）；`count <= 0` 时立即 `nm.cancel(BADGE_NOTIFICATION_ID)` 清除角标。
-
-### 7.3 桌面液态玻璃小组件（`PickupWidgetProvider` & `PickupWidgetService`）
-- **布局与外观**：`4×3`（`250dp × 160dp`，支持水平/垂直拉伸至 `600dp × 900dp`）圆角 `24dp` 磨砂渐变外框（支持浅/深色 `values`/`values-night` 资源），`ListView` 包裹在 `FrameLayout(0dp, weight=1)` 内；内部列表行 `widget_item_root` 采用固定 `56dp` 行高（`14dp` 浅层圆角背景）并统一使用 `dp` 字号（站房 `11dp`、取件码 `17dp`、`已取` 胶囊 `11dp`）及 `TypedValue.COMPLEX_UNIT_DIP` 显式锁定。
-- **防拉伸缩放机制**：实现 `onAppWidgetOptionsChanged` 回调刷新 `RemoteViews` 与 `ListView`；Android 12+（`API >= 31`）使用 `RemoteViews(Map<SizeF, RemoteViews>)` 响应式尺寸映射（读取 `OPTION_APPWIDGET_SIZES` 或默认断点），避免定制桌面在纵向拉伸组件高度时等比放大行高与字号。
-- **顶部三枚身份码直达图标**：使用 `loadAppleRoundedIconBitmapForWidget`（`fitCenter` `72px` 降采样）生成三枚 `28dp` 原生苹果连续圆角图标（淘宝、菜鸟、拼多多）。为绕过 **Android 12+ 后台启动 Activity 限制**，优先绑定直接 `PendingIntent.getActivity(...)` + `setPackage(...)` 唤起对应客户端；若未检测到包名，则回退绑定 `PendingIntent.getBroadcast` 在接收器中提示 `"未检测到...客户端"`。
-- **桌面交互与数据联动**：点击小组件左上角标题区或空视图打开主页面；点击列表行「已取」直接在小组件后台 `goAsync()` 核销该条目并即时同步 `AppBadgeManager` 与刷新全部小组件列表；数据在主页或 `SmsReceiver` 发生任何变更后亦主动调用 `PickupWidgetProvider.notifyWidgetDataChanged(context)`。
+### 7.2 桌面液态玻璃小组件（`PickupWidgetProvider` & `PickupWidgetService`）
+- **布局与外观**：严格锁定 `4×4` 尺寸（`minWidth=296dp`、`minHeight=296dp`、`targetCellWidth=4`、`targetCellHeight=4`、`resizeMode="none"`），圆角 `24dp` 磨砂渐变外框（支持浅/深色 `values`/`values-night` 资源），使用 `@android:id/background` 适配系统桌面容器，`ListView` 包裹在 `FrameLayout(0dp, weight=1)` 内；内部列表行 `widget_item_root` 采用固定 `56dp` 行高（`14dp` 浅层圆角背景）并统一使用 `dp` 字号与 `TypedValue.COMPLEX_UNIT_DIP` 显式锁定。
+- **零抖动列表更新**：Android 12+（`API >= 31`）使用单一 `RemoteViews` + `RemoteViews.RemoteCollectionItems` 原子更新列表数据，所有后台查询均在 `goAsync()` 协程中完成。
+- **顶部三枚身份码直达图标**：使用 `loadAppleRoundedIconBitmapForWidget`（`fitCenter` `112px` 降采样）生成三枚 `28dp` 原生苹果连续圆角图标（淘宝、菜鸟、拼多多）。为绕过 **Android 12+ 后台启动 Activity 限制**，优先绑定直接 `PendingIntent.getActivity(...)` + `setPackage(...)` 唤起对应客户端；若未检测到包名，则回退绑定 `PendingIntent.getBroadcast` 在接收器中提示 `"未检测到...客户端"`。
+- **桌面交互与数据联动**：点击小组件左上角标题区或空视图打开主页面；点击列表行「已取」直接在小组件后台 `goAsync()` 核销该条目并刷新全部小组件列表；数据在主页或 `SmsReceiver` 发生任何变更后亦主动调用 `PickupWidgetProvider.notifyWidgetDataChanged(context)`。

@@ -57,16 +57,16 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.pickupcode.data.local.PickupItemEntity
-import com.example.pickupcode.service.AppBadgeManager
 import com.example.pickupcode.ui.PickupViewModel
 import com.example.pickupcode.ui.components.HomeBottomFloatingBar
 import com.example.pickupcode.ui.home.AddOrPastePickupDialog
 import com.example.pickupcode.ui.home.EditProductRemarkDialog
 import com.example.pickupcode.ui.home.HomeScreen
 import com.example.pickupcode.ui.home.LongPressQuickActionDialog
-import com.example.pickupcode.ui.home.NotificationAndBadgePermissionDialog
 import com.example.pickupcode.ui.home.RawMessageDetailDialog
 import com.example.pickupcode.ui.home.SharePickupMethodDialog
+import com.example.pickupcode.ui.home.SmsOnboardingPermissionDialog
+import com.example.pickupcode.ui.home.SmsOnboardingStep
 import com.example.pickupcode.ui.home.StationCountSetupDialog
 import com.example.pickupcode.ui.settings.SettingsScreen
 import com.example.pickupcode.ui.theme.AppleCorners
@@ -74,6 +74,8 @@ import com.example.pickupcode.ui.theme.LiquidGlassBackdrop
 import com.example.pickupcode.ui.theme.PickupCodeTheme
 import com.example.pickupcode.ui.theme.liquidGlass
 import com.example.pickupcode.util.PickupShareHelper
+import com.example.pickupcode.util.RestrictedSettingsHelper
+import com.example.pickupcode.util.RestrictedSettingsState
 import com.example.pickupcode.widget.PickupWidgetProvider
 import kotlinx.coroutines.launch
 
@@ -165,6 +167,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     val capsuleToast by viewModel.capsuleToastMessage.collectAsState()
     val latestItems by rememberUpdatedState(items)
     val latestItemsLoaded by rememberUpdatedState(isItemsLoaded)
+    val latestSettings by rememberUpdatedState(settings)
 
     val coroutineScope = rememberCoroutineScope()
     var showSettingsScreen by rememberSaveable { mutableStateOf(false) }
@@ -191,9 +194,6 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     var hasSmsPermission by remember {
         mutableStateOf(checkSmsPermission(context))
     }
-    var hasNotificationPermission by remember {
-        mutableStateOf(AppBadgeManager.hasNotificationPermission(context))
-    }
 
     // 弹窗控制状态
     var activeDetailItem by remember { mutableStateOf<PickupItemEntity?>(null) }
@@ -202,125 +202,178 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     var showAddOrPasteDialog by remember { mutableStateOf(false) }
     var quickAddTargetStation by remember { mutableStateOf<Int?>(null) }
     var showStationCountSetupDialog by remember { mutableStateOf(false) }
-    var showNotificationBadgeDialog by remember { mutableStateOf(false) }
-    var awaitingPostStartupDialogs by remember { mutableStateOf(false) }
+
+    // 首次打开与按需触发的短信权限引导状态（适配 Android 15/16 受限设置与各 ROM 指引）
+    val romGuide = remember { RestrictedSettingsHelper.detectRomGuide() }
+    var showSmsOnboardingDialog by remember { mutableStateOf(false) }
+    var smsOnboardingStep by remember { mutableStateOf(SmsOnboardingStep.SMS_PERMISSION) }
+    var smsOnboardingShowSteps by remember { mutableStateOf(false) }
+    var awaitingAppInfoReturn by remember { mutableStateOf(false) }
+    var returnedWithoutLift by remember { mutableStateOf(false) }
+    var hasTriedDirectSmsAfterReturn by remember { mutableStateOf(false) }
+    var justUnlockedRestricted by remember { mutableStateOf(false) }
+    var hasRequestedSmsInSession by rememberSaveable { mutableStateOf(false) }
+    var isSmsPermanentlyDenied by remember { mutableStateOf(false) }
+    var awaitingStationSetupAfterOnboarding by remember { mutableStateOf(false) }
     var hasTriggeredInitialPermissionFlow by rememberSaveable { mutableStateOf(false) }
 
-    val startupPermissionLauncher = rememberLauncherForActivityResult(
+    val completeOnboardingAndContinue: () -> Unit = {
+        showSmsOnboardingDialog = false
+        awaitingAppInfoReturn = false
+        returnedWithoutLift = false
+        hasTriedDirectSmsAfterReturn = false
+        justUnlockedRestricted = false
+        if (awaitingStationSetupAfterOnboarding) {
+            awaitingStationSetupAfterOnboarding = false
+            if (!latestSettings.stationCountPrompted) {
+                showStationCountSetupDialog = true
+            }
+        }
+    }
+
+    val openSmsOnboardingDialog: (Boolean) -> Unit = { fromStartup ->
+        val restrictedState = RestrictedSettingsHelper.checkRestrictedSettingsState(context)
+        val needsRestricted = restrictedState == RestrictedSettingsState.RESTRICTED
+        smsOnboardingStep = if (needsRestricted) {
+            SmsOnboardingStep.RESTRICTED_SETTINGS
+        } else {
+            SmsOnboardingStep.SMS_PERMISSION
+        }
+        smsOnboardingShowSteps = needsRestricted
+        awaitingAppInfoReturn = false
+        returnedWithoutLift = false
+        hasTriedDirectSmsAfterReturn = false
+        justUnlockedRestricted = restrictedState == RestrictedSettingsState.ALLOWED
+        isSmsPermanentlyDenied = RestrictedSettingsHelper.isSmsPermissionPermanentlyDenied(
+            context = context,
+            hasRequestedBefore = hasRequestedSmsInSession
+        )
+        if (fromStartup) {
+            awaitingStationSetupAfterOnboarding = !latestSettings.stationCountPrompted
+        }
+        showSmsOnboardingDialog = true
+    }
+
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { _ ->
+        hasRequestedSmsInSession = true
         val smsGranted = checkSmsPermission(context)
         hasSmsPermission = smsGranted
-        hasNotificationPermission = AppBadgeManager.hasNotificationPermission(context)
         if (smsGranted) {
             (context.applicationContext as? PickupApplication)?.ensureSmsObserverRegistered()
             viewModel.scanRecentSmsOnAppOpen(context)
-        }
-        if (latestItemsLoaded) {
-            AppBadgeManager.updateBadgeCount(context, latestItems.count { !it.isPickedUp }, force = true)
-        }
-        if (awaitingPostStartupDialogs) {
-            awaitingPostStartupDialogs = false
-            if (!settings.stationCountPrompted) {
-                showStationCountSetupDialog = true
-            } else if (!settings.badgePermissionPrompted) {
-                showNotificationBadgeDialog = true
-            }
-        }
-    }
-
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        val grantedNow = AppBadgeManager.hasNotificationPermission(context)
-        hasNotificationPermission = grantedNow
-        if (latestItemsLoaded) {
-            AppBadgeManager.updateBadgeCount(context, latestItems.count { !it.isPickedUp }, force = true)
-        }
-        if (!grantedNow) {
-            AppBadgeManager.openNotificationAndBadgeSettings(context)
-        }
-    }
-
-    val requestSmsPermissions = {
-        val perms = buildList {
-            add(Manifest.permission.READ_SMS)
-            add(Manifest.permission.RECEIVE_SMS)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }.toTypedArray()
-        startupPermissionLauncher.launch(perms)
-    }
-
-    val requestNotificationPermission: () -> Unit = {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            viewModel.showCapsuleToast("短信读取权限已开启")
+            completeOnboardingAndContinue()
         } else {
-            AppBadgeManager.openNotificationAndBadgeSettings(context)
+            val restrictedNow = RestrictedSettingsHelper.checkRestrictedSettingsState(context)
+            val permanentlyDeniedNow = RestrictedSettingsHelper.isSmsPermissionPermanentlyDenied(
+                context = context,
+                hasRequestedBefore = true
+            )
+            isSmsPermanentlyDenied = permanentlyDeniedNow
+            if (showSmsOnboardingDialog) {
+                if (smsOnboardingStep == SmsOnboardingStep.RESTRICTED_SETTINGS) {
+                    if (restrictedNow == RestrictedSettingsState.ALLOWED) {
+                        justUnlockedRestricted = true
+                        returnedWithoutLift = false
+                        hasTriedDirectSmsAfterReturn = false
+                        smsOnboardingStep = SmsOnboardingStep.SMS_PERMISSION
+                    } else {
+                        returnedWithoutLift = true
+                        hasTriedDirectSmsAfterReturn = true
+                    }
+                } else if (restrictedNow == RestrictedSettingsState.RESTRICTED) {
+                    smsOnboardingShowSteps = true
+                    returnedWithoutLift = true
+                    hasTriedDirectSmsAfterReturn = true
+                    smsOnboardingStep = SmsOnboardingStep.RESTRICTED_SETTINGS
+                }
+            } else if (restrictedNow == RestrictedSettingsState.RESTRICTED || permanentlyDeniedNow) {
+                openSmsOnboardingDialog(false)
+                if (restrictedNow == RestrictedSettingsState.RESTRICTED) {
+                    returnedWithoutLift = true
+                    hasTriedDirectSmsAfterReturn = true
+                }
+            }
         }
     }
 
-    // 首次打开：请求短信与通知权限（Android 13+），并在完成后弹出桌面角标权限引导弹窗
+    val launchRuntimeSmsRequest: () -> Unit = {
+        smsPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.READ_SMS,
+                Manifest.permission.RECEIVE_SMS
+            )
+        )
+    }
+
+    val requestSmsPermissions: () -> Unit = {
+        val restrictedState = RestrictedSettingsHelper.checkRestrictedSettingsState(context)
+        val permanentlyDenied = RestrictedSettingsHelper.isSmsPermissionPermanentlyDenied(
+            context = context,
+            hasRequestedBefore = hasRequestedSmsInSession
+        )
+        if (restrictedState == RestrictedSettingsState.RESTRICTED || permanentlyDenied) {
+            openSmsOnboardingDialog(false)
+        } else {
+            launchRuntimeSmsRequest()
+        }
+    }
+
+    // 首次打开：若未获得短信读取权限，自动根据当前系统展示受限设置 / 短信读取引导；已授权则绝不打扰
     LaunchedEffect(isSettingsLoaded) {
         if (!isSettingsLoaded || hasTriggeredInitialPermissionFlow) return@LaunchedEffect
         hasTriggeredInitialPermissionFlow = true
 
         val smsNow = checkSmsPermission(context)
-        val notifNow = AppBadgeManager.hasNotificationPermission(context)
         hasSmsPermission = smsNow
-        hasNotificationPermission = notifNow
 
-        val startupPerms = buildList {
-            if (!smsNow) {
-                add(Manifest.permission.READ_SMS)
-                add(Manifest.permission.RECEIVE_SMS)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED &&
-                (!smsNow || !settings.badgePermissionPrompted)
-            ) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-
-        if (startupPerms.isNotEmpty()) {
-            awaitingPostStartupDialogs = !settings.stationCountPrompted || !settings.badgePermissionPrompted
-            startupPermissionLauncher.launch(startupPerms.toTypedArray())
+        if (!smsNow) {
+            openSmsOnboardingDialog(true)
         } else if (!settings.stationCountPrompted) {
             showStationCountSetupDialog = true
-        } else if (!settings.badgePermissionPrompted) {
-            showNotificationBadgeDialog = true
         }
     }
 
-    // 每次打开应用（冷启动与热启动）刷新权限状态、自动扫描最近 7 天短信并同步桌面角标
+    // 每次返回应用刷新短信权限与受限设置状态：检测到解除限制后自动衔接短信授权；已获取短信权限立即收起弹窗并扫描
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 val smsNow = checkSmsPermission(context)
+                val wasSmsGranted = hasSmsPermission
                 hasSmsPermission = smsNow
-                hasNotificationPermission = AppBadgeManager.hasNotificationPermission(context)
+
                 if (smsNow) {
                     (context.applicationContext as? PickupApplication)?.ensureSmsObserverRegistered()
                     viewModel.scanRecentSmsOnAppOpen(context)
+                    if (showSmsOnboardingDialog) {
+                        if (!wasSmsGranted) {
+                            viewModel.showCapsuleToast("短信读取权限已开启")
+                        }
+                        completeOnboardingAndContinue()
+                    }
+                } else if (showSmsOnboardingDialog) {
+                    val restrictedNow = RestrictedSettingsHelper.checkRestrictedSettingsState(context)
+                    isSmsPermanentlyDenied = RestrictedSettingsHelper.isSmsPermissionPermanentlyDenied(
+                        context = context,
+                        hasRequestedBefore = hasRequestedSmsInSession
+                    )
+                    if (smsOnboardingStep == SmsOnboardingStep.RESTRICTED_SETTINGS && awaitingAppInfoReturn) {
+                        awaitingAppInfoReturn = false
+                        if (restrictedNow != RestrictedSettingsState.RESTRICTED) {
+                            justUnlockedRestricted = true
+                            returnedWithoutLift = false
+                            hasTriedDirectSmsAfterReturn = false
+                            smsOnboardingStep = SmsOnboardingStep.SMS_PERMISSION
+                        } else {
+                            returnedWithoutLift = true
+                        }
+                    }
                 }
+
                 if (latestItemsLoaded) {
                     val count = latestItems.count { !it.isPickedUp }
-                    AppBadgeManager.updateBadgeCount(context, count, force = true)
                     PickupWidgetProvider.notifyWidgetDataChanged(context, pendingCountOverride = count)
                 }
             }
@@ -331,11 +384,10 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         }
     }
 
-    // 根据待取快递数量实时更新桌面应用角标与桌面液态玻璃小组件（等待数据库首帧加载完成后再同步，避免冷启动角标闪烁归零）
+    // 根据待取快递数量实时更新桌面液态玻璃小组件（等待数据库首帧加载完成后再同步）
     LaunchedEffect(isItemsLoaded, items, settings.stationRules) {
         if (!isItemsLoaded) return@LaunchedEffect
         val pendingCount = items.count { !it.isPickedUp }
-        AppBadgeManager.updateBadgeCount(context, pendingCount)
         PickupWidgetProvider.notifyWidgetDataChanged(context, pendingCountOverride = pendingCount)
     }
 
@@ -490,12 +542,10 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         items = items,
                         settings = settings,
                         hasSmsPermission = hasSmsPermission,
-                        hasNotificationPermission = hasNotificationPermission,
                         onBack = {
                             if (showSettingsScreen) showSettingsScreen = false
                         },
                         onRequestSmsPermission = requestSmsPermissions,
-                        onRequestNotificationPermission = requestNotificationPermission,
                         onToggleTaobaoBanner = viewModel::setShowTaobaoIdentityBanner,
                         onToggleCainiaoBanner = viewModel::setShowCainiaoIdentityBanner,
                         onTogglePinduoduoBanner = viewModel::setShowPinduoduoIdentityBanner,
@@ -606,43 +656,43 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         )
     }
 
-    // 5. 新安装询问学校快递房数量引导弹窗
+    // 5. 首次打开受限设置解除与短信读取权限分步引导弹窗（已获取短信权限则不再弹出）
+    if (showSmsOnboardingDialog && !hasSmsPermission) {
+        SmsOnboardingPermissionDialog(
+            step = smsOnboardingStep,
+            showStepIndicator = smsOnboardingShowSteps,
+            romGuide = romGuide,
+            returnedWithoutLift = returnedWithoutLift,
+            hasTriedDirectSmsAfterReturn = hasTriedDirectSmsAfterReturn,
+            justUnlockedRestricted = justUnlockedRestricted,
+            isSmsPermanentlyDenied = isSmsPermanentlyDenied,
+            onDismiss = completeOnboardingAndContinue,
+            onOpenAppInfo = {
+                if (RestrictedSettingsHelper.openAppDetailsSettings(context)) {
+                    awaitingAppInfoReturn = true
+                } else {
+                    viewModel.showCapsuleToast("无法打开系统应用信息页面")
+                }
+            },
+            onRequestSmsPermission = launchRuntimeSmsRequest
+        )
+    }
+
+    // 6. 新安装询问学校快递房数量引导弹窗
     if (showStationCountSetupDialog) {
         StationCountSetupDialog(
             onDismiss = {
                 showStationCountSetupDialog = false
                 viewModel.markStationCountPrompted()
-                if (!settings.badgePermissionPrompted) {
-                    showNotificationBadgeDialog = true
-                }
             },
             onConfirmCount = { count ->
                 showStationCountSetupDialog = false
                 viewModel.configureInitialStationCount(count)
-                if (!settings.badgePermissionPrompted) {
-                    showNotificationBadgeDialog = true
-                }
             }
         )
     }
 
-    // 6. 首次打开通知与桌面角标权限引导弹窗
-    if (showNotificationBadgeDialog) {
-        NotificationAndBadgePermissionDialog(
-            hasNotificationPermission = hasNotificationPermission,
-            onDismiss = {
-                showNotificationBadgeDialog = false
-                viewModel.markBadgePermissionPrompted()
-            },
-            onRequestNotificationPermission = requestNotificationPermission,
-            onOpenBadgeSettings = {
-                viewModel.markBadgePermissionPrompted()
-                AppBadgeManager.openNotificationAndBadgeSettings(context)
-            }
-        )
-    }
-
-    // 6. 分享取件码弹窗（仅图片分享，可选是否附带备注）
+    // 7. 分享取件码弹窗（仅图片分享，可选是否附带备注）
     if (showShareMethodDialog && dialogShareItems.isNotEmpty()) {
         SharePickupMethodDialog(
             selectedCount = dialogShareItems.size,

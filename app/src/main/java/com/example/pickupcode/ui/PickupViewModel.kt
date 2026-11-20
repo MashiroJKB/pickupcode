@@ -297,12 +297,6 @@ class PickupViewModel(
         }
     }
 
-    fun markBadgePermissionPrompted() {
-        viewModelScope.launch {
-            settingsDataStore.setBadgePermissionPrompted(true)
-        }
-    }
-
     fun setShowTaobaoIdentityBanner(enabled: Boolean) {
         viewModelScope.launch {
             settingsDataStore.setShowTaobaoIdentityBanner(enabled)

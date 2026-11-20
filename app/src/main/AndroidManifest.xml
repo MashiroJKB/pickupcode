@@ -11,17 +11,6 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
-    <!-- 桌面角标通知与各主流国产系统桌面角标权限 -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="com.huawei.android.launcher.permission.CHANGE_BADGE" />
-    <uses-permission android:name="com.hihonor.android.launcher.permission.CHANGE_BADGE" />
-    <uses-permission android:name="com.sec.android.provider.badge.permission.READ" />
-    <uses-permission android:name="com.sec.android.provider.badge.permission.WRITE" />
-    <uses-permission android:name="com.oppo.launcher.permission.READ_SETTINGS" />
-    <uses-permission android:name="com.oppo.launcher.permission.WRITE_SETTINGS" />
-    <uses-permission android:name="com.oplus.notification.permission.BADGE_DIGITAL" />
-    <uses-permission android:name="com.vivo.notification.permission.BADGE_ICON" />
-
     <!-- Android 11+ 包可见性声明：用于直接唤起淘宝/拼多多 DeepLink -->
     <queries>
         <package android:name="com.taobao.taobao" />
