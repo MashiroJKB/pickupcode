@@ -1,6 +1,7 @@
 package com.example.pickupcode.ui.settings
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -125,6 +126,8 @@ import java.util.Locale
 
 private const val GITHUB_REPO_URL = "https://github.com/MashiroJKB/pickupcode"
 private const val GITHUB_RELEASES_URL = "https://github.com/MashiroJKB/pickupcode/releases"
+private const val LANZOU_UPDATE_URL = "https://mashirojk.lanzoub.com/b00ctlhpta"
+private const val LANZOU_PASSWORD = "43tf"
 
 @Composable
 fun SettingsScreen(
@@ -173,9 +176,9 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.3.6" }
+            info.versionName.orEmpty().ifBlank { "2.3.7" }
         } catch (_: Exception) {
-            "2.3.6"
+            "2.3.7"
         }
     }
 
@@ -771,36 +774,85 @@ fun SettingsScreen(
             }
         }
 
-        // 5. 关于（版本号 + GitHub 开源地址，点击调用默认浏览器打开）
+        // 5. 关于（版本号 + GitHub 开源入口，不展示具体 URL，点击调用默认浏览器打开）
         item(key = "about_card") {
             SettingsLinkCard(
                 icon = Icons.Rounded.Info,
                 iconTint = MaterialTheme.colorScheme.primary,
                 title = "关于",
                 badgeText = "v$appVersionName",
-                url = GITHUB_REPO_URL,
+                subtitle = "GitHub 开源项目",
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    openUrlInDefaultBrowser(context, GITHUB_REPO_URL, onFeedbackMessage)
+                    if (!openUrlInDefaultBrowser(context, GITHUB_REPO_URL)) {
+                        onFeedbackMessage("未检测到可用浏览器")
+                    }
                 },
                 modifier = Modifier.animateItem()
             )
         }
 
-        // 6. 检查更新（GitHub Releases 地址，点击调用默认浏览器打开）
+        // 6. 检查更新（提供 GitHub Release 与蓝奏云双渠道，不展示具体 URL，点击调用默认浏览器打开）
         item(key = "check_update_card") {
-            SettingsLinkCard(
-                icon = Icons.Rounded.SystemUpdateAlt,
-                iconTint = statusGreen,
-                title = "检查更新",
-                badgeText = "Release",
-                url = GITHUB_RELEASES_URL,
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    openUrlInDefaultBrowser(context, GITHUB_RELEASES_URL, onFeedbackMessage)
-                },
-                modifier = Modifier.animateItem()
-            )
+            Column(
+                modifier = Modifier
+                    .animateItem()
+                    .fillMaxWidth()
+                    .liquidGlass(cornerRadius = AppleCorners.OuterCard)
+                    .padding(18.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.SystemUpdateAlt,
+                        contentDescription = null,
+                        tint = statusGreen,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "检查更新",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        softWrap = false,
+                        maxLines = 1
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    UpdateChannelRow(
+                        title = "GitHub Release",
+                        badgeText = null,
+                        accentColor = MaterialTheme.colorScheme.primary,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            if (!openUrlInDefaultBrowser(context, GITHUB_RELEASES_URL)) {
+                                onFeedbackMessage("未检测到可用浏览器")
+                            }
+                        }
+                    )
+
+                    UpdateChannelRow(
+                        title = "蓝奏云",
+                        badgeText = "密码 $LANZOU_PASSWORD",
+                        accentColor = statusGreen,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            clipboard?.setPrimaryClip(ClipData.newPlainText("蓝奏云密码", LANZOU_PASSWORD))
+                            if (openUrlInDefaultBrowser(context, LANZOU_UPDATE_URL)) {
+                                onFeedbackMessage("已复制密码 $LANZOU_PASSWORD，正在打开蓝奏云")
+                            } else {
+                                onFeedbackMessage("已复制密码 $LANZOU_PASSWORD，未检测到浏览器")
+                            }
+                        }
+                    )
+                }
+            }
         }
     }
 
@@ -870,7 +922,7 @@ private fun SettingsLinkCard(
     iconTint: Color,
     title: String,
     badgeText: String,
-    url: String,
+    subtitle: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -937,9 +989,10 @@ private fun SettingsLinkCard(
                 }
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = url,
+                    text = subtitle,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    softWrap = false,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -957,21 +1010,87 @@ private fun SettingsLinkCard(
     }
 }
 
+@Composable
+private fun UpdateChannelRow(
+    title: String,
+    badgeText: String?,
+    accentColor: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlassInnerCard(
+                cornerRadius = AppleCorners.InnerCard,
+                accentTint = accentColor
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 13.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                softWrap = false,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!badgeText.isNullOrBlank()) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(AppleCorners.Pill))
+                        .background(accentColor.copy(alpha = 0.14f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        ),
+                        color = accentColor,
+                        softWrap = false,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+            contentDescription = "在默认浏览器打开 $title",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(17.dp)
+        )
+    }
+}
+
 private fun openUrlInDefaultBrowser(
     context: Context,
-    url: String,
-    onError: (String) -> Unit
-) {
+    url: String
+): Boolean {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
         addCategory(Intent.CATEGORY_BROWSABLE)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    try {
+    return try {
         context.startActivity(intent)
+        true
     } catch (_: ActivityNotFoundException) {
-        onError("未检测到可用浏览器")
+        false
     } catch (_: Exception) {
-        onError("无法打开浏览器链接")
+        false
     }
 }
 

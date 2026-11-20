@@ -37,14 +37,17 @@
 ## 安装
 
 <p>
-  <a href="https://github.com/MashiroJKB/pickupcode/releases/latest">
-    <img src="https://img.shields.io/github/v/release/MashiroJKB/pickupcode?label=GitHub%20Releases&style=for-the-badge&color=007AFF" alt="Download from GitHub Releases" />
+  <a href="https://github.com/MashiroJKB/pickupcode/releases">
+    <img src="https://img.shields.io/github/v/release/MashiroJKB/pickupcode?label=GitHub%20Release&style=for-the-badge&color=007AFF" alt="GitHub Release" />
+  </a>
+  <a href="https://mashirojk.lanzoub.com/b00ctlhpta">
+    <img src="https://img.shields.io/badge/%E8%93%9D%E5%A5%8F%E4%BA%91-%E5%AF%86%E7%A0%81%2043tf-34C759?style=for-the-badge" alt="蓝奏云" />
   </a>
 </p>
 
 - 系统要求：Android 10（API 29）及以上
-- 下载地址：<https://github.com/MashiroJKB/pickupcode/releases>
-- 权限说明：仅用于本地读取/监听取件短信（`READ_SMS` / `RECEIVE_SMS`）与桌面角标通知（`POST_NOTIFICATIONS`），应用内设置页可直接跳转本仓库与 Releases 页面检查更新
+- 检查更新 / 下载渠道：[GitHub Release](https://github.com/MashiroJKB/pickupcode/releases) ｜ [蓝奏云](https://mashirojk.lanzoub.com/b00ctlhpta)（密码：`43tf`）
+- 权限说明：仅用于本地读取/监听取件短信（`READ_SMS` / `RECEIVE_SMS`）与桌面角标通知（`POST_NOTIFICATIONS`），应用内设置页支持直接跳转「关于」与「检查更新」（GitHub Release / 蓝奏云）
 
 ## 外观
 
