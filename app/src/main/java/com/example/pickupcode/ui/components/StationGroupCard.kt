@@ -154,7 +154,7 @@ fun StationGroupCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 4.dp)
+                .padding(horizontal = 4.dp, vertical = 4.dp)
                 .heightIn(min = 28.dp)
         ) {
             Row(
@@ -172,10 +172,7 @@ fun StationGroupCard(
                 Column {
                     Text(
                         text = stationDisplayName,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp
-                        ),
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

@@ -363,7 +363,7 @@ private fun HomeTopHeader(
                             text = "全选",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             ),
                             color = if (displayedAllSelected) Color.White else primaryColor,
                             softWrap = false,
@@ -398,10 +398,7 @@ private fun HomeTopHeader(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "授权短信",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
-                                    ),
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = statusAmber,
                                     softWrap = false,
                                     maxLines = 1

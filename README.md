@@ -24,7 +24,7 @@
 
 - **身份码与桌面同步**
 
-  支持同时开启淘宝身份码、菜鸟身份码与拼多多取件码入口（开启 2～3 个自动切换为「身份码/取件码」紧凑并排方块）；提供 4×3 液态玻璃桌面小组件一键核销与跳转，并支持桌面图标未读角标
+  支持同时开启淘宝身份码、菜鸟身份码与拼多多取件码入口（开启 2～3 个自动切换为「身份码/取件码」无框对称圆角图标排布）；提供 4×3 液态玻璃桌面小组件一键核销与跳转，并支持桌面图标未读角标
 
 - **图片清单分享**
 
@@ -47,7 +47,7 @@
 
 - 系统要求：Android 10（API 29）及以上
 - 检查更新 / 下载渠道：[GitHub Release](https://github.com/MashiroJKB/pickupcode/releases) ｜ [蓝奏云](https://mashirojk.lanzoub.com/b00ctlhpta)（密码：`43tf`）
-- 权限说明：仅用于本地读取/监听取件短信（`READ_SMS` / `RECEIVE_SMS`）与桌面角标通知（`POST_NOTIFICATIONS`），应用内设置页支持直接跳转「关于」与「检查更新」（GitHub Release / 蓝奏云）
+- 权限说明：仅用于本地读取/监听取件短信（`READ_SMS` / `RECEIVE_SMS`）与桌面角标通知（`POST_NOTIFICATIONS`），应用内设置页支持直接访问「关于」、「检查更新」（GitHub Release / 蓝奏云）与「支持」
 
 ## 外观
 

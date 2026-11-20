@@ -3,14 +3,20 @@ package com.example.pickupcode.ui.settings
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +32,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,20 +55,15 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.RestartAlt
-import androidx.compose.material.icons.rounded.Sms
-import androidx.compose.material.icons.rounded.SystemUpdateAlt
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,6 +81,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -92,16 +95,20 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.example.pickupcode.R
 import com.example.pickupcode.data.local.AppSettings
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.StationRule
@@ -117,10 +124,12 @@ import com.example.pickupcode.ui.theme.AppleOrangeLight
 import com.example.pickupcode.ui.theme.AppleRedDark
 import com.example.pickupcode.ui.theme.AppleRedLight
 import com.example.pickupcode.ui.theme.PickupCodeMonospaceStyle
-import com.example.pickupcode.ui.theme.TaobaoOrangeStart
 import com.example.pickupcode.ui.theme.liquidGlass
 import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 import com.example.pickupcode.ui.theme.stationAccentColor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -178,9 +187,9 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.4.0" }
+            info.versionName.orEmpty().ifBlank { "2.5.0" }
         } catch (_: Exception) {
-            "2.4.0"
+            "2.5.0"
         }
     }
 
@@ -188,6 +197,7 @@ fun SettingsScreen(
     var showAddStationDialog by remember { mutableStateOf(false) }
     var showImportRulesDialog by remember { mutableStateOf(false) }
     var showPickedUpHistoryDialog by remember { mutableStateOf(false) }
+    var showSupportPosterDialog by remember { mutableStateOf(false) }
 
     // 支持按住拖动排序的本地规则列表状态
     var localRules by remember { mutableStateOf(settings.stationRules) }
@@ -284,7 +294,7 @@ fun SettingsScreen(
             }
         }
 
-        // 1. 历史包裹入口卡片（永久保存取件记录）
+        // 1. 历史包裹入口卡片（永久保存取件记录，大标题无前置图标）
         item(key = "history_packages_card") {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -302,47 +312,22 @@ fun SettingsScreen(
                     }
                     .padding(horizontal = 18.dp, vertical = 16.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(statusGreen.copy(alpha = 0.16f))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.History,
-                            contentDescription = null,
-                            tint = statusGreen,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "历史包裹",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 17.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            softWrap = false,
-                            maxLines = 1
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "取件记录永久保存 · 点击查看",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "历史包裹",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        softWrap = false,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = "取件记录永久保存 · 点击查看",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
@@ -384,7 +369,6 @@ fun SettingsScreen(
         if (!hasSmsPermission) {
             item(key = "sms_permission_card") {
                 PermissionStatusCard(
-                    icon = Icons.Rounded.Sms,
                     title = "监听短信权限未开启",
                     subtitle = "授权后自动扫描近 7 天取件短信",
                     accentColor = statusAmber,
@@ -399,7 +383,6 @@ fun SettingsScreen(
         if (!hasNotificationPermission) {
             item(key = "notification_badge_card") {
                 PermissionStatusCard(
-                    icon = Icons.Rounded.NotificationsActive,
                     title = "通知与桌面角标未开启",
                     subtitle = "开启后在桌面同步待取件数",
                     accentColor = statusAmber,
@@ -426,10 +409,7 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = "识别规则",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        ),
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         softWrap = false,
                         maxLines = 1
@@ -680,9 +660,7 @@ fun SettingsScreen(
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Text(
                                         text = rule.displayName,
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontWeight = FontWeight.Bold
-                                        ),
+                                        style = MaterialTheme.typography.titleSmall,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -750,25 +728,13 @@ fun SettingsScreen(
                     .liquidGlass(cornerRadius = AppleCorners.OuterCard)
                     .padding(18.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Rounded.QrCodeScanner,
-                        contentDescription = null,
-                        tint = TaobaoOrangeStart,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "身份码跳转链路",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        softWrap = false,
-                        maxLines = 1
-                    )
-                }
+                Text(
+                    text = "身份码跳转链路",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    softWrap = false,
+                    maxLines = 1
+                )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -806,8 +772,7 @@ fun SettingsScreen(
         // 5. 关于（版本号 + GitHub 开源入口，不展示具体 URL，点击调用默认浏览器打开）
         item(key = "about_card") {
             SettingsLinkCard(
-                icon = Icons.Rounded.Info,
-                iconTint = MaterialTheme.colorScheme.primary,
+                badgeAccent = MaterialTheme.colorScheme.primary,
                 title = "关于",
                 badgeText = "v$appVersionName",
                 subtitle = "GitHub 开源项目",
@@ -830,25 +795,13 @@ fun SettingsScreen(
                     .liquidGlass(cornerRadius = AppleCorners.OuterCard)
                     .padding(18.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Rounded.SystemUpdateAlt,
-                        contentDescription = null,
-                        tint = statusGreen,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "检查更新",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        softWrap = false,
-                        maxLines = 1
-                    )
-                }
+                Text(
+                    text = "检查更新",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    softWrap = false,
+                    maxLines = 1
+                )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -881,6 +834,51 @@ fun SettingsScreen(
                         }
                     )
                 }
+            }
+        }
+
+        // 7. 支持（点击居中弹出支付宝扫码领红包海报）
+        item(key = "support_card") {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .animateItem()
+                    .fillMaxWidth()
+                    .liquidGlass(cornerRadius = AppleCorners.OuterCard)
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        showSupportPosterDialog = true
+                    }
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "支持",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        softWrap = false,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = "扫码领红包，支持开发者",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        softWrap = false,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowForwardIos,
+                    contentDescription = "打开支持页面",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
             }
         }
     }
@@ -943,12 +941,19 @@ fun SettingsScreen(
             onDeleteItem = onDeletePickedUpItem
         )
     }
+
+    // 支持弹窗（支付宝扫码领红包海报）
+    if (showSupportPosterDialog) {
+        SupportPosterDialog(
+            onDismiss = { showSupportPosterDialog = false },
+            onFeedbackMessage = onFeedbackMessage
+        )
+    }
 }
 
 @Composable
 private fun SettingsLinkCard(
-    icon: ImageVector,
-    iconTint: Color,
+    badgeAccent: Color,
     title: String,
     badgeText: String,
     subtitle: String,
@@ -964,68 +969,40 @@ private fun SettingsLinkCard(
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(iconTint.copy(alpha = 0.14f))
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(20.dp)
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    softWrap = false,
+                    maxLines = 1
                 )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(AppleCorners.Pill))
+                        .background(badgeAccent.copy(alpha = 0.14f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
                     Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        text = badgeText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = badgeAccent,
                         softWrap = false,
                         maxLines = 1
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(AppleCorners.Pill))
-                            .background(iconTint.copy(alpha = 0.14f))
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = badgeText,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            ),
-                            color = iconTint,
-                            softWrap = false,
-                            maxLines = 1
-                        )
-                    }
                 }
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    softWrap = false,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                softWrap = false,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
 
         Spacer(modifier = Modifier.width(10.dp))
@@ -1034,7 +1011,7 @@ private fun SettingsLinkCard(
             imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
             contentDescription = "在默认浏览器打开",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(17.dp)
         )
     }
 }
@@ -1064,9 +1041,7 @@ private fun UpdateChannelRow(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Bold
-                ),
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 softWrap = false,
                 maxLines = 1,
@@ -1082,10 +1057,7 @@ private fun UpdateChannelRow(
                 ) {
                     Text(
                         text = badgeText,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        ),
+                        style = MaterialTheme.typography.labelSmall,
                         color = accentColor,
                         softWrap = false,
                         maxLines = 1
@@ -1125,7 +1097,6 @@ private fun openUrlInDefaultBrowser(
 
 @Composable
 private fun PermissionStatusCard(
-    icon: ImageVector,
     title: String,
     subtitle: String,
     accentColor: Color,
@@ -1133,77 +1104,49 @@ private fun PermissionStatusCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
         modifier = modifier
             .fillMaxWidth()
             .liquidGlass(cornerRadius = AppleCorners.OuterCard)
-            .padding(18.dp)
+            .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth()
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(AppleCorners.Pill))
+                .background(accentColor.copy(alpha = 0.16f))
+                .border(0.8.dp, accentColor.copy(alpha = 0.4f), RoundedCornerShape(AppleCorners.Pill))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(accentColor)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(AppleCorners.Pill))
-                    .background(accentColor.copy(alpha = 0.16f))
-                    .border(0.8.dp, accentColor.copy(alpha = 0.4f), RoundedCornerShape(AppleCorners.Pill))
-                    .clickable(onClick = onClick)
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = buttonText,
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = accentColor,
-                    softWrap = false,
-                    maxLines = 1
-                )
-            }
+            Text(
+                text = buttonText,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                color = accentColor,
+                softWrap = false,
+                maxLines = 1
+            )
         }
     }
 }
@@ -1232,14 +1175,12 @@ private fun IdentitySwitchRow(
         ) {
             AppBrandIcon(
                 type = type,
-                size = 30.dp
+                size = 32.dp
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = type.title,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Bold
-                ),
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1630,7 +1571,7 @@ private fun PickedUpHistoryDialog(
                     )
                     Text(
                         text = "共 ${pickedUpItems.size} 件 · 永久保存",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -1831,7 +1772,7 @@ private fun PickedUpHistoryDialog(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = item.productName,
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
@@ -1845,3 +1786,168 @@ private fun PickedUpHistoryDialog(
         }
     }
 }
+
+@Composable
+private fun SupportPosterDialog(
+    onDismiss: () -> Unit,
+    onFeedbackMessage: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val isDark = isSystemInDarkTheme()
+    val statusGreen = if (isDark) AppleGreenDark else AppleGreenLight
+    val configuration = LocalConfiguration.current
+    val maxPosterHeight = remember(configuration.screenHeightDp) {
+        (configuration.screenHeightDp * 0.56f).dp.coerceIn(280.dp, 460.dp)
+    }
+    var isSaving by remember { mutableStateOf(false) }
+    var saveSucceeded by remember { mutableStateOf(false) }
+
+    SpringGlassDialog(onDismissRequest = onDismiss) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "支持",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    softWrap = false,
+                    maxLines = 1
+                )
+
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "关闭",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxPosterHeight)
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.img_support_alipay),
+                    contentDescription = "支付宝扫码领红包",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .aspectRatio(705f / 1024f)
+                        .clip(RoundedCornerShape(AppleCorners.InnerCard))
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(AppleCorners.InnerCard))
+                    .background(
+                        if (saveSucceeded) {
+                            statusGreen.copy(alpha = 0.16f)
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                    )
+                    .clickable(enabled = !isSaving) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        isSaving = true
+                        scope.launch {
+                            val saved = saveSupportPosterToGallery(context)
+                            isSaving = false
+                            saveSucceeded = saved
+                            onFeedbackMessage(
+                                if (saved) "已保存到相册，可打开支付宝扫一扫" else "保存失败，请截图后在支付宝扫码"
+                            )
+                        }
+                    }
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Icon(
+                    imageVector = if (saveSucceeded) Icons.Rounded.Check else Icons.Rounded.Download,
+                    contentDescription = null,
+                    tint = if (saveSucceeded) statusGreen else Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = when {
+                        isSaving -> "正在保存..."
+                        saveSucceeded -> "已保存到相册 · 打开支付宝扫一扫"
+                        else -> "保存图片到相册"
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (saveSucceeded) statusGreen else Color.White,
+                    softWrap = false,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+private suspend fun saveSupportPosterToGallery(context: Context): Boolean =
+    withContext(Dispatchers.IO) {
+        val resolver = context.contentResolver
+        val fileName = "pickupcode_support_${System.currentTimeMillis()}.jpg"
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/取件码")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+        }
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: return@withContext false
+        try {
+            resolver.openOutputStream(uri)?.use { out ->
+                val rawCopied = runCatching {
+                    context.resources.openRawResource(R.drawable.img_support_alipay).use { input ->
+                        input.copyTo(out)
+                    }
+                    true
+                }.getOrDefault(false)
+                if (!rawCopied) {
+                    val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.img_support_alipay)
+                        ?: return@withContext false
+                    try {
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 96, out)
+                    } finally {
+                        bitmap.recycle()
+                    }
+                }
+            } ?: return@withContext false
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val doneValues = ContentValues().apply {
+                    put(MediaStore.Images.Media.IS_PENDING, 0)
+                }
+                resolver.update(uri, doneValues, null, null)
+            }
+            true
+        } catch (_: Exception) {
+            runCatching { resolver.delete(uri, null, null) }
+            false
+        }
+    }

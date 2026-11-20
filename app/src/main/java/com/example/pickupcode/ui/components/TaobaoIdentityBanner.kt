@@ -51,7 +51,6 @@ import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.TaobaoOrangeEnd
 import com.example.pickupcode.ui.theme.TaobaoOrangeStart
 import com.example.pickupcode.ui.theme.liquidGlass
-import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 
 val CainiaoBlueStart = Color(0xFF006EFF)
 val CainiaoBlueEnd = Color(0xFF0055D4)
@@ -153,7 +152,7 @@ object TaobaoDeepLinkLauncher {
 /**
  * 首页顶部身份码/取件码入口容器：
  * - 当仅开启 1 个开关时，展示完整单栏液态玻璃 Banner
- * - 当同时开启 2 个或 3 个开关时，自动切换为标题为「身份码/取件码」的紧凑并排模式（一行 2~3 格液态玻璃方块按钮，仅显示对应应用图标）
+ * - 当同时开启 2 个或 3 个开关时，自动切换为标题为「身份码/取件码」的对称无框图标模式（均匀排布原生 Apple 连续圆角应用图标）
  */
 @Composable
 fun IdentityCodeBannersSection(
@@ -179,7 +178,9 @@ fun IdentityCodeBannersSection(
 }
 
 /**
- * 多个身份码/取件码紧凑并排模式：标题为「身份码/取件码」，下方一行 2~3 格紧凑型液态玻璃方块按钮，只显示原生苹果圆角应用图标
+ * 多个身份码/取件码对称图标模式：
+ * 仅保留外层液态玻璃卡片与统一层级标题「身份码/取件码」，去除图标外层小框，
+ * 2～3 枚统一 Apple 连续圆角应用图标等距对称排布，兼顾美观与大面积舒适点按。
  */
 @Composable
 fun CompactIdentityCodeBar(
@@ -195,47 +196,41 @@ fun CompactIdentityCodeBar(
         modifier = modifier
             .fillMaxWidth()
             .liquidGlass(cornerRadius = AppleCorners.OuterCard)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(horizontal = 18.dp, vertical = 14.dp)
     ) {
         Text(
             text = "身份码/取件码",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            ),
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
             softWrap = false,
-            maxLines = 1,
-            modifier = Modifier.padding(start = 2.dp)
+            maxLines = 1
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth()
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp)
         ) {
             enabledTypes.forEach { type ->
                 key(type) {
                     var isPressed by remember { mutableStateOf(false) }
                     val scale by animateFloatAsState(
-                        targetValue = if (isPressed) 0.94f else 1f,
+                        targetValue = if (isPressed) 0.91f else 1f,
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioNoBouncy,
                             stiffness = Spring.StiffnessMedium
                         ),
-                        label = "compact_tile_scale"
+                        label = "compact_icon_scale"
                     )
 
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .weight(1f)
-                            .height(68.dp)
                             .scale(scale)
-                            .liquidGlassInnerCard(
-                                cornerRadius = AppleCorners.InnerCard
-                            )
                             .pointerInput(type) {
                                 detectTapGestures(
                                     onPress = {
@@ -253,10 +248,11 @@ fun CompactIdentityCodeBar(
                                     }
                                 )
                             }
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
                         AppBrandIcon(
                             type = type,
-                            size = 48.dp
+                            size = 54.dp
                         )
                     }
                 }
@@ -339,10 +335,7 @@ fun IdentityCodeBanner(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = type.title,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 17.sp
-                            ),
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -351,16 +344,13 @@ fun IdentityCodeBanner(
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(AppleCorners.Pill))
                                 .background(type.primaryColor.copy(alpha = 0.16f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .padding(horizontal = 7.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "扫码出库",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 11.sp
-                                ),
+                                style = MaterialTheme.typography.labelSmall,
                                 color = type.primaryColor,
                                 softWrap = false,
                                 maxLines = 1

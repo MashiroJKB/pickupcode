@@ -980,10 +980,7 @@ private fun PermissionGuideItemRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
-                ),
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -991,7 +988,7 @@ private fun PermissionGuideItemRow(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1063,7 +1060,7 @@ fun SharePickupMethodDialog(
                         )
                         Text(
                             text = "已选 $selectedCount 件 · 可分享到微信等应用",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1139,10 +1136,7 @@ fun SharePickupMethodDialog(
 
                 Text(
                     text = if (includeRemarks) "分享备注" else "不分享备注",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    ),
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     softWrap = false,
                     maxLines = 1
@@ -1215,10 +1209,7 @@ private fun ShareOptionCard(
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.bodyLarge.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp
-            ),
+            style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1270,7 +1261,7 @@ fun StationCountSetupDialog(
                     )
                     Text(
                         text = "将自动生成对应数量的识别规则",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
