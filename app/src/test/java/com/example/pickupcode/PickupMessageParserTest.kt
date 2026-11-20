@@ -194,4 +194,44 @@ class PickupMessageParserTest {
         assertEquals(1, results.size)
         assertEquals("682914", results[0].code)
     }
+
+    @Test
+    fun `matches extended station keywords and chinese numerals up to 20`() {
+        val rules15 = SettingsDataStore.defaultStationRules(15)
+        val sms12 = "您的包裹已放至十二号快递点，请凭自提码 4-1-9023 及时取件。"
+        val sms15 = "【兔喜】已入库15号快递超市，提取码 A8-3021 请及时领取。"
+        val smsHash = "已到达3#快递房，货架号 2-3-1180 请及时自提。"
+
+        val r12 = PickupMessageParser.parse(sms12, rules15)
+        val r15 = PickupMessageParser.parse(sms15, rules15)
+        val rHash = PickupMessageParser.parse(smsHash, rules15)
+
+        assertEquals(12, r12.single().stationNumber)
+        assertEquals("4-1-9023", r12.single().code)
+        assertEquals(15, r15.single().stationNumber)
+        assertEquals("A8-3021", r15.single().code)
+        assertEquals(3, rHash.single().stationNumber)
+        assertEquals("2-3-1180", rHash.single().code)
+    }
+
+    @Test
+    fun `prevents numeric prefix collision such as station 12 matching station 2`() {
+        val smsPrefix = "您的包裹已到达12号快递房，请凭取件码 7-2-6610 领取。"
+        val resultsPrefix = PickupMessageParser.parse(smsPrefix, defaultRules) // defaultRules only has 1..8
+        assertEquals(1, resultsPrefix.size)
+        assertEquals("7-2-6610", resultsPrefix[0].code)
+        assertEquals(0, resultsPrefix[0].stationNumber)
+
+        val smsSuffix = "您的包裹已到达快递房12，请凭取件码 7-2-6611 领取。"
+        val resultsSuffix = PickupMessageParser.parse(smsSuffix, defaultRules)
+        assertEquals(1, resultsSuffix.size)
+        assertEquals("7-2-6611", resultsSuffix[0].code)
+        assertEquals(0, resultsSuffix[0].stationNumber)
+
+        val smsChinese = "您的包裹已到达十二号快递房，请凭取件码 7-2-6612 领取。"
+        val resultsChinese = PickupMessageParser.parse(smsChinese, defaultRules)
+        assertEquals(1, resultsChinese.size)
+        assertEquals("7-2-6612", resultsChinese[0].code)
+        assertEquals(0, resultsChinese[0].stationNumber)
+    }
 }

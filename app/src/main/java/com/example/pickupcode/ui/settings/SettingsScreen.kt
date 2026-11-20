@@ -44,6 +44,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
@@ -53,8 +54,8 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.RestartAlt
@@ -121,6 +122,7 @@ import com.example.pickupcode.ui.theme.liquidGlass
 import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 import com.example.pickupcode.ui.theme.stationAccentColor
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -176,9 +178,9 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.3.7" }
+            info.versionName.orEmpty().ifBlank { "2.4.0" }
         } catch (_: Exception) {
-            "2.3.7"
+            "2.4.0"
         }
     }
 
@@ -202,10 +204,6 @@ fun SettingsScreen(
         }
     }
 
-    val pendingCount = remember(items) { items.count { !it.isPickedUp } }
-    val activeStationCount = remember(items) {
-        items.filter { !it.isPickedUp && it.stationNumber > 0 }.map { it.stationNumber }.distinct().size
-    }
     val pickedUpItems = remember(items) {
         items.filter { it.isPickedUp }
             .sortedByDescending { it.pickedUpAt ?: it.updatedAt }
@@ -286,66 +284,97 @@ fun SettingsScreen(
             }
         }
 
-        // 1. 取件统计与离线隐私承诺卡片
-        item(key = "stats_and_privacy_card") {
-            Column(
+        // 1. 历史包裹入口卡片（永久保存取件记录）
+        item(key = "history_packages_card") {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier
+                    .animateItem()
                     .fillMaxWidth()
-                    .liquidGlass(cornerRadius = AppleCorners.OuterCard)
-                    .padding(18.dp)
+                    .liquidGlass(
+                        cornerRadius = AppleCorners.OuterCard,
+                        tintColor = statusGreen
+                    )
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        showPickedUpHistoryDialog = true
+                    }
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Lock,
-                        contentDescription = null,
-                        tint = statusGreen,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "100% 纯本地离线存储 · 零联网权限",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = statusGreen,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(statusGreen.copy(alpha = 0.16f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = null,
+                            tint = statusGreen,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "历史包裹",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "取件记录永久保存 · 点击查看",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    StatBox(
-                        title = "待取包裹",
-                        value = "$pendingCount",
-                        unit = "件",
-                        accent = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatBox(
-                        title = "7天内已取",
-                        value = "$pickedUpCount",
-                        unit = "件",
-                        accent = statusGreen,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            showPickedUpHistoryDialog = true
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatBox(
-                        title = "覆盖快递房",
-                        value = "$activeStationCount",
-                        unit = "个",
-                        accent = TaobaoOrangeStart,
-                        modifier = Modifier.weight(1f)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = "$pickedUpCount",
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 24.sp
+                            ),
+                            color = statusGreen,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "件",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            softWrap = false,
+                            maxLines = 1,
+                            modifier = Modifier.padding(bottom = 3.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowForwardIos,
+                        contentDescription = "查看历史包裹",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             }
@@ -904,7 +933,7 @@ fun SettingsScreen(
         )
     }
 
-    // 7天内已取记录弹窗
+    // 历史包裹记录弹窗
     if (showPickedUpHistoryDialog) {
         PickedUpHistoryDialog(
             pickedUpItems = pickedUpItems,
@@ -1228,60 +1257,6 @@ private fun IdentitySwitchRow(
     }
 }
 
-@Composable
-private fun StatBox(
-    title: String,
-    value: String,
-    unit: String,
-    accent: Color,
-    onClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-            .liquidGlassInnerCard(cornerRadius = AppleCorners.InnerCard, accentTint = accent)
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable(onClick = onClick)
-                } else {
-                    Modifier
-                }
-            )
-            .padding(vertical = 12.dp, horizontal = 8.dp)
-    ) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 24.sp
-                ),
-                color = accent,
-                softWrap = false,
-                maxLines = 1
-            )
-            Spacer(modifier = Modifier.width(3.dp))
-            Text(
-                text = unit,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                softWrap = false,
-                maxLines = 1,
-                modifier = Modifier.padding(bottom = 3.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            softWrap = false,
-            maxLines = 1
-        )
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EditStationRuleDialog(
@@ -1506,7 +1481,8 @@ private fun AddNewStationDialog(
             OutlinedTextField(
                 value = keywordsText,
                 onValueChange = { keywordsText = it },
-                label = { Text("匹配关键词（空格或逗号分隔）", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                label = { Text("匹配关键词（留空使用默认）", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                placeholder = { Text("多个词用空格或逗号分隔", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
                 shape = RoundedCornerShape(AppleCorners.InnerCard),
                 modifier = Modifier.fillMaxWidth()
@@ -1631,7 +1607,9 @@ private fun PickedUpHistoryDialog(
 ) {
     val isDark = isSystemInDarkTheme()
     val haptic = LocalHapticFeedback.current
-    val dateFormat = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
+    val currentYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
+    val sameYearFormat = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
+    val fullDateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
     val rulesByNum = remember(stationRules) { stationRules.associateBy { it.stationNumber } }
     val deleteRed = if (isDark) AppleRedDark else AppleRedLight
 
@@ -1644,14 +1622,14 @@ private fun PickedUpHistoryDialog(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "7天内已取记录",
+                        text = "历史包裹",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         softWrap = false,
                         maxLines = 1
                     )
                     Text(
-                        text = "共 ${pickedUpItems.size} 件 · 满 7 天自动清理",
+                        text = "共 ${pickedUpItems.size} 件 · 永久保存",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -1678,7 +1656,7 @@ private fun PickedUpHistoryDialog(
                         .padding(vertical = 36.dp)
                 ) {
                     Text(
-                        text = "最近 7 天暂无已取件记录",
+                        text = "暂无历史包裹记录",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         softWrap = false,
@@ -1689,7 +1667,7 @@ private fun PickedUpHistoryDialog(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 380.dp),
+                        .heightIn(max = 420.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(
@@ -1706,13 +1684,24 @@ private fun PickedUpHistoryDialog(
                         val stationName = if (item.stationNumber > 0) {
                             rule?.displayName ?: "${item.stationNumber}号快递房"
                         } else {
-                            "待分类"
+                            "待分类快递房"
                         }
-                        val timeText = dateFormat.format(Date(item.pickedUpAt ?: item.updatedAt))
+                        val timestamp = item.pickedUpAt ?: item.updatedAt
+                        val timeText = remember(timestamp, currentYear) {
+                            val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
+                            if (cal.get(Calendar.YEAR) == currentYear) {
+                                sameYearFormat.format(Date(timestamp))
+                            } else {
+                                fullDateFormat.format(Date(timestamp))
+                            }
+                        }
+                        val codeFontSize = when {
+                            item.code.length >= 14 -> 15.sp
+                            item.code.length >= 11 -> 17.sp
+                            else -> 19.sp
+                        }
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .liquidGlassInnerCard(
@@ -1721,97 +1710,133 @@ private fun PickedUpHistoryDialog(
                                 )
                                 .padding(horizontal = 12.dp, vertical = 10.dp)
                         ) {
+                            // 第一行：快递房徽章与名称 + 完整取件时间，确保互不挤压
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                StationBadgeSymbol(
-                                    badgeNumber = badgeNum,
-                                    accentColor = accent,
-                                    isUnclassified = item.stationNumber == 0
-                                )
-
-                                Spacer(modifier = Modifier.width(10.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.code,
-                                        style = PickupCodeMonospaceStyle.copy(fontSize = 18.sp),
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        softWrap = false,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    val subInfo = buildString {
-                                        append(stationName)
-                                        if (item.productName.isNotBlank()) {
-                                            append(" · ").append(item.productName)
-                                        }
-                                        append(" · ").append(timeText)
-                                    }
-                                    Text(
-                                        text = subInfo,
-                                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(6.dp))
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(AppleCorners.Pill))
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            onRestoreItem(item)
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Rounded.Undo,
-                                        contentDescription = "恢复待取",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(14.dp)
+                                    StationBadgeSymbol(
+                                        badgeNumber = badgeNum,
+                                        accentColor = accent,
+                                        isUnclassified = item.stationNumber == 0
                                     )
-                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "恢复",
+                                        text = stationName,
                                         style = MaterialTheme.typography.labelMedium.copy(
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
                                         ),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        softWrap = false,
-                                        maxLines = 1
+                                        color = accent,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
 
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .clip(CircleShape)
-                                        .background(deleteRed.copy(alpha = 0.12f))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onDeleteItem(item)
-                                        }
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Text(
+                                    text = timeText,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    softWrap = false,
+                                    maxLines = 1
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // 第二行：完整取件码 + 恢复/删除操作按钮
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = item.code,
+                                    style = PickupCodeMonospaceStyle.copy(
+                                        fontSize = codeFontSize,
+                                        lineHeight = 22.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    softWrap = false,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.DeleteOutline,
-                                        contentDescription = "删除记录",
-                                        tint = deleteRed,
-                                        modifier = Modifier.size(15.dp)
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(AppleCorners.Pill))
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                onRestoreItem(item)
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Rounded.Undo,
+                                            contentDescription = "恢复待取",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = "恢复",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            softWrap = false,
+                                            maxLines = 1
+                                        )
+                                    }
+
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(deleteRed.copy(alpha = 0.12f))
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onDeleteItem(item)
+                                            }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.DeleteOutline,
+                                            contentDescription = "删除记录",
+                                            tint = deleteRed,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
                                 }
+                            }
+
+                            // 第三行（可选）：独立全宽商品备注，避免与右侧按钮互相挤压截断
+                            if (item.productName.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = item.productName,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
                     }

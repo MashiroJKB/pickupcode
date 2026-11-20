@@ -67,6 +67,7 @@ import com.example.pickupcode.ui.home.LongPressQuickActionDialog
 import com.example.pickupcode.ui.home.NotificationAndBadgePermissionDialog
 import com.example.pickupcode.ui.home.RawMessageDetailDialog
 import com.example.pickupcode.ui.home.SharePickupMethodDialog
+import com.example.pickupcode.ui.home.StationCountSetupDialog
 import com.example.pickupcode.ui.settings.SettingsScreen
 import com.example.pickupcode.ui.theme.AppleCorners
 import com.example.pickupcode.ui.theme.LiquidGlassBackdrop
@@ -200,8 +201,9 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     var activeLongPressItem by remember { mutableStateOf<PickupItemEntity?>(null) }
     var showAddOrPasteDialog by remember { mutableStateOf(false) }
     var quickAddTargetStation by remember { mutableStateOf<Int?>(null) }
+    var showStationCountSetupDialog by remember { mutableStateOf(false) }
     var showNotificationBadgeDialog by remember { mutableStateOf(false) }
-    var awaitingBadgeDialogAfterStartupPrompt by remember { mutableStateOf(false) }
+    var awaitingPostStartupDialogs by remember { mutableStateOf(false) }
     var hasTriggeredInitialPermissionFlow by rememberSaveable { mutableStateOf(false) }
 
     val startupPermissionLauncher = rememberLauncherForActivityResult(
@@ -217,9 +219,11 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         if (latestItemsLoaded) {
             AppBadgeManager.updateBadgeCount(context, latestItems.count { !it.isPickedUp }, force = true)
         }
-        if (awaitingBadgeDialogAfterStartupPrompt) {
-            awaitingBadgeDialogAfterStartupPrompt = false
-            if (!settings.badgePermissionPrompted) {
+        if (awaitingPostStartupDialogs) {
+            awaitingPostStartupDialogs = false
+            if (!settings.stationCountPrompted) {
+                showStationCountSetupDialog = true
+            } else if (!settings.badgePermissionPrompted) {
                 showNotificationBadgeDialog = true
             }
         }
@@ -294,8 +298,10 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         }
 
         if (startupPerms.isNotEmpty()) {
-            awaitingBadgeDialogAfterStartupPrompt = !settings.badgePermissionPrompted
+            awaitingPostStartupDialogs = !settings.stationCountPrompted || !settings.badgePermissionPrompted
             startupPermissionLauncher.launch(startupPerms.toTypedArray())
+        } else if (!settings.stationCountPrompted) {
+            showStationCountSetupDialog = true
         } else if (!settings.badgePermissionPrompted) {
             showNotificationBadgeDialog = true
         }
@@ -600,7 +606,27 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         )
     }
 
-    // 5. 首次打开通知与桌面角标权限引导弹窗
+    // 5. 新安装询问学校快递房数量引导弹窗
+    if (showStationCountSetupDialog) {
+        StationCountSetupDialog(
+            onDismiss = {
+                showStationCountSetupDialog = false
+                viewModel.markStationCountPrompted()
+                if (!settings.badgePermissionPrompted) {
+                    showNotificationBadgeDialog = true
+                }
+            },
+            onConfirmCount = { count ->
+                showStationCountSetupDialog = false
+                viewModel.configureInitialStationCount(count)
+                if (!settings.badgePermissionPrompted) {
+                    showNotificationBadgeDialog = true
+                }
+            }
+        )
+    }
+
+    // 6. 首次打开通知与桌面角标权限引导弹窗
     if (showNotificationBadgeDialog) {
         NotificationAndBadgePermissionDialog(
             hasNotificationPermission = hasNotificationPermission,

@@ -87,18 +87,6 @@ interface PickupDao {
     suspend fun deleteByIds(ids: List<Long>)
 
     /**
-     * 自动清理超过 7 天的已取件记录
-     */
-    @Query(
-        """
-        DELETE FROM pickup_items
-        WHERE is_picked_up = 1
-          AND COALESCE(picked_up_at, updated_at, created_at) < :expireTimestamp
-        """
-    )
-    suspend fun deleteExpiredPickedUp(expireTimestamp: Long): Int
-
-    /**
      * 清理旧版本遗留的演示示例数据
      */
     @Query(

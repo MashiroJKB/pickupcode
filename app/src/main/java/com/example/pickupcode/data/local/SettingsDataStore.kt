@@ -35,12 +35,14 @@ data class StationRule(
 
 /**
  * 应用全局设置快照
+ * - stationCountPrompted: 新安装时是否已询问过学校快递房数量
  * - badgePermissionPrompted: 首次通知与桌面角标授权弹窗是否已引导
  * - showTaobaoIdentityBanner: 是否开启「淘宝身份码」Banner（默认开启）
  * - showCainiaoIdentityBanner: 是否开启「菜鸟身份码」Banner
  * - showPinduoduoIdentityBanner: 是否开启「拼多多取件码」Banner
  */
 data class AppSettings(
+    val stationCountPrompted: Boolean = false,
     val badgePermissionPrompted: Boolean = false,
     val showTaobaoIdentityBanner: Boolean = true,
     val showCainiaoIdentityBanner: Boolean = false,
@@ -51,11 +53,12 @@ data class AppSettings(
 class SettingsDataStore(private val context: Context) {
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
+        val rulesJson = prefs[KEY_STATION_RULES_JSON]
+        val stationCountPrompted = prefs[KEY_STATION_COUNT_PROMPTED] ?: (rulesJson != null)
         val badgePermissionPrompted = prefs[KEY_BADGE_PERMISSION_PROMPTED] ?: false
         val showTaobao = prefs[KEY_SHOW_TAOBAO_IDENTITY] ?: true
         val showCainiao = prefs[KEY_SHOW_CAINIAO_IDENTITY] ?: false
         val showPinduoduo = prefs[KEY_SHOW_PINDUODUO_IDENTITY] ?: false
-        val rulesJson = prefs[KEY_STATION_RULES_JSON]
         val stationRules = if (rulesJson.isNullOrBlank()) {
             defaultStationRules()
         } else {
@@ -63,12 +66,31 @@ class SettingsDataStore(private val context: Context) {
         }
 
         AppSettings(
+            stationCountPrompted = stationCountPrompted,
             badgePermissionPrompted = badgePermissionPrompted,
             showTaobaoIdentityBanner = showTaobao,
             showCainiaoIdentityBanner = showCainiao,
             showPinduoduoIdentityBanner = showPinduoduo,
             stationRules = stationRules
         )
+    }
+
+    suspend fun setStationCountPrompted(prompted: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_STATION_COUNT_PROMPTED] = prompted
+        }
+    }
+
+    /**
+     * 根据用户首次安装时输入的学校快递房数量生成对应识别规则
+     */
+    suspend fun configureStationRulesByCount(count: Int) {
+        val safeCount = count.coerceIn(1, 20)
+        val rules = defaultStationRules(safeCount)
+        context.dataStore.edit { prefs ->
+            prefs[KEY_STATION_RULES_JSON] = serializeStationRulesJson(rules)
+            prefs[KEY_STATION_COUNT_PROMPTED] = true
+        }
     }
 
     suspend fun setBadgePermissionPrompted(prompted: Boolean) {
@@ -155,13 +177,22 @@ class SettingsDataStore(private val context: Context) {
                     ?: ((usedNumbers.maxOrNull() ?: 20) + 1)
             }
 
-            val finalName = customName.trim().ifEmpty { "${assignedNum}号快递房" }
+            val trimmedCustomName = customName.trim()
+            val finalName = trimmedCustomName.ifEmpty { "${assignedNum}号快递房" }
             val validBadge = badgeNumber?.takeIf { it in 1..20 }
+            val extractedNameNum = Regex("""^(\d{1,2})号""")
+                .find(trimmedCustomName)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.toIntOrNull()
+                ?.takeIf { it in 1..20 }
             val cleanedInitial = initialKeywords.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
             val mergedKeywords = when {
                 cleanedInitial.isNotEmpty() -> cleanedInitial
-                validBadge != null -> defaultKeywordsForNumber(validBadge)
-                else -> listOf(finalName)
+                validBadge != null -> (listOf(finalName) + defaultKeywordsForNumber(validBadge)).distinct()
+                extractedNameNum != null -> (listOf(finalName) + defaultKeywordsForNumber(extractedNameNum)).distinct()
+                trimmedCustomName.isNotEmpty() -> listOf(finalName)
+                else -> defaultKeywordsForNumber(assignedNum)
             }
 
             val updated = currentRules + StationRule(
@@ -227,6 +258,7 @@ class SettingsDataStore(private val context: Context) {
     suspend fun resetStationRulesToDefault() {
         context.dataStore.edit { prefs ->
             prefs.remove(KEY_STATION_RULES_JSON)
+            prefs[KEY_STATION_COUNT_PROMPTED] = true
         }
     }
 
@@ -253,6 +285,7 @@ class SettingsDataStore(private val context: Context) {
     companion object {
         const val DEFAULT_SMS_SCAN_DAYS = 7
 
+        private val KEY_STATION_COUNT_PROMPTED = booleanPreferencesKey("station_count_prompted")
         private val KEY_BADGE_PERMISSION_PROMPTED = booleanPreferencesKey("badge_permission_prompted")
         private val KEY_SHOW_TAOBAO_IDENTITY = booleanPreferencesKey("show_taobao_identity_banner")
         private val KEY_SHOW_CAINIAO_IDENTITY = booleanPreferencesKey("show_cainiao_identity_banner")
@@ -269,7 +302,17 @@ class SettingsDataStore(private val context: Context) {
             7 to "七",
             8 to "八",
             9 to "九",
-            10 to "十"
+            10 to "十",
+            11 to "十一",
+            12 to "十二",
+            13 to "十三",
+            14 to "十四",
+            15 to "十五",
+            16 to "十六",
+            17 to "十七",
+            18 to "十八",
+            19 to "十九",
+            20 to "二十"
         )
 
         fun defaultKeywordsForNumber(num: Int): List<String> {
@@ -278,18 +321,32 @@ class SettingsDataStore(private val context: Context) {
                 add("${num}号快递房")
                 add("${num}号房")
                 add("${num}号驿站")
+                add("${num}号快递点")
                 add("${num}号快递站")
+                add("${num}号快递超市")
+                add("${num}号菜鸟驿站")
                 add("${num}号菜鸟")
+                add("${num}号代收点")
+                add("${num}号服务点")
+                add("${num}号站点")
+                add("${num}号站")
+                add("${num}号快递柜")
+                add("${num}号柜")
+                add("${num}号丰巢")
+                add("${num}号兔喜")
                 if (cn != null) {
                     add("${cn}号快递房")
                     add("${cn}号房")
                     add("${cn}号驿站")
+                    add("${cn}号快递点")
+                    add("${cn}号快递站")
                 }
             }
         }
 
-        fun defaultStationRules(): List<StationRule> {
-            return (1..8).map { num ->
+        fun defaultStationRules(count: Int = 8): List<StationRule> {
+            val safeCount = count.coerceIn(1, 20)
+            return (1..safeCount).map { num ->
                 StationRule(
                     stationNumber = num,
                     displayName = "${num}号快递房",

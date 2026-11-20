@@ -54,7 +54,7 @@ data class PickupItemEntity(
     @ColumnInfo(name = "sender_or_package")
     val senderOrPackage: String = "",
 
-    /** 是否已确认取件（已取件记录在数据库中保留 7 天用于自动去重排除，满 7 天自动清理） */
+    /** 是否已确认取件（已取件记录永久保存在本地历史包裹中，自动扫描短信时跳过已取记录） */
     @ColumnInfo(name = "is_picked_up")
     val isPickedUp: Boolean = false,
 

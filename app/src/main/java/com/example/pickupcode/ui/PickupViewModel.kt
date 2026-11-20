@@ -73,7 +73,7 @@ class PickupViewModel(
     }
 
     /**
-     * 每次打开应用（冷启动与热启动）自动扫描最近 7 天短信，自动排除已取快递并清理超过 7 天的已取记录
+     * 每次打开应用（冷启动与热启动）自动扫描最近 7 天短信，自动排除已取快递
      */
     fun scanRecentSmsOnAppOpen(context: Context) {
         val now = System.currentTimeMillis()
@@ -190,7 +190,7 @@ class PickupViewModel(
     }
 
     /**
-     * 从「7天内已取记录」中将单条已取快递恢复回待取列表
+     * 从「历史包裹」中将单条已取快递恢复回待取列表
      */
     fun restorePickedUpItem(item: PickupItemEntity) {
         viewModelScope.launch {
@@ -279,6 +279,21 @@ class PickupViewModel(
                 productName = productName
             )
             showCapsuleToast("已添加取件码 $cleanCode")
+        }
+    }
+
+    fun markStationCountPrompted() {
+        viewModelScope.launch {
+            settingsDataStore.setStationCountPrompted(true)
+        }
+    }
+
+    fun configureInitialStationCount(count: Int) {
+        val safeCount = count.coerceIn(1, 20)
+        viewModelScope.launch {
+            settingsDataStore.configureStationRulesByCount(safeCount)
+            repository.reapplyStationRules()
+            showCapsuleToast("已配置 $safeCount 个快递房识别规则")
         }
     }
 

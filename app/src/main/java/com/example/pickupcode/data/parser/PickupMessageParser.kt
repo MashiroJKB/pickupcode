@@ -36,9 +36,11 @@ object PickupMessageParser {
 
     // 2. 取件强特征词
     private val STRONG_PICKUP_KEYWORDS = listOf(
-        "取件码", "提货码", "取货码", "取件编号", "包裹码", "开箱码",
-        "凭", "快递", "驿站", "号房", "菜鸟", "丰巢", "兔喜", "妈妈驿站",
-        "近邻宝", "熊猫快收", "速递易", "快递柜", "到站", "待取", "代收点"
+        "取件码", "提货码", "取货码", "自提码", "提取码", "取件密码", "取件编号", "取件号",
+        "包裹码", "开箱码", "货架", "凭", "取件", "自提", "入库", "已放至", "已存放", "已到达",
+        "快递", "驿站", "号房", "菜鸟", "丰巢", "兔喜", "妈妈驿站",
+        "近邻宝", "熊猫快收", "速递易", "快递柜", "快递点", "快递超市", "快递中心",
+        "到站", "待取", "代收点", "服务点"
     )
 
     // 干扰数字掩码正则（时间、日期、手机号、座机、客服热线、尾号、计件/金额）
@@ -46,7 +48,7 @@ object PickupMessageParser {
     private val DATE_REGEX = Regex("""(?<!\d)(?:20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?|\d{1,2}月\d{1,2}日)(?!\d)""")
     private val PHONE_REGEX = Regex("""(?<!\d)(?:1[3-9]\d{9}|0\d{2,3}-?\d{7,8}|95\d{3,5}|400-?\d{3}-?\d{4}|100\d{2})(?!\d)""")
     private val TAIL_NUMBER_REGEX = Regex("""(?:手机尾号|尾号|后四位)\s*[:：为是]?\s*\d{4}""")
-    private val QUANTITY_REGEX = Regex("""(?<!\d)\d+(?:\.\d+)?\s*(?:元|kg(?![A-Za-z])|克|件|个|袋|箱|小时|天|折|号快递房|号房|号驿站|号站|号柜|号门|号楼|栋|层)""")
+    private val QUANTITY_REGEX = Regex("""(?<!\d)\d+(?:\.\d+)?\s*(?:元|kg(?![A-Za-z])|克|件|个|袋|箱|小时|天|折|号快递房|号快递点|号快递站|号快递超市|号快递中心|号菜鸟驿站|号菜鸟|号代收点|号服务点|号站点|号房|号驿站|号站|号柜|号窗口|号门|号店|号库|号楼|栋|层)""")
     private val ISO_DATE_TOKEN_REGEX = Regex("""^20[2-3]\d-\d{1,2}-\d{1,2}$""")
 
     // 货架-层-号 横杠格式取件码（如 1-2-3045, 102-2-5, J8-5-3012, A1-2048）
@@ -56,7 +58,7 @@ object PickupMessageParser {
 
     // 紧跟在取件码关键词后的单码或多码片段（允许换行后直接接取件码，并在非码字符或换行处自然结束）
     private val CONTEXTUAL_BLOCK_REGEX = Regex(
-        """(?:取件码|提货码|取货码|取件编号|包裹码|开箱码|取件密码|凭码|凭)\s*(?:为|是)?\s*[:：]?\s*([A-Za-z0-9\-、,，/或及和与 \t]{3,80})(?=[^A-Za-z0-9\-]|$)"""
+        """(?:取件码|提货码|取货码|自提码|提取码|取件编号|取件号|货架号|包裹码|开箱码|取件密码|凭码|凭)\s*(?:为|是)?\s*[:：]?\s*([A-Za-z0-9\-、,，/或及和与 \t]{3,80})(?=[^A-Za-z0-9\-]|$)"""
     )
 
     // 拆分多码连接符
@@ -67,10 +69,11 @@ object PickupMessageParser {
         """^(?:[A-Za-z0-9]{1,5}(?:-[A-Za-z0-9]{1,6})+|[A-Za-z]{1,4}\d{3,8}|\d{3,8}[A-Za-z]{1,3}|\d{4,8})$"""
     )
 
-    // 内置快递房号兜底正则（仅匹配当前已启用的快递房编号）
+    // 内置快递房号兜底正则（支持 1~20 及中文数字一~二十，且仅匹配当前已启用的快递房编号）
+    private val STATION_NUMBER_TOKEN = """(?:(?<!\d)(?:20|1\d|[1-9])(?!\d)|(?<![一二三四五六七八九十])(?:二十|十[一二三四五六七八九]|[一二三四五六七八九十]))"""
     private val BUILTIN_STATION_REGEX_LIST = listOf(
-        Regex("""(\d{1,2}|[一二三四五六七八九十])\s*号\s*(?:快递房|快递站|菜鸟驿站|驿站|快递柜|丰巢柜|丰巢|房|站|柜|点|门)"""),
-        Regex("""(?:快递房|快递站|菜鸟驿站|驿站)\s*(\d{1,2}|[一二三四五六七八九十])\s*号?""")
+        Regex("""($STATION_NUMBER_TOKEN)\s*(?:号|#)\s*(?:快递房|快递站|快递点|快递超市|快递中心|菜鸟驿站|妈妈驿站|兔喜驿站|兔喜超市|兔喜生活|驿站|快递柜|丰巢柜|丰巢|近邻宝|熊猫快收|速递易|代收点|服务点|站点|菜鸟|兔喜|窗口|库房|超市|房|站|柜|点|门|店|库)"""),
+        Regex("""(?:快递房|快递站|快递点|快递超市|快递中心|菜鸟驿站|妈妈驿站|驿站|快递柜|货架房)\s*#?($STATION_NUMBER_TOKEN)\s*号?""")
     )
 
     // 商品名称提取正则（仅提取明确带有“您购买的【...】”等商品描述的文本，绝不提取快递或站点名）
@@ -194,7 +197,7 @@ object PickupMessageParser {
             .sortedByDescending { it.first.length }
 
         for ((keyword, stationNum) in keywordPairs) {
-            if (text.contains(keyword, ignoreCase = true)) {
+            if (containsKeywordSafely(text, keyword)) {
                 return stationNum to keyword
             }
         }
@@ -215,6 +218,36 @@ object PickupMessageParser {
         return 0 to ""
     }
 
+    /**
+     * 安全关键词匹配：
+     * 1. 若关键词以数字开头（如 "2号房"），要求前一位不能是数字，避免 "12号房" 误匹配 "2号房"；
+     * 2. 若关键词以数字结尾（如 "快递房1"），要求后一位不能是数字，避免 "快递房12" 误匹配 "快递房1"；
+     * 3. 若关键词以中文数字一~九开头（如 "二号房"），要求前一位不能是"十"，避免 "十二号房" 误匹配 "二号房"。
+     */
+    private fun containsKeywordSafely(text: String, keyword: String): Boolean {
+        if (keyword.isEmpty()) return false
+        val startsWithDigit = keyword.first().isDigit()
+        val endsWithDigit = keyword.last().isDigit()
+        val startsWithSmallChineseDigit = keyword.first() in "一二三四五六七八九"
+        var startIndex = 0
+        while (startIndex <= text.length - keyword.length) {
+            val idx = text.indexOf(keyword, startIndex = startIndex, ignoreCase = true)
+            if (idx < 0) return false
+            val endIdx = idx + keyword.length
+            val prefixOk = when {
+                startsWithDigit -> idx == 0 || !text[idx - 1].isDigit()
+                startsWithSmallChineseDigit -> idx == 0 || text[idx - 1] != '十'
+                else -> true
+            }
+            val suffixOk = !endsWithDigit || endIdx >= text.length || !text[endIdx].isDigit()
+            if (prefixOk && suffixOk) {
+                return true
+            }
+            startIndex = idx + 1
+        }
+        return false
+    }
+
     private fun parseStationDigit(token: String): Int {
         val trimmed = token.trim()
         trimmed.toIntOrNull()?.let { return it }
@@ -229,6 +262,16 @@ object PickupMessageParser {
             "八" -> 8
             "九" -> 9
             "十" -> 10
+            "十一" -> 11
+            "十二" -> 12
+            "十三" -> 13
+            "十四" -> 14
+            "十五" -> 15
+            "十六" -> 16
+            "十七" -> 17
+            "十八" -> 18
+            "十九" -> 19
+            "二十" -> 20
             else -> 0
         }
     }

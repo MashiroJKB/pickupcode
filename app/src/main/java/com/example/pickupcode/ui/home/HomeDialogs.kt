@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -60,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1221,5 +1224,127 @@ private fun ShareOptionCard(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+    }
+}
+
+/**
+ * 7. 新安装引导弹窗：询问学校快递房数量并一键生成对应识别规则
+ */
+@Composable
+fun StationCountSetupDialog(
+    onDismiss: () -> Unit,
+    onConfirmCount: (Int) -> Unit
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    var countText by remember { mutableStateOf("8") }
+    val parsedCount = countText.trim().toIntOrNull()
+    val isValidCount = parsedCount != null && parsedCount in 1..20
+
+    SpringGlassDialog(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(primaryColor.copy(alpha = 0.14f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Storefront,
+                        contentDescription = null,
+                        tint = primaryColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "你的学校有几个快递房？",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "将自动生成对应数量的识别规则",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                listOf(4, 6, 8, 10, 12).forEach { preset ->
+                    val selected = parsedCount == preset
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                            .background(
+                                if (selected) primaryColor else primaryColor.copy(alpha = 0.12f)
+                            )
+                            .clickable { countText = preset.toString() }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "${preset}个",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = if (selected) Color.White else primaryColor,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = countText,
+                onValueChange = { input ->
+                    countText = input.filter { it.isDigit() }.take(2)
+                },
+                label = { Text("输入快递房数量（1~20）", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                isError = countText.isNotEmpty() && !isValidCount,
+                shape = RoundedCornerShape(AppleCorners.InnerCard),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("暂不设置", softWrap = false, maxLines = 1)
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Button(
+                    enabled = isValidCount,
+                    onClick = {
+                        parsedCount?.let { onConfirmCount(it) }
+                    },
+                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                ) {
+                    Text("确认配置", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
+                }
+            }
+        }
     }
 }

@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
  *
  * 负责：
  * 1. 短信读取与监听（默认扫描最近 7 天短信）
- * 2. 自动排除已取快递，已取件记录在本地数据库保留 7 天用于防重复导入，超过 7 天自动清理
+ * 2. 自动排除已取快递，历史取件记录永久保存在本地数据库
  * 3. 提供多选确认已取与 3 秒内撤销恢复接口
  */
 class PickupRepository(
@@ -177,16 +177,15 @@ class PickupRepository(
     }
 
     /**
-     * 扫描系统收件箱最近 7 天的历史短信，并自动清理超过 7 天的已取件记录
+     * 扫描系统收件箱最近 7 天的历史短信（历史已取件记录永久保存，不再过期清理）
      */
     suspend fun scanRecentSmsInbox(
         context: Context,
         daysOverride: Int? = null
     ): Int = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
-        // 清理旧版遗留的示例数据及超过 7 天的已取件记录
+        // 清理旧版遗留的示例数据
         pickupDao.deleteLegacyDemoItems()
-        pickupDao.deleteExpiredPickedUp(now - RETENTION_SEVEN_DAYS_MILLIS)
 
         val hasSmsPermission = ContextCompat.checkSelfPermission(
             context,
@@ -290,7 +289,7 @@ class PickupRepository(
     }
 
     /**
-     * 批量确认已取件（确认后从待取列表中消失，并在数据库保留 7 天以防扫描短信重复导入）
+     * 批量确认已取件（确认后从待取列表中消失，并永久保存至本地历史包裹）
      */
     suspend fun confirmPickedUpBatch(ids: List<Long>) = withContext(Dispatchers.IO) {
         if (ids.isEmpty()) return@withContext
