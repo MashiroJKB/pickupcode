@@ -667,16 +667,18 @@ private fun EmptyPickupStateCard(
         Text(
             text = "暂无待取快递",
             style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            softWrap = false,
+            maxLines = 1
         )
 
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
             text = if (hasSmsPermission) {
-                "每次打开自动扫描最近 7 天取件短信，也可点击右下角「+」手动添加。"
+                "每次打开自动扫描最近 7 天取件短信\n也可点击右下角「+」手动添加"
             } else {
-                "授予短信读取权限后，每次打开将自动扫描最近 7 天的取件短信。"
+                "授予短信读取权限后\n每次打开将自动扫描最近 7 天取件短信"
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -697,7 +699,9 @@ private fun EmptyPickupStateCard(
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = if (hasSmsPermission) "添加取件码" else "授权短信读取权限",
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                softWrap = false,
+                maxLines = 1
             )
         }
     }

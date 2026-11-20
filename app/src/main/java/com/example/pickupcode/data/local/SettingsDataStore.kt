@@ -157,15 +157,17 @@ class SettingsDataStore(private val context: Context) {
 
             val finalName = customName.trim().ifEmpty { "${assignedNum}号快递房" }
             val validBadge = badgeNumber?.takeIf { it in 1..20 }
-            val defaultKws = defaultKeywordsForNumber(validBadge ?: assignedNum)
-            val mergedKeywords = (initialKeywords.map { it.trim() }.filter { it.isNotEmpty() } +
-                if (initialKeywords.isEmpty()) defaultKws else emptyList())
-                .distinct()
+            val cleanedInitial = initialKeywords.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+            val mergedKeywords = when {
+                cleanedInitial.isNotEmpty() -> cleanedInitial
+                validBadge != null -> defaultKeywordsForNumber(validBadge)
+                else -> listOf(finalName)
+            }
 
             val updated = currentRules + StationRule(
                 stationNumber = assignedNum,
                 displayName = finalName,
-                keywords = mergedKeywords.ifEmpty { listOf(finalName) },
+                keywords = mergedKeywords,
                 badgeNumber = validBadge
             )
 
@@ -240,21 +242,7 @@ class SettingsDataStore(private val context: Context) {
      * 从剪贴板或纯文本口令导入识别规则，返回成功导入的快递房数量（失败返回 0）
      */
     suspend fun importStationRulesToken(rawText: String): Int {
-        val trimmed = rawText.trim()
-        val startIdx = trimmed.indexOf('[')
-        val endIdx = trimmed.lastIndexOf(']')
-        if (startIdx < 0 || endIdx <= startIdx) return 0
-
-        val jsonPart = trimmed.substring(startIdx, endIdx + 1)
-        val parsed = try {
-            val array = JSONArray(jsonPart)
-            if (array.length() == 0) return 0
-            parseStationRulesJson(jsonPart)
-        } catch (_: Exception) {
-            emptyList()
-        }
-
-        if (parsed.isEmpty()) return 0
+        val parsed = parseStationRulesTokenStrict(rawText) ?: return 0
 
         context.dataStore.edit { prefs ->
             prefs[KEY_STATION_RULES_JSON] = serializeStationRulesJson(parsed)
@@ -330,20 +318,33 @@ class SettingsDataStore(private val context: Context) {
             return array.toString()
         }
 
-        private fun parseStationRulesJson(json: String): List<StationRule> {
+        /**
+         * 严格解析识别规则口令文本：不合法或无有效规则时返回 null（绝不误覆盖为默认规则）
+         */
+        fun parseStationRulesTokenStrict(rawText: String): List<StationRule>? {
+            val trimmed = rawText.trim()
+            val startIdx = trimmed.indexOf('[')
+            val endIdx = trimmed.lastIndexOf(']')
+            if (startIdx < 0 || endIdx <= startIdx) return null
+            val jsonPart = trimmed.substring(startIdx, endIdx + 1)
+            return parseStationRulesJsonOrNull(jsonPart)?.takeIf { it.isNotEmpty() }
+        }
+
+        private fun parseStationRulesJsonOrNull(json: String): List<StationRule>? {
             return try {
                 val parsedList = mutableListOf<StationRule>()
+                val seenNumbers = hashSetOf<Int>()
                 val array = JSONArray(json)
                 for (i in 0 until array.length()) {
-                    val obj = array.getJSONObject(i)
+                    val obj = array.optJSONObject(i) ?: return null
                     val num = obj.optInt("stationNumber", 0)
-                    if (num in 1..100) {
-                        val name = obj.optString("displayName", "${num}号快递房")
+                    if (num in 1..100 && seenNumbers.add(num)) {
+                        val name = obj.optString("displayName", "").trim().ifEmpty { "${num}号快递房" }
                         val badgeNumber = if (obj.has("badgeNumber")) {
                             if (obj.isNull("badgeNumber")) null
                             else obj.optInt("badgeNumber", num).takeIf { it in 1..20 }
                         } else {
-                            num
+                            num.takeIf { it in 1..20 }
                         }
                         val kwArray = obj.optJSONArray("keywords")
                         val kws = mutableListOf<String>()
@@ -357,7 +358,7 @@ class SettingsDataStore(private val context: Context) {
                             StationRule(
                                 stationNumber = num,
                                 displayName = name,
-                                keywords = kws,
+                                keywords = kws.distinct(),
                                 badgeNumber = badgeNumber
                             )
                         )
@@ -366,8 +367,12 @@ class SettingsDataStore(private val context: Context) {
                 // 保持用户拖拽排序后的顺序，不再强制按 stationNumber 排序
                 parsedList
             } catch (_: Exception) {
-                defaultStationRules()
+                null
             }
+        }
+
+        private fun parseStationRulesJson(json: String): List<StationRule> {
+            return parseStationRulesJsonOrNull(json) ?: defaultStationRules()
         }
     }
 }

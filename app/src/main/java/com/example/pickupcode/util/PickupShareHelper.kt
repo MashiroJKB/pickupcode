@@ -89,18 +89,21 @@ object PickupShareHelper {
 
         val uri = try {
             val bitmap = renderShareBitmap(groups, includeRemarks = includeRemarks)
-            val cacheDir = File(context.cacheDir, "shared_images").apply {
-                mkdirs()
-                listFiles()?.forEach { oldFile ->
-                    if (oldFile.isFile) oldFile.delete()
+            try {
+                val cacheDir = File(context.cacheDir, "shared_images").apply {
+                    mkdirs()
+                    listFiles()?.forEach { oldFile ->
+                        if (oldFile.isFile) oldFile.delete()
+                    }
                 }
+                val file = File(cacheDir, "pickup_codes_${System.currentTimeMillis()}.png")
+                FileOutputStream(file).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            } finally {
+                bitmap.recycle()
             }
-            val file = File(cacheDir, "pickup_codes_${System.currentTimeMillis()}.png")
-            FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-            }
-            bitmap.recycle()
-            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         } catch (_: Exception) {
             null
         } ?: return@withContext false

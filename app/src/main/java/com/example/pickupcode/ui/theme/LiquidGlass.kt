@@ -37,24 +37,22 @@ object AppleCorners {
 @Composable
 fun Modifier.liquidGlass(
     cornerRadius: Dp = AppleCorners.OuterCard,
-    tintColor: Color = Color.Unspecified,
-    surfaceAlphaMultiplier: Float = 1f,
-    @Suppress("UNUSED_PARAMETER") shadowElevation: Dp = 0.dp
+    tintColor: Color = Color.Unspecified
 ): Modifier {
     val isDark = isSystemInDarkTheme()
     val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
 
-    val surfaceBrush = remember(isDark, tintColor, surfaceAlphaMultiplier) {
+    val surfaceBrush = remember(isDark, tintColor) {
         val topSurface = if (isDark) {
-            Color(0xFF232734).copy(alpha = (0.86f * surfaceAlphaMultiplier).coerceIn(0f, 0.96f))
+            Color(0xFF232734).copy(alpha = 0.86f)
         } else {
-            Color(0xFFFFFFFF).copy(alpha = (0.88f * surfaceAlphaMultiplier).coerceIn(0f, 0.96f))
+            Color(0xFFFFFFFF).copy(alpha = 0.88f)
         }
 
         val bottomSurface = if (isDark) {
-            Color(0xFF181B24).copy(alpha = (0.80f * surfaceAlphaMultiplier).coerceIn(0f, 0.94f))
+            Color(0xFF181B24).copy(alpha = 0.80f)
         } else {
-            Color(0xFFF6F9FF).copy(alpha = (0.82f * surfaceAlphaMultiplier).coerceIn(0f, 0.94f))
+            Color(0xFFF6F9FF).copy(alpha = 0.82f)
         }
 
         val colors = if (tintColor != Color.Unspecified) {
@@ -95,26 +93,24 @@ fun Modifier.liquidGlass(
 @Composable
 fun Modifier.liquidGlassInnerCard(
     cornerRadius: Dp = AppleCorners.InnerCard,
-    isPickedUp: Boolean = false,
     accentTint: Color = Color.Unspecified
 ): Modifier {
     val isDark = isSystemInDarkTheme()
     val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
 
-    val surfaceBrush = remember(isDark, isPickedUp, accentTint) {
-        val fillAlpha = if (isPickedUp) 0.42f else 0.78f
+    val surfaceBrush = remember(isDark, accentTint) {
         val topFill = if (isDark) {
-            Color(0xFF2D3140).copy(alpha = fillAlpha)
+            Color(0xFF2D3140).copy(alpha = 0.78f)
         } else {
-            Color.White.copy(alpha = if (isPickedUp) 0.55f else 0.92f)
+            Color.White.copy(alpha = 0.92f)
         }
         val bottomFill = if (isDark) {
-            Color(0xFF232633).copy(alpha = fillAlpha * 0.92f)
+            Color(0xFF232633).copy(alpha = 0.72f)
         } else {
-            Color(0xFFF8FAFC).copy(alpha = if (isPickedUp) 0.48f else 0.85f)
+            Color(0xFFF8FAFC).copy(alpha = 0.85f)
         }
 
-        val colors = if (accentTint != Color.Unspecified && !isPickedUp) {
+        val colors = if (accentTint != Color.Unspecified) {
             listOf(
                 accentTint.copy(alpha = if (isDark) 0.14f else 0.08f),
                 topFill,
@@ -126,11 +122,11 @@ fun Modifier.liquidGlassInnerCard(
         Brush.horizontalGradient(colors = colors)
     }
 
-    val borderColor = remember(isDark, isPickedUp) {
+    val borderColor = remember(isDark) {
         if (isDark) {
-            Color.White.copy(alpha = if (isPickedUp) 0.06f else 0.14f)
+            Color.White.copy(alpha = 0.14f)
         } else {
-            Color(0xFFE2E8F0).copy(alpha = if (isPickedUp) 0.45f else 0.85f)
+            Color(0xFFE2E8F0).copy(alpha = 0.85f)
         }
     }
 

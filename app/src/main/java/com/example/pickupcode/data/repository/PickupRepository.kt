@@ -9,6 +9,7 @@ import com.example.pickupcode.data.local.AppSettings
 import com.example.pickupcode.data.local.PickupDao
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.SettingsDataStore
+import com.example.pickupcode.data.local.StationRule
 import com.example.pickupcode.data.parser.PickupMessageParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -42,18 +43,19 @@ class PickupRepository(
         source: String,
         senderOrPackage: String = "",
         messageTimestamp: Long = System.currentTimeMillis(),
-        preferredStationNumber: Int? = null
+        preferredStationNumber: Int? = null,
+        preloadedStationRules: List<StationRule>? = null
     ): Int = withContext(Dispatchers.IO) {
-        val settings = settingsDataStore.settingsFlow.first()
+        val stationRules = preloadedStationRules ?: settingsDataStore.settingsFlow.first().stationRules
         val parsedList = PickupMessageParser.parse(
             rawText = rawText,
-            stationRules = settings.stationRules
+            stationRules = stationRules
         )
         if (parsedList.isEmpty()) return@withContext 0
 
         val preferredRuleName = preferredStationNumber?.let { targetNum ->
             if (targetNum > 0) {
-                settings.stationRules.firstOrNull { it.stationNumber == targetNum }?.displayName
+                stationRules.firstOrNull { it.stationNumber == targetNum }?.displayName
                     ?: "${targetNum}号快递房"
             } else {
                 ""
@@ -194,6 +196,7 @@ class PickupRepository(
 
         val scanDays = daysOverride ?: SettingsDataStore.DEFAULT_SMS_SCAN_DAYS
         val sinceTimestamp = now - scanDays * 24L * 60L * 60L * 1000L
+        val stationRules = settingsDataStore.settingsFlow.first().stationRules
 
         var totalAffected = 0
         val projection = arrayOf(
@@ -228,7 +231,8 @@ class PickupRepository(
                             rawText = body,
                             source = PickupItemEntity.SOURCE_SMS,
                             senderOrPackage = address,
-                            messageTimestamp = date
+                            messageTimestamp = date,
+                            preloadedStationRules = stationRules
                         )
                     }
                 }
@@ -244,28 +248,43 @@ class PickupRepository(
      * 重新应用当前识别规则到所有未取件记录（当用户修改了识别规则或增删了快递房时自动重分类）
      */
     suspend fun reapplyStationRules() = withContext(Dispatchers.IO) {
-        val settings = settingsDataStore.settingsFlow.first()
-        val activeNumbers = settings.stationRules.map { it.stationNumber }.toSet()
-        val allItems = pickupDao.observeAllItems().first()
-        for (item in allItems) {
-            if (item.isPickedUp) continue
-            val (matchedNum, matchedRaw) = PickupMessageParser.matchStation(
-                text = item.rawMessage,
-                stationRules = settings.stationRules
-            )
-            val newStation = when {
-                matchedNum in activeNumbers -> matchedNum
-                item.stationNumber in activeNumbers -> item.stationNumber
-                else -> 0
-            }
-            if (newStation != item.stationNumber) {
-                pickupDao.update(
-                    item.copy(
-                        stationNumber = newStation,
-                        stationRawName = matchedRaw,
-                        updatedAt = System.currentTimeMillis()
-                    )
+        ingestMutex.withLock {
+            val settings = settingsDataStore.settingsFlow.first()
+            val activeNumbers = settings.stationRules.map { it.stationNumber }.toSet()
+            val allItems = pickupDao.observeAllItems().first()
+            for (item in allItems) {
+                if (item.isPickedUp) continue
+                // 用户手动录入并明确指定过快递房的记录：仅在该快递房被删除时才归入待分类
+                if (item.source == PickupItemEntity.SOURCE_MANUAL && item.senderOrPackage == "user") {
+                    if (item.stationNumber > 0 && item.stationNumber !in activeNumbers) {
+                        pickupDao.update(
+                            item.copy(
+                                stationNumber = 0,
+                                stationRawName = "",
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                    continue
+                }
+                val (matchedNum, matchedRaw) = PickupMessageParser.matchStation(
+                    text = item.rawMessage,
+                    stationRules = settings.stationRules
                 )
+                val newStation = when {
+                    matchedNum in activeNumbers -> matchedNum
+                    item.stationNumber in activeNumbers -> item.stationNumber
+                    else -> 0
+                }
+                if (newStation != item.stationNumber) {
+                    pickupDao.update(
+                        item.copy(
+                            stationNumber = newStation,
+                            stationRawName = matchedRaw,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
             }
         }
     }
@@ -332,25 +351,36 @@ class PickupRepository(
     ) = withContext(Dispatchers.IO) {
         val cleanCode = code.trim().uppercase()
         if (cleanCode.isEmpty()) return@withContext
+        val safeStation = stationNumber.coerceIn(0, 100)
+        val settings = settingsDataStore.settingsFlow.first()
+        val stationLabel = if (safeStation > 0) {
+            settings.stationRules.firstOrNull { it.stationNumber == safeStation }?.displayName
+                ?: "${safeStation}号快递房"
+        } else {
+            "待分类快递房"
+        }
+        val cleanProduct = productName.trim()
         val now = System.currentTimeMillis()
-        pickupDao.insert(
-            PickupItemEntity(
-                code = cleanCode,
-                stationNumber = stationNumber.coerceIn(0, 100),
-                stationRawName = if (stationNumber > 0) "${stationNumber}号快递房" else "",
-                expressCompany = "",
-                productName = productName.trim(),
-                isCustomRemark = productName.isNotBlank(),
-                rawMessage = "【手动录入】取件码 $cleanCode，地点：${
-                    if (stationNumber > 0) "${stationNumber}号快递房" else "待分类"
-                }${if (productName.isNotBlank()) "，商品：${productName.trim()}" else ""}",
-                source = PickupItemEntity.SOURCE_MANUAL,
-                senderOrPackage = "user",
-                isPickedUp = false,
-                createdAt = now,
-                updatedAt = now
+        ingestMutex.withLock {
+            pickupDao.insert(
+                PickupItemEntity(
+                    code = cleanCode,
+                    stationNumber = safeStation,
+                    stationRawName = if (safeStation > 0) stationLabel else "",
+                    expressCompany = "",
+                    productName = cleanProduct,
+                    isCustomRemark = cleanProduct.isNotEmpty(),
+                    rawMessage = "【手动录入】取件码 $cleanCode，地点：$stationLabel${
+                        if (cleanProduct.isNotEmpty()) "，商品：$cleanProduct" else ""
+                    }",
+                    source = PickupItemEntity.SOURCE_MANUAL,
+                    senderOrPackage = "user",
+                    isPickedUp = false,
+                    createdAt = now,
+                    updatedAt = now
+                )
             )
-        )
+        }
     }
 
     suspend fun deleteItem(id: Long) = withContext(Dispatchers.IO) {

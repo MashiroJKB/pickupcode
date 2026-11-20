@@ -33,6 +33,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,6 +102,20 @@ fun HomeBottomFloatingBar(
         else -> CenterActionMode.NONE
     }
 
+    // 保留退场动画期间的最后一次有效态与计数，避免胶囊退出时闪现「确认已取 (0)」或缩成空白点
+    var displayedActionMode by remember { mutableStateOf(CenterActionMode.CONFIRM_PICKED_UP) }
+    var displayedSelectedCount by remember { mutableIntStateOf(1) }
+    var displayedShareCount by remember { mutableIntStateOf(0) }
+    LaunchedEffect(actionMode, selectedCount, shareSelectedCount) {
+        if (actionMode != CenterActionMode.NONE) {
+            displayedActionMode = actionMode
+        }
+        if (selectedCount > 0) {
+            displayedSelectedCount = selectedCount
+        }
+        displayedShareCount = shareSelectedCount
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -152,7 +172,7 @@ fun HomeBottomFloatingBar(
                 ) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium))
             ) {
                 AnimatedContent(
-                    targetState = actionMode,
+                    targetState = displayedActionMode,
                     transitionSpec = {
                         (scaleIn(
                             initialScale = 0.92f,
@@ -169,7 +189,7 @@ fun HomeBottomFloatingBar(
                         CenterActionMode.CONFIRM_PICKED_UP -> {
                             CenterActionPill(
                                 icon = Icons.Rounded.CheckCircle,
-                                text = "确认已取 ($selectedCount)",
+                                text = "确认已取 ($displayedSelectedCount)",
                                 accentColor = confirmGreen,
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -191,10 +211,10 @@ fun HomeBottomFloatingBar(
                         }
 
                         CenterActionMode.SHARE_SELECTED -> {
-                            if (shareSelectedCount > 0) {
+                            if (displayedShareCount > 0) {
                                 CenterActionPill(
                                     icon = Icons.Rounded.Share,
-                                    text = "分享已选 ($shareSelectedCount)",
+                                    text = "分享已选 ($displayedShareCount)",
                                     accentColor = MaterialTheme.colorScheme.primary,
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)

@@ -1,10 +1,17 @@
 package com.example.pickupcode.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -204,8 +211,7 @@ fun StationGroupCard(
             Spacer(modifier = Modifier.width(8.dp))
 
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
@@ -224,24 +230,41 @@ fun StationGroupCard(
                     )
                 }
 
-                if (!isShareSelectionMode) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(accentColor.copy(alpha = 0.14f))
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onQuickAddToStation()
-                            }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = "添加取件码到$stationDisplayName",
-                            tint = accentColor,
-                            modifier = Modifier.size(18.dp)
-                        )
+                AnimatedVisibility(
+                    visible = !isShareSelectionMode,
+                    enter = fadeIn(
+                        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
+                    ) + expandHorizontally(
+                        expandFrom = Alignment.End,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
+                    ),
+                    exit = fadeOut(
+                        animationSpec = tween(durationMillis = 100, easing = FastOutSlowInEasing)
+                    ) + shrinkHorizontally(
+                        shrinkTowards = Alignment.End,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
+                    )
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(accentColor.copy(alpha = 0.14f))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onQuickAddToStation()
+                                }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = "添加取件码到$stationDisplayName",
+                                tint = accentColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -411,7 +434,9 @@ fun SwipeablePickupItemCard(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp
                             ),
-                            color = Color.White
+                            color = Color.White,
+                            softWrap = false,
+                            maxLines = 1
                         )
                     }
                 }
@@ -453,7 +478,9 @@ fun SwipeablePickupItemCard(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp
                             ),
-                            color = Color.White
+                            color = Color.White,
+                            softWrap = false,
+                            maxLines = 1
                         )
                     }
                 }
@@ -470,7 +497,6 @@ fun SwipeablePickupItemCard(
                 }
                 .liquidGlassInnerCard(
                     cornerRadius = AppleCorners.InnerCard,
-                    isPickedUp = false,
                     accentTint = if (isSelected) activeCheckColor else accentColor
                 )
                 .draggable(

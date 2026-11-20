@@ -33,10 +33,10 @@ val AppleIconSquircleShape: Shape = GenericShape { size, _ ->
     val c = r * 1.28f // iOS continuous corner curve offset
     val k = r * 0.44f // Bezier handle factor for smooth G2 transition
 
-    this.addAppleSquirclePath(w, h, r, c, k)
+    this.addAppleSquirclePath(w, h, c, k)
 }
 
-private fun Path.addAppleSquirclePath(w: Float, h: Float, r: Float, c: Float, k: Float) {
+private fun Path.addAppleSquirclePath(w: Float, h: Float, c: Float, k: Float) {
     moveTo(c, 0f)
     lineTo(w - c, 0f)
     cubicTo(w - k, 0f, w, k, w, c)

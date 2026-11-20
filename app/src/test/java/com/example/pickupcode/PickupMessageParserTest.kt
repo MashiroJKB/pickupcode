@@ -175,4 +175,23 @@ class PickupMessageParserTest {
         assertEquals(listOf("2-1-5", "10-1-2"), groups[0].items.map { it.code })
         assertEquals("数据线", groups[0].items[1].productName)
     }
+
+    @Test
+    fun `masks chinese dates and quantities without misreading them as pickup codes`() {
+        val sms = "【菜鸟驿站】您的2件包裹于2026年11月17日到3号房，请于11月19日前24小时内凭取件码 5-2-8019 取件，超时2026号柜不收费。"
+        val results = PickupMessageParser.parse(sms, defaultRules)
+
+        assertEquals(1, results.size)
+        assertEquals("5-2-8019", results[0].code)
+        assertEquals(3, results[0].stationNumber)
+    }
+
+    @Test
+    fun `does not confuse large locker or room numbers with contextual pickup codes`() {
+        val sms = "【丰巢】请凭取件码 682914 到1024号柜领取，共1件包裹，营业时间08:00-22:00。"
+        val results = PickupMessageParser.parse(sms, defaultRules)
+
+        assertEquals(1, results.size)
+        assertEquals("682914", results[0].code)
+    }
 }

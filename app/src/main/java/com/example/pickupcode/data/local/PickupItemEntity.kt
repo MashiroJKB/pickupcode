@@ -22,7 +22,7 @@ data class PickupItemEntity(
     @ColumnInfo(name = "code")
     val code: String,
 
-    /** 1~20 代表 ①~⑳ 号快递房；0 代表 ？待分类 */
+    /** 1~100 代表自定义快递房编号；0 代表 ？待分类 */
     @ColumnInfo(name = "station_number")
     val stationNumber: Int = 0,
 
@@ -42,7 +42,7 @@ data class PickupItemEntity(
     @ColumnInfo(name = "is_custom_remark")
     val isCustomRemark: Boolean = false,
 
-    /** 原始短信全文（点击卡片空白处弹窗核对） */
+    /** 原始短信全文（点击卡片右侧竖点按钮弹窗核对） */
     @ColumnInfo(name = "raw_message")
     val rawMessage: String,
 
@@ -70,9 +70,6 @@ data class PickupItemEntity(
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long = System.currentTimeMillis()
 ) {
-    val stationCircleSymbol: String
-        get() = stationCircleSymbolFor(stationNumber)
-
     companion object {
         const val SOURCE_SMS = "SMS"
         const val SOURCE_MANUAL = "MANUAL"

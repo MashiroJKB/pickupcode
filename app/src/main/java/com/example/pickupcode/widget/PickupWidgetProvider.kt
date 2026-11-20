@@ -102,7 +102,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
                             app.repository.confirmPickedUpBatch(listOf(itemId))
                             val remaining = app.repository.allItemsFlow.first().count { !it.isPickedUp }
                             AppBadgeManager.updateBadgeCount(context, remaining)
-                            notifyWidgetDataChanged(context)
+                            notifyWidgetDataChangedSync(context)
                         } finally {
                             pendingResult.finish()
                         }
@@ -111,7 +111,10 @@ class PickupWidgetProvider : AppWidgetProvider() {
                     val openIntent = Intent(context, MainActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     }
-                    context.startActivity(openIntent)
+                    try {
+                        context.startActivity(openIntent)
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
@@ -125,12 +128,47 @@ class PickupWidgetProvider : AppWidgetProvider() {
         const val EXTRA_ITEM_ID = "extra_item_id"
         const val EXTRA_MARK_DONE = "extra_mark_done"
 
+        private val widgetRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val iconCacheLock = Any()
+
+        @Volatile
+        private var cachedIcons: Triple<Bitmap, Bitmap, Bitmap>? = null
+
+        private fun getCachedBrandIcons(context: Context): Triple<Bitmap, Bitmap, Bitmap> {
+            val existing = cachedIcons
+            if (existing != null &&
+                !existing.first.isRecycled &&
+                !existing.second.isRecycled &&
+                !existing.third.isRecycled
+            ) {
+                return existing
+            }
+            return synchronized(iconCacheLock) {
+                val doubleChecked = cachedIcons
+                if (doubleChecked != null &&
+                    !doubleChecked.first.isRecycled &&
+                    !doubleChecked.second.isRecycled &&
+                    !doubleChecked.third.isRecycled
+                ) {
+                    doubleChecked
+                } else {
+                    val appContext = context.applicationContext
+                    Triple(
+                        loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.TAOBAO, 72),
+                        loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.CAINIAO, 72),
+                        loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.PINDUODUO, 72)
+                    ).also { cachedIcons = it }
+                }
+            }
+        }
+
         fun updateAppWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
-            appWidgetId: Int
+            appWidgetId: Int,
+            pendingCountOverride: Int? = null
         ) {
-            val pendingCount = try {
+            val pendingCount = pendingCountOverride ?: try {
                 val app = context.applicationContext as? PickupApplication
                 if (app != null) {
                     runBlocking(Dispatchers.IO) {
@@ -141,9 +179,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
                 0
             }
 
-            val taobaoBmp = loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.TAOBAO, 72)
-            val cainiaoBmp = loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.CAINIAO, 72)
-            val pddBmp = loadAppleRoundedIconBitmapForWidget(context, IdentityCodeType.PINDUODUO, 72)
+            val (taobaoBmp, cainiaoBmp, pddBmp) = getCachedBrandIcons(context)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
@@ -313,19 +349,39 @@ class PickupWidgetProvider : AppWidgetProvider() {
         }
 
         /**
-         * 当本地取件码数据发生变化时，主动刷新所有桌面小组件
+         * 当本地取件码数据发生变化时，异步刷新所有桌面小组件（避免在主线程阻塞 120Hz 渲染）
+         */
+        fun notifyWidgetDataChanged(context: Context, pendingCountOverride: Int? = null) {
+            val appContext = context.applicationContext
+            widgetRefreshScope.launch {
+                notifyWidgetDataChangedSync(appContext, pendingCountOverride)
+            }
+        }
+
+        /**
+         * 在后台线程同步刷新所有桌面小组件（供 BroadcastReceiver goAsync 等后台任务调用）
          */
         @Suppress("DEPRECATION")
-        fun notifyWidgetDataChanged(context: Context) {
+        fun notifyWidgetDataChangedSync(context: Context, pendingCountOverride: Int? = null) {
             try {
                 val appContext = context.applicationContext
                 val manager = AppWidgetManager.getInstance(appContext)
                 val componentName = ComponentName(appContext, PickupWidgetProvider::class.java)
                 val ids = manager.getAppWidgetIds(componentName)
                 if (ids != null && ids.isNotEmpty()) {
+                    val count = pendingCountOverride ?: try {
+                        val app = appContext as? PickupApplication
+                        if (app != null) {
+                            runBlocking(Dispatchers.IO) {
+                                app.repository.allItemsFlow.first().count { !it.isPickedUp }
+                            }
+                        } else 0
+                    } catch (_: Exception) {
+                        0
+                    }
                     manager.notifyAppWidgetViewDataChanged(ids, R.id.widget_list_view)
                     for (id in ids) {
-                        updateAppWidget(appContext, manager, id)
+                        updateAppWidget(appContext, manager, id, pendingCountOverride = count)
                     }
                 }
             } catch (_: Exception) {

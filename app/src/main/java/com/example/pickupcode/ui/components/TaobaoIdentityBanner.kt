@@ -28,8 +28,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -109,19 +111,19 @@ object TaobaoDeepLinkLauncher {
             IdentityCodeType.TAOBAO -> {
                 if (tryStartAppUri(context, TAOBAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
                 if (tryStartAppUri(context, CAINIAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
-                onFeedbackMessage("未检测到淘宝客户端，请先安装手机淘宝后再试")
+                onFeedbackMessage("未检测到淘宝客户端，请先安装后再试")
             }
 
             IdentityCodeType.CAINIAO -> {
                 if (tryStartAppUri(context, CAINIAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
                 if (tryStartAppUri(context, TAOBAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
-                onFeedbackMessage("未检测到淘宝客户端，请先安装手机淘宝后再试")
+                onFeedbackMessage("未检测到淘宝客户端，请先安装后再试")
             }
 
             IdentityCodeType.PINDUODUO -> {
                 if (tryStartAppUri(context, PINDUODUO_IDENTITY_DEEPLINK, PINDUODUO_PACKAGE)) return
                 if (tryStartAppUri(context, PINDUODUO_IDENTITY_DEEPLINK, null)) return
-                onFeedbackMessage("未检测到拼多多客户端，请先安装拼多多后再试")
+                onFeedbackMessage("未检测到拼多多客户端，请先安装后再试")
             }
         }
     }
@@ -187,6 +189,7 @@ fun CompactIdentityCodeBar(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val latestFeedback by rememberUpdatedState(onFeedbackMessage)
 
     Column(
         modifier = modifier
@@ -201,6 +204,8 @@ fun CompactIdentityCodeBar(
                 fontSize = 16.sp
             ),
             color = MaterialTheme.colorScheme.onSurface,
+            softWrap = false,
+            maxLines = 1,
             modifier = Modifier.padding(start = 2.dp)
         )
 
@@ -211,47 +216,49 @@ fun CompactIdentityCodeBar(
             modifier = Modifier.fillMaxWidth()
         ) {
             enabledTypes.forEach { type ->
-                var isPressed by remember { mutableStateOf(false) }
-                val scale by animateFloatAsState(
-                    targetValue = if (isPressed) 0.94f else 1f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    ),
-                    label = "compact_tile_scale"
-                )
-
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(68.dp)
-                        .scale(scale)
-                        .liquidGlassInnerCard(
-                            cornerRadius = AppleCorners.InnerCard
-                        )
-                        .pointerInput(type) {
-                            detectTapGestures(
-                                onPress = {
-                                    isPressed = true
-                                    tryAwaitRelease()
-                                    isPressed = false
-                                },
-                                onTap = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    TaobaoDeepLinkLauncher.launchIdentityCode(
-                                        context = context,
-                                        type = type,
-                                        onFeedbackMessage = onFeedbackMessage
-                                    )
-                                }
-                            )
-                        }
-                ) {
-                    AppBrandIcon(
-                        type = type,
-                        size = 48.dp
+                key(type) {
+                    var isPressed by remember { mutableStateOf(false) }
+                    val scale by animateFloatAsState(
+                        targetValue = if (isPressed) 0.94f else 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "compact_tile_scale"
                     )
+
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(68.dp)
+                            .scale(scale)
+                            .liquidGlassInnerCard(
+                                cornerRadius = AppleCorners.InnerCard
+                            )
+                            .pointerInput(type) {
+                                detectTapGestures(
+                                    onPress = {
+                                        isPressed = true
+                                        tryAwaitRelease()
+                                        isPressed = false
+                                    },
+                                    onTap = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        TaobaoDeepLinkLauncher.launchIdentityCode(
+                                            context = context,
+                                            type = type,
+                                            onFeedbackMessage = latestFeedback
+                                        )
+                                    }
+                                )
+                            }
+                    ) {
+                        AppBrandIcon(
+                            type = type,
+                            size = 48.dp
+                        )
+                    }
                 }
             }
         }
@@ -269,6 +276,7 @@ fun IdentityCodeBanner(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val latestFeedback by rememberUpdatedState(onFeedbackMessage)
     var isPressed by remember { mutableStateOf(false) }
 
     val scale by animateFloatAsState(
@@ -304,7 +312,7 @@ fun IdentityCodeBanner(
                         TaobaoDeepLinkLauncher.launchIdentityCode(
                             context = context,
                             type = type,
-                            onFeedbackMessage = onFeedbackMessage
+                            onFeedbackMessage = latestFeedback
                         )
                     }
                 )

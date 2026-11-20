@@ -42,11 +42,12 @@ object PickupMessageParser {
     )
 
     // 干扰数字掩码正则（时间、日期、手机号、座机、客服热线、尾号、计件/金额）
-    private val TIME_RANGE_REGEX = Regex("""\b\d{1,2}:\d{2}(?:\s*[-~至到]\s*\d{1,2}:\d{2})?\b""")
-    private val DATE_REGEX = Regex("""\b(?:20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?|\d{1,2}月\d{1,2}日)\b""")
+    private val TIME_RANGE_REGEX = Regex("""(?<!\d)\d{1,2}:\d{2}(?:\s*[-~至到]\s*\d{1,2}:\d{2})?(?!\d)""")
+    private val DATE_REGEX = Regex("""(?<!\d)(?:20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?|\d{1,2}月\d{1,2}日)(?!\d)""")
     private val PHONE_REGEX = Regex("""(?<!\d)(?:1[3-9]\d{9}|0\d{2,3}-?\d{7,8}|95\d{3,5}|400-?\d{3}-?\d{4}|100\d{2})(?!\d)""")
     private val TAIL_NUMBER_REGEX = Regex("""(?:手机尾号|尾号|后四位)\s*[:：为是]?\s*\d{4}""")
-    private val QUANTITY_REGEX = Regex("""\b\d+(?:\.\d+)?\s*(?:元|kg|克|件|个|袋|箱|小时|天|折|号快递房|号房|号驿站|号站|号柜|号门|号楼|栋|层)\b""")
+    private val QUANTITY_REGEX = Regex("""(?<!\d)\d+(?:\.\d+)?\s*(?:元|kg(?![A-Za-z])|克|件|个|袋|箱|小时|天|折|号快递房|号房|号驿站|号站|号柜|号门|号楼|栋|层)""")
+    private val ISO_DATE_TOKEN_REGEX = Regex("""^20[2-3]\d-\d{1,2}-\d{1,2}$""")
 
     // 货架-层-号 横杠格式取件码（如 1-2-3045, 102-2-5, J8-5-3012, A1-2048）
     private val HYPHENATED_CODE_REGEX = Regex(
@@ -169,7 +170,7 @@ object PickupMessageParser {
         val digitCount = token.count { it.isDigit() }
         if (digitCount < 2) return false
         if (token.length == 11 && token.startsWith("1") && token.all { it.isDigit() }) return false
-        if (token.matches(Regex("""^20[2-3]\d-\d{1,2}-\d{1,2}$"""))) return false
+        if (ISO_DATE_TOKEN_REGEX.matches(token)) return false
         return true
     }
 

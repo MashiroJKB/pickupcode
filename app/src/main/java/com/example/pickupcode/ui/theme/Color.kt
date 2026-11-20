@@ -15,15 +15,6 @@ val AppleOrangeDark = Color(0xFFFF9F0A)
 val AppleRedLight = Color(0xFFFF3B30)
 val AppleRedDark = Color(0xFFFF453A)
 
-val AppleIndigoLight = Color(0xFF5856D6)
-val AppleIndigoDark = Color(0xFF5E5CE6)
-
-val AppleTealLight = Color(0xFF30B0C7)
-val AppleTealDark = Color(0xFF40C8E0)
-
-val ApplePurpleLight = Color(0xFFAF52DE)
-val ApplePurpleDark = Color(0xFFBF5AF2)
-
 // 淘宝身份码品牌渐变强调色
 val TaobaoOrangeStart = Color(0xFFFF6A00)
 val TaobaoOrangeEnd = Color(0xFFFF2E00)

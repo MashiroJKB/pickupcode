@@ -33,17 +33,23 @@ class SmsReceiver : BroadcastReceiver() {
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         if (messages.isNullOrEmpty()) return
 
-        // 将同一发送方的多段长短信拼接为完整正文
-        val groupedBySender = linkedMapOf<String, StringBuilder>()
-        var timestamp = System.currentTimeMillis()
+        // 将同一发送方的多段长短信拼接为完整正文并保留各自时间戳
+        val groupedBySender = linkedMapOf<String, Pair<StringBuilder, Long>>()
+        val fallbackNow = System.currentTimeMillis()
 
         for (sms in messages) {
             val sender = sms.displayOriginatingAddress ?: "SMS"
             val body = sms.displayMessageBody ?: continue
-            if (sms.timestampMillis > 0) {
-                timestamp = sms.timestampMillis
+            val ts = if (sms.timestampMillis > 0) sms.timestampMillis else fallbackNow
+            val existing = groupedBySender[sender]
+            if (existing == null) {
+                groupedBySender[sender] = StringBuilder(body) to ts
+            } else {
+                existing.first.append(body)
+                if (ts > existing.second) {
+                    groupedBySender[sender] = existing.first to ts
+                }
             }
-            groupedBySender.getOrPut(sender) { StringBuilder() }.append(body)
         }
 
         if (groupedBySender.isEmpty()) return
@@ -53,17 +59,20 @@ class SmsReceiver : BroadcastReceiver() {
 
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                for ((sender, fullBody) in groupedBySender) {
-                    app.repository.ingestRawMessage(
-                        rawText = fullBody.toString(),
+                var totalAffected = 0
+                for ((sender, entry) in groupedBySender) {
+                    totalAffected += app.repository.ingestRawMessage(
+                        rawText = entry.first.toString(),
                         source = PickupItemEntity.SOURCE_SMS,
                         senderOrPackage = sender,
-                        messageTimestamp = timestamp
+                        messageTimestamp = entry.second
                     )
                 }
-                val pendingCount = app.repository.allItemsFlow.first().count { !it.isPickedUp }
-                AppBadgeManager.updateBadgeCount(context, pendingCount)
-                PickupWidgetProvider.notifyWidgetDataChanged(context)
+                if (totalAffected > 0) {
+                    val pendingCount = app.repository.allItemsFlow.first().count { !it.isPickedUp }
+                    AppBadgeManager.updateBadgeCount(context, pendingCount, force = true)
+                    PickupWidgetProvider.notifyWidgetDataChangedSync(context)
+                }
             } finally {
                 pendingResult.finish()
             }
@@ -116,7 +125,7 @@ class SmsContentObserver(
             if (added > 0) {
                 val pendingCount = repository.allItemsFlow.first().count { !it.isPickedUp }
                 AppBadgeManager.updateBadgeCount(context, pendingCount, force = true)
-                PickupWidgetProvider.notifyWidgetDataChanged(context)
+                PickupWidgetProvider.notifyWidgetDataChangedSync(context)
             }
         }
     }

@@ -35,4 +35,14 @@ class PickupApplication : Application() {
         observer.register()
         smsContentObserver = observer
     }
+
+    /**
+     * 授予 READ_SMS 权限后确保短信内容观察者已完成注册
+     */
+    fun ensureSmsObserverRegistered() {
+        val observer = smsContentObserver ?: SmsContentObserver(applicationContext, repository).also {
+            smsContentObserver = it
+        }
+        observer.register()
+    }
 }

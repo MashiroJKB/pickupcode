@@ -25,10 +25,14 @@ class PickupViewModel(
     private val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
 
+    private val _isItemsLoaded = MutableStateFlow(false)
+    val isItemsLoaded: StateFlow<Boolean> = _isItemsLoaded.asStateFlow()
+
     private val _isSettingsLoaded = MutableStateFlow(false)
     val isSettingsLoaded: StateFlow<Boolean> = _isSettingsLoaded.asStateFlow()
 
     val itemsState: StateFlow<List<PickupItemEntity>> = repository.allItemsFlow
+        .onEach { _isItemsLoaded.value = true }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -130,11 +134,16 @@ class PickupViewModel(
      * 勾选的快递立即消失，并在相同位置显示 3 秒内可点击的「撤销」按钮
      */
     fun confirmSelectedPickedUp() {
-        val idsToConfirm = _selectedItemIds.value.toList()
-        if (idsToConfirm.isEmpty()) return
+        val pendingIds = itemsState.value.asSequence().filter { !it.isPickedUp }.map { it.id }.toSet()
+        val idsToConfirm = _selectedItemIds.value.filter { it in pendingIds }
+        if (idsToConfirm.isEmpty()) {
+            _selectedItemIds.value = emptySet()
+            return
+        }
 
         _selectedItemIds.value = emptySet()
         undoTimerJob?.cancel()
+        _undoableItemIds.value = emptyList()
 
         viewModelScope.launch {
             repository.confirmPickedUpBatch(idsToConfirm)
@@ -152,6 +161,7 @@ class PickupViewModel(
     fun markSingleItemPickedUp(item: PickupItemEntity) {
         _selectedItemIds.value = _selectedItemIds.value - item.id
         undoTimerJob?.cancel()
+        _undoableItemIds.value = emptyList()
 
         viewModelScope.launch {
             repository.confirmPickedUpBatch(listOf(item.id))
@@ -199,16 +209,22 @@ class PickupViewModel(
     fun updateStationNumber(itemId: Long, stationNumber: Int) {
         viewModelScope.launch {
             repository.updateStationNumber(itemId, stationNumber)
-            val rule = settingsState.value.stationRules.firstOrNull { it.stationNumber == stationNumber }
-            val symbol = rule?.circleSymbol ?: PickupItemEntity.stationCircleSymbolFor(stationNumber)
-            val name = rule?.displayName ?: "${stationNumber}号快递房"
-            showCapsuleToast("已归入 $symbol $name")
+            val label = if (stationNumber > 0) {
+                val rule = settingsState.value.stationRules.firstOrNull { it.stationNumber == stationNumber }
+                val symbol = rule?.circleSymbol ?: PickupItemEntity.stationCircleSymbolFor(stationNumber)
+                val name = rule?.displayName ?: "${stationNumber}号快递房"
+                "$symbol $name"
+            } else {
+                "？ 待分类快递房"
+            }
+            showCapsuleToast("已归入 $label")
         }
     }
 
     fun deleteItem(item: PickupItemEntity) {
         viewModelScope.launch {
             _selectedItemIds.value = _selectedItemIds.value - item.id
+            _undoableItemIds.value = _undoableItemIds.value.filterNot { it == item.id }
             repository.deleteItem(item.id)
             showCapsuleToast("已删除取件码 ${item.code}")
         }
@@ -220,9 +236,14 @@ class PickupViewModel(
     fun deleteSelectedItems() {
         val pendingIds = itemsState.value.asSequence().filter { !it.isPickedUp }.map { it.id }.toSet()
         val idsToDelete = _selectedItemIds.value.filter { it in pendingIds }
-        if (idsToDelete.isEmpty()) return
+        if (idsToDelete.isEmpty()) {
+            _selectedItemIds.value = emptySet()
+            return
+        }
 
+        val deleteSet = idsToDelete.toSet()
         _selectedItemIds.value = emptySet()
+        _undoableItemIds.value = _undoableItemIds.value.filterNot { it in deleteSet }
         viewModelScope.launch {
             repository.deleteItemsBatch(idsToDelete)
             showCapsuleToast("已删除 ${idsToDelete.size} 条取件码")
@@ -243,19 +264,21 @@ class PickupViewModel(
             if (count > 0) {
                 showCapsuleToast("智能解析成功：提取 $count 个取件码")
             } else {
-                showCapsuleToast("未识别到有效新取件码（已排除已取或干扰短信）")
+                showCapsuleToast("未识别到新的有效取件码")
             }
         }
     }
 
     fun addManualPickupCode(code: String, stationNumber: Int, productName: String) {
+        val cleanCode = code.trim().uppercase()
+        if (cleanCode.isEmpty()) return
         viewModelScope.launch {
             repository.addManualPickupCode(
-                code = code,
+                code = cleanCode,
                 stationNumber = stationNumber,
                 productName = productName
             )
-            showCapsuleToast("已添加取件码 ${code.uppercase()}")
+            showCapsuleToast("已添加取件码 $cleanCode")
         }
     }
 
@@ -297,7 +320,7 @@ class PickupViewModel(
         val token = settingsDataStore.exportStationRulesToken(rules)
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         clipboard?.setPrimaryClip(ClipData.newPlainText("取件码识别规则", token))
-        showCapsuleToast("已复制识别规则口令到剪贴板，可直接分享给同学")
+        showCapsuleToast("已复制规则口令，可直接分享给同学")
     }
 
     fun importStationRulesFromText(rawText: String) {
@@ -319,7 +342,8 @@ class PickupViewModel(
             val symbol = badgeNumber?.takeIf { it in 1..20 }?.let {
                 PickupItemEntity.stationCircleSymbolFor(it)
             } ?: "●"
-            showCapsuleToast("已添加 $symbol ${displayName.ifBlank { "${num}号快递房" }}")
+            val trimmedName = displayName.trim().ifEmpty { "${num}号快递房" }
+            showCapsuleToast("已添加 $symbol $trimmedName")
         }
     }
 

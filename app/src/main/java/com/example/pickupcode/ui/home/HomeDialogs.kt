@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -185,23 +186,31 @@ fun RawMessageDetailDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     StationBadgeSymbol(
                         badgeNumber = badgeNum,
                         accentColor = accent,
                         isUnclassified = item.stationNumber == 0
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = item.code,
                             style = PickupCodeMonospaceStyle.copy(fontSize = 20.sp),
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            softWrap = false,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = dateFormat.format(Date(item.createdAt)),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            softWrap = false,
+                            maxLines = 1
                         )
                     }
                 }
@@ -220,16 +229,20 @@ fun RawMessageDetailDialog(
             Text(
                 text = "原始短信全文",
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                softWrap = false,
+                maxLines = 1
             )
             Spacer(modifier = Modifier.height(6.dp))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = 220.dp)
                     .clip(RoundedCornerShape(AppleCorners.InnerCard))
                     .background(
                         MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f)
                     )
+                    .verticalScroll(rememberScrollState())
                     .padding(14.dp)
             ) {
                 Text(
@@ -244,7 +257,9 @@ fun RawMessageDetailDialog(
                 Text(
                     text = "归属快递房",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    softWrap = false,
+                    maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
@@ -272,7 +287,9 @@ fun RawMessageDetailDialog(
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = if (selected) Color.White else numAccent
+                                color = if (selected) Color.White else numAccent,
+                                softWrap = false,
+                                maxLines = 1
                             )
                         }
                     }
@@ -302,7 +319,9 @@ fun RawMessageDetailDialog(
                     Text(
                         text = "删除",
                         color = if (isDark) AppleRedDark else AppleRedLight,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        softWrap = false,
+                        maxLines = 1
                     )
                 }
 
@@ -315,7 +334,9 @@ fun RawMessageDetailDialog(
                     ) {
                         Text(
                             text = "备注商品",
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            softWrap = false,
+                            maxLines = 1
                         )
                     }
 
@@ -323,7 +344,12 @@ fun RawMessageDetailDialog(
                         onClick = onDismiss,
                         shape = RoundedCornerShape(AppleCorners.InnerCard)
                     ) {
-                        Text(text = "完成", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "完成",
+                            fontWeight = FontWeight.Bold,
+                            softWrap = false,
+                            maxLines = 1
+                        )
                     }
                 }
             }
@@ -347,13 +373,17 @@ fun EditProductRemarkDialog(
             Text(
                 text = "备注商品名称",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                softWrap = false,
+                maxLines = 1
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "取件码 ${item.code}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -380,11 +410,16 @@ fun EditProductRemarkDialog(
                             onDismiss()
                         }
                     ) {
-                        Text("清空备注", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = "清空备注",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            softWrap = false,
+                            maxLines = 1
+                        )
                     }
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text("取消", softWrap = false, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Button(
@@ -394,7 +429,7 @@ fun EditProductRemarkDialog(
                     },
                     shape = RoundedCornerShape(AppleCorners.InnerCard)
                 ) {
-                    Text("保存", fontWeight = FontWeight.Bold)
+                    Text("保存", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                 }
             }
         }
@@ -418,7 +453,7 @@ fun AddOrPastePickupDialog(
     var tabIndex by remember { mutableIntStateOf(0) }
     var manualCode by remember { mutableStateOf("") }
     var manualStation by remember(initialStationNumber, stationRules) {
-        mutableIntStateOf(initialStationNumber ?: stationRules.firstOrNull()?.stationNumber ?: 1)
+        mutableIntStateOf(initialStationNumber ?: stationRules.firstOrNull()?.stationNumber ?: 0)
     }
     var manualProduct by remember { mutableStateOf("") }
     var rawSmsInput by remember { mutableStateOf("") }
@@ -718,14 +753,19 @@ fun LongPressQuickActionDialog(
             Text(
                 text = item.code,
                 style = PickupCodeMonospaceStyle.copy(fontSize = 22.sp),
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                softWrap = false,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             if (item.productName.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = item.productName,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -753,7 +793,13 @@ fun LongPressQuickActionDialog(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("已取", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(
+                        text = "已取",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        softWrap = false,
+                        maxLines = 1
+                    )
                 }
 
                 Button(
@@ -774,7 +820,13 @@ fun LongPressQuickActionDialog(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("删除", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(
+                        text = "删除",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        softWrap = false,
+                        maxLines = 1
+                    )
                 }
             }
         }
@@ -837,7 +889,7 @@ fun NotificationAndBadgePermissionDialog(
 
             PermissionGuideItemRow(
                 title = "通知权限",
-                subtitle = "允许同步待取件数量状态",
+                subtitle = "允许同步待取件数量",
                 statusText = if (hasNotificationPermission) "已开启" else "点击授权",
                 statusColor = if (hasNotificationPermission) statusGreen else statusAmber,
                 clickable = !hasNotificationPermission,
@@ -848,7 +900,7 @@ fun NotificationAndBadgePermissionDialog(
 
             PermissionGuideItemRow(
                 title = "桌面图标角标",
-                subtitle = "请在系统通知管理开启「桌面角标」",
+                subtitle = "前往通知管理开启桌面角标",
                 statusText = "去设置",
                 statusColor = MaterialTheme.colorScheme.primary,
                 clickable = true,
@@ -862,7 +914,11 @@ fun NotificationAndBadgePermissionDialog(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text(if (hasNotificationPermission) "完成" else "暂不设置")
+                    Text(
+                        text = if (hasNotificationPermission) "完成" else "暂不设置",
+                        softWrap = false,
+                        maxLines = 1
+                    )
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Button(
@@ -878,7 +934,9 @@ fun NotificationAndBadgePermissionDialog(
                 ) {
                     Text(
                         text = if (!hasNotificationPermission) "开启通知权限" else "前往开启角标",
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        softWrap = false,
+                        maxLines = 1
                     )
                 }
             }
@@ -923,7 +981,7 @@ private fun PermissionGuideItemRow(
                 text = subtitle,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
@@ -1081,9 +1139,10 @@ fun SharePickupMethodDialog(
                 Spacer(modifier = Modifier.weight(1f))
 
                 Text(
-                    text = if (includeRemarks) "图片中附带商品备注" else "图片中不附带备注",
+                    text = if (includeRemarks) "附带商品备注" else "不附带商品备注",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    softWrap = false,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 10.dp)
@@ -1101,7 +1160,7 @@ fun SharePickupMethodDialog(
                     enabled = !isGeneratingImage,
                     onClick = onDismiss
                 ) {
-                    Text("取消")
+                    Text("取消", softWrap = false, maxLines = 1)
                 }
             }
         }

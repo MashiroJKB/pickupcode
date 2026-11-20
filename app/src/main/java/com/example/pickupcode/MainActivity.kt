@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -155,19 +156,27 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val items by viewModel.itemsState.collectAsState()
+    val isItemsLoaded by viewModel.isItemsLoaded.collectAsState()
     val settings by viewModel.settingsState.collectAsState()
     val isSettingsLoaded by viewModel.isSettingsLoaded.collectAsState()
     val selectedItemIds by viewModel.selectedItemIds.collectAsState()
     val undoableItemIds by viewModel.undoableItemIds.collectAsState()
     val capsuleToast by viewModel.capsuleToastMessage.collectAsState()
     val latestItems by rememberUpdatedState(items)
+    val latestItemsLoaded by rememberUpdatedState(isItemsLoaded)
 
     val coroutineScope = rememberCoroutineScope()
-    var showSettingsScreen by remember { mutableStateOf(false) }
+    var showSettingsScreen by rememberSaveable { mutableStateOf(false) }
     var isShareSelectionMode by remember { mutableStateOf(false) }
     var shareSelectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showShareMethodDialog by remember { mutableStateOf(false) }
     var isGeneratingShareImage by remember { mutableStateOf(false) }
+    var renderedToast by remember { mutableStateOf("") }
+    LaunchedEffect(capsuleToast) {
+        if (capsuleToast != null) {
+            renderedToast = capsuleToast.orEmpty()
+        }
+    }
     val homeListState = rememberLazyListState()
     val settingsListState = rememberLazyListState()
 
@@ -194,7 +203,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     var quickAddTargetStation by remember { mutableStateOf<Int?>(null) }
     var showNotificationBadgeDialog by remember { mutableStateOf(false) }
     var awaitingBadgeDialogAfterStartupPrompt by remember { mutableStateOf(false) }
-    var hasTriggeredInitialPermissionFlow by remember { mutableStateOf(false) }
+    var hasTriggeredInitialPermissionFlow by rememberSaveable { mutableStateOf(false) }
 
     val startupPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -203,9 +212,12 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         hasSmsPermission = smsGranted
         hasNotificationPermission = AppBadgeManager.hasNotificationPermission(context)
         if (smsGranted) {
+            (context.applicationContext as? PickupApplication)?.ensureSmsObserverRegistered()
             viewModel.scanRecentSmsOnAppOpen(context)
         }
-        AppBadgeManager.updateBadgeCount(context, latestItems.count { !it.isPickedUp }, force = true)
+        if (latestItemsLoaded) {
+            AppBadgeManager.updateBadgeCount(context, latestItems.count { !it.isPickedUp }, force = true)
+        }
         if (awaitingBadgeDialogAfterStartupPrompt) {
             awaitingBadgeDialogAfterStartupPrompt = false
             if (!settings.badgePermissionPrompted) {
@@ -219,7 +231,9 @@ fun PickupMainApp(viewModel: PickupViewModel) {
     ) { _ ->
         val grantedNow = AppBadgeManager.hasNotificationPermission(context)
         hasNotificationPermission = grantedNow
-        AppBadgeManager.updateBadgeCount(context, latestItems.count { !it.isPickedUp }, force = true)
+        if (latestItemsLoaded) {
+            AppBadgeManager.updateBadgeCount(context, latestItems.count { !it.isPickedUp }, force = true)
+        }
         if (!grantedNow) {
             AppBadgeManager.openNotificationAndBadgeSettings(context)
         }
@@ -296,14 +310,14 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                 hasSmsPermission = smsNow
                 hasNotificationPermission = AppBadgeManager.hasNotificationPermission(context)
                 if (smsNow) {
+                    (context.applicationContext as? PickupApplication)?.ensureSmsObserverRegistered()
                     viewModel.scanRecentSmsOnAppOpen(context)
                 }
-                AppBadgeManager.updateBadgeCount(
-                    context,
-                    latestItems.count { !it.isPickedUp },
-                    force = true
-                )
-                PickupWidgetProvider.notifyWidgetDataChanged(context)
+                if (latestItemsLoaded) {
+                    val count = latestItems.count { !it.isPickedUp }
+                    AppBadgeManager.updateBadgeCount(context, count, force = true)
+                    PickupWidgetProvider.notifyWidgetDataChanged(context, pendingCountOverride = count)
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -312,11 +326,12 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         }
     }
 
-    // 根据待取快递数量实时更新桌面应用角标与桌面液态玻璃小组件
-    LaunchedEffect(items, settings.stationRules) {
+    // 根据待取快递数量实时更新桌面应用角标与桌面液态玻璃小组件（等待数据库首帧加载完成后再同步，避免冷启动角标闪烁归零）
+    LaunchedEffect(isItemsLoaded, items, settings.stationRules) {
+        if (!isItemsLoaded) return@LaunchedEffect
         val pendingCount = items.count { !it.isPickedUp }
         AppBadgeManager.updateBadgeCount(context, pendingCount)
-        PickupWidgetProvider.notifyWidgetDataChanged(context)
+        PickupWidgetProvider.notifyWidgetDataChanged(context, pendingCountOverride = pendingCount)
     }
 
     val pendingItems = remember(items) {
@@ -519,7 +534,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         .padding(horizontal = 18.dp, vertical = 10.dp)
                 ) {
                     Text(
-                        text = capsuleToast.orEmpty(),
+                        text = renderedToast,
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp

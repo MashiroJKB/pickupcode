@@ -1,5 +1,7 @@
 package com.example.pickupcode.ui.settings
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -62,6 +64,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -154,6 +157,8 @@ fun SettingsScreen(
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     var itemRowHeightPx by remember { mutableIntStateOf(with(density) { 52.dp.roundToPx() }) }
     val itemSpacingPx = remember(density) { with(density) { 9.dp.toPx() } }
+    val latestOnReorderStations by rememberUpdatedState(onReorderStations)
+    val latestPersistedRules by rememberUpdatedState(settings.stationRules)
 
     LaunchedEffect(settings.stationRules) {
         if (draggingStationNumber == null) {
@@ -311,7 +316,7 @@ fun SettingsScreen(
                 PermissionStatusCard(
                     icon = Icons.Rounded.Sms,
                     title = "监听短信权限未开启",
-                    subtitle = "授权后自动扫描最近 7 天取件短信",
+                    subtitle = "授权后自动扫描近 7 天取件短信",
                     accentColor = statusAmber,
                     buttonText = "开启权限",
                     onClick = onRequestSmsPermission
@@ -325,7 +330,7 @@ fun SettingsScreen(
                 PermissionStatusCard(
                     icon = Icons.Rounded.NotificationsActive,
                     title = "通知与桌面角标未开启",
-                    subtitle = "开启通知与角标，实时显示待取件数",
+                    subtitle = "开启后在桌面同步待取件数",
                     accentColor = statusAmber,
                     buttonText = "开启通知",
                     onClick = onRequestNotificationPermission
@@ -334,7 +339,7 @@ fun SettingsScreen(
                 PermissionStatusCard(
                     icon = Icons.Rounded.NotificationsActive,
                     title = "桌面角标与通知已就绪",
-                    subtitle = "可在系统通知管理开启「桌面图标角标」",
+                    subtitle = "可在通知管理开启桌面图标角标",
                     accentColor = statusGreen,
                     buttonText = "管理角标",
                     onClick = onOpenBadgeSettings
@@ -499,6 +504,14 @@ fun SettingsScreen(
                         key(rule.stationNumber) {
                             val isDragging = draggingStationNumber == rule.stationNumber
                             val accent = stationAccentColor(rule.badgeNumber ?: rule.stationNumber, isDark)
+                            val dragScale by animateFloatAsState(
+                                targetValue = if (isDragging) 1.03f else 1f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = 500f
+                                ),
+                                label = "station_drag_scale"
+                            )
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -514,9 +527,9 @@ fun SettingsScreen(
                                     .graphicsLayer {
                                         if (isDragging) {
                                             translationY = dragOffsetY
-                                            scaleX = 1.03f
-                                            scaleY = 1.03f
                                         }
+                                        scaleX = dragScale
+                                        scaleY = dragScale
                                     }
                                     .liquidGlassInnerCard(
                                         cornerRadius = AppleCorners.InnerCard,
@@ -533,11 +546,8 @@ fun SettingsScreen(
                                                 change.consume()
                                                 dragOffsetY += dragAmount.y
                                                 val stepPx = itemRowHeightPx + itemSpacingPx
-                                                val currentIndex = localRules.indexOfFirst {
-                                                    it.stationNumber == rule.stationNumber
-                                                }
-                                                if (currentIndex != -1 && stepPx > 0f) {
-                                                    while (dragOffsetY > stepPx * 0.55f && currentIndex < localRules.lastIndex) {
+                                                if (stepPx > 0f) {
+                                                    while (dragOffsetY > stepPx * 0.55f) {
                                                         val idx = localRules.indexOfFirst { it.stationNumber == rule.stationNumber }
                                                         if (idx == -1 || idx >= localRules.lastIndex) break
                                                         val mutable = localRules.toMutableList()
@@ -547,7 +557,7 @@ fun SettingsScreen(
                                                         dragOffsetY -= stepPx
                                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                     }
-                                                    while (dragOffsetY < -stepPx * 0.55f && currentIndex > 0) {
+                                                    while (dragOffsetY < -stepPx * 0.55f) {
                                                         val idx = localRules.indexOfFirst { it.stationNumber == rule.stationNumber }
                                                         if (idx <= 0) break
                                                         val mutable = localRules.toMutableList()
@@ -562,12 +572,16 @@ fun SettingsScreen(
                                             onDragEnd = {
                                                 draggingStationNumber = null
                                                 dragOffsetY = 0f
-                                                onReorderStations(localRules)
+                                                if (localRules != latestPersistedRules) {
+                                                    latestOnReorderStations(localRules)
+                                                }
                                             },
                                             onDragCancel = {
                                                 draggingStationNumber = null
                                                 dragOffsetY = 0f
-                                                onReorderStations(localRules)
+                                                if (localRules != latestPersistedRules) {
+                                                    latestOnReorderStations(localRules)
+                                                }
                                             }
                                         )
                                     }
@@ -820,7 +834,7 @@ private fun PermissionStatusCard(
                         text = subtitle,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -866,7 +880,10 @@ private fun IdentitySwitchRow(
             .clickable { onCheckedChange(!checked) }
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
             AppBrandIcon(
                 type = type,
                 size = 30.dp
@@ -877,7 +894,9 @@ private fun IdentitySwitchRow(
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
@@ -921,13 +940,17 @@ private fun StatBox(
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 24.sp
                 ),
-                color = accent
+                color = accent,
+                softWrap = false,
+                maxLines = 1
             )
             Spacer(modifier = Modifier.width(3.dp))
             Text(
                 text = unit,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                softWrap = false,
+                maxLines = 1,
                 modifier = Modifier.padding(bottom = 3.dp)
             )
         }
@@ -935,7 +958,9 @@ private fun StatBox(
         Text(
             text = title,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            softWrap = false,
+            maxLines = 1
         )
     }
 }
@@ -992,7 +1017,7 @@ private fun EditStationRuleDialog(
                 onValueChange = { input ->
                     badgeNumberText = input.filter { it.isDigit() }.take(2)
                 },
-                label = { Text("快递房序号（留空则为实心圆）") },
+                label = { Text("序号（1~20，留空为实心圆）", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 shape = RoundedCornerShape(AppleCorners.InnerCard),
@@ -1004,7 +1029,7 @@ private fun EditStationRuleDialog(
             OutlinedTextField(
                 value = newKeyword,
                 onValueChange = { newKeyword = it.take(20) },
-                label = { Text("新增匹配关键词") },
+                label = { Text("新增匹配关键词", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
                 trailingIcon = {
                     if (newKeyword.isNotBlank()) {
@@ -1014,7 +1039,7 @@ private fun EditStationRuleDialog(
                                 newKeyword = ""
                             }
                         ) {
-                            Text("添加", fontWeight = FontWeight.Bold)
+                            Text("添加", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
                     }
                 },
@@ -1027,7 +1052,9 @@ private fun EditStationRuleDialog(
             Text(
                 text = "当前匹配关键词",
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                softWrap = false,
+                maxLines = 1
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -1067,7 +1094,9 @@ private fun EditStationRuleDialog(
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         fontWeight = FontWeight.SemiBold
                                     ),
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Icon(
@@ -1092,7 +1121,7 @@ private fun EditStationRuleDialog(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text("取消", softWrap = false, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Button(
@@ -1103,7 +1132,7 @@ private fun EditStationRuleDialog(
                     },
                     shape = RoundedCornerShape(AppleCorners.InnerCard)
                 ) {
-                    Text("保存", fontWeight = FontWeight.Bold)
+                    Text("保存", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                 }
             }
         }
@@ -1144,7 +1173,7 @@ private fun AddNewStationDialog(
                 onValueChange = { input ->
                     badgeNumberText = input.filter { it.isDigit() }.take(2)
                 },
-                label = { Text("快递房序号（留空则为实心圆）") },
+                label = { Text("序号（1~20，留空为实心圆）", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 shape = RoundedCornerShape(AppleCorners.InnerCard),
@@ -1156,7 +1185,7 @@ private fun AddNewStationDialog(
             OutlinedTextField(
                 value = keywordsText,
                 onValueChange = { keywordsText = it },
-                label = { Text("匹配关键词（多个词用空格或逗号分隔）") },
+                label = { Text("匹配关键词（空格或逗号分隔）", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
                 shape = RoundedCornerShape(AppleCorners.InnerCard),
                 modifier = Modifier.fillMaxWidth()
@@ -1169,7 +1198,7 @@ private fun AddNewStationDialog(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text("取消", softWrap = false, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Button(
@@ -1183,7 +1212,7 @@ private fun AddNewStationDialog(
                     },
                     shape = RoundedCornerShape(AppleCorners.InnerCard)
                 ) {
-                    Text("添加", fontWeight = FontWeight.Bold)
+                    Text("添加", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                 }
             }
         }
@@ -1226,7 +1255,7 @@ private fun ImportStationRulesDialog(
                         modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("粘贴剪贴板", fontWeight = FontWeight.Bold)
+                    Text("粘贴剪贴板", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                 }
             }
 
@@ -1235,7 +1264,7 @@ private fun ImportStationRulesDialog(
             OutlinedTextField(
                 value = inputToken,
                 onValueChange = { inputToken = it },
-                placeholder = { Text("在此粘贴同学分享的【取件码识别规则】口令...") },
+                placeholder = { Text("在此粘贴【取件码识别规则】口令...") },
                 minLines = 4,
                 maxLines = 6,
                 shape = RoundedCornerShape(AppleCorners.InnerCard),
@@ -1249,7 +1278,7 @@ private fun ImportStationRulesDialog(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text("取消", softWrap = false, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Button(
@@ -1257,7 +1286,7 @@ private fun ImportStationRulesDialog(
                     onClick = { onImport(inputToken) },
                     shape = RoundedCornerShape(AppleCorners.InnerCard)
                 ) {
-                    Text("导入规则", fontWeight = FontWeight.Bold)
+                    Text("导入规则", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                 }
             }
         }
@@ -1370,12 +1399,14 @@ private fun PickedUpHistoryDialog(
 
                                 Spacer(modifier = Modifier.width(10.dp))
 
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = item.code,
                                         style = PickupCodeMonospaceStyle.copy(fontSize = 18.sp),
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        softWrap = false
+                                        softWrap = false,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     val subInfo = buildString {
                                         append(stationName)
