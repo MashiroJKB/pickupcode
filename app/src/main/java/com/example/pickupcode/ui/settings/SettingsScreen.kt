@@ -1,5 +1,12 @@
 package com.example.pickupcode.ui.settings
 
+import android.content.ActivityNotFoundException
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
@@ -16,10 +23,13 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,6 +43,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
@@ -41,11 +52,13 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Sms
+import androidx.compose.material.icons.rounded.SystemUpdateAlt
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -77,8 +90,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -112,6 +123,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private const val GITHUB_REPO_URL = "https://github.com/MashiroJKB/pickupcode"
+private const val GITHUB_RELEASES_URL = "https://github.com/MashiroJKB/pickupcode/releases"
+
 @Composable
 fun SettingsScreen(
     items: List<PickupItemEntity>,
@@ -121,7 +135,6 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onRequestSmsPermission: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
-    onOpenBadgeSettings: () -> Unit,
     onToggleTaobaoBanner: (Boolean) -> Unit,
     onToggleCainiaoBanner: (Boolean) -> Unit,
     onTogglePinduoduoBanner: (Boolean) -> Unit,
@@ -136,15 +149,35 @@ fun SettingsScreen(
     onImportStationRules: (String) -> Unit,
     onRestorePickedUpItem: (PickupItemEntity) -> Unit,
     onDeletePickedUpItem: (PickupItemEntity) -> Unit,
+    onFeedbackMessage: (String) -> Unit,
     listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
     val isDark = isSystemInDarkTheme()
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val statusGreen = if (isDark) AppleGreenDark else AppleGreenLight
     val statusAmber = if (isDark) AppleOrangeDark else AppleOrangeLight
     val deleteRed = if (isDark) AppleRedDark else AppleRedLight
+
+    val appVersionName = remember(context) {
+        try {
+            val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(
+                    context.packageName,
+                    PackageManager.PackageInfoFlags.of(0)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+            info.versionName.orEmpty().ifBlank { "2.3.5" }
+        } catch (_: Exception) {
+            "2.3.5"
+        }
+    }
 
     var editingStationNumber by remember { mutableStateOf<Int?>(null) }
     var showAddStationDialog by remember { mutableStateOf(false) }
@@ -180,7 +213,7 @@ fun SettingsScreen(
             start = 16.dp,
             end = 16.dp,
             top = 12.dp,
-            bottom = 40.dp
+            bottom = 28.dp + navBarBottom
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -240,7 +273,9 @@ fun SettingsScreen(
                 Text(
                     text = "设置",
                     style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = MaterialTheme.colorScheme.onBackground,
+                    softWrap = false,
+                    maxLines = 1
                 )
             }
         }
@@ -324,9 +359,9 @@ fun SettingsScreen(
             }
         }
 
-        // 2.5 通知与桌面角标权限卡片
-        item(key = "notification_badge_card") {
-            if (!hasNotificationPermission) {
+        // 2.5 仅当未开启通知与桌面角标权限时展示授权卡片，已授权后自动隐藏
+        if (!hasNotificationPermission) {
+            item(key = "notification_badge_card") {
                 PermissionStatusCard(
                     icon = Icons.Rounded.NotificationsActive,
                     title = "通知与桌面角标未开启",
@@ -334,15 +369,6 @@ fun SettingsScreen(
                     accentColor = statusAmber,
                     buttonText = "开启通知",
                     onClick = onRequestNotificationPermission
-                )
-            } else {
-                PermissionStatusCard(
-                    icon = Icons.Rounded.NotificationsActive,
-                    title = "桌面角标与通知已就绪",
-                    subtitle = "可在通知管理开启桌面图标角标",
-                    accentColor = statusGreen,
-                    buttonText = "管理角标",
-                    onClick = onOpenBadgeSettings
                 )
             }
         }
@@ -366,7 +392,9 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        softWrap = false,
+                        maxLines = 1
                     )
 
                     Row(
@@ -680,7 +708,9 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        softWrap = false,
+                        maxLines = 1
                     )
                 }
 
@@ -715,6 +745,36 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+
+        // 5. 关于（版本号 + GitHub 开源地址，点击调用默认浏览器打开）
+        item(key = "about_card") {
+            SettingsLinkCard(
+                icon = Icons.Rounded.Info,
+                iconTint = MaterialTheme.colorScheme.primary,
+                title = "关于",
+                badgeText = "v$appVersionName",
+                url = GITHUB_REPO_URL,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    openUrlInDefaultBrowser(context, GITHUB_REPO_URL, onFeedbackMessage)
+                }
+            )
+        }
+
+        // 6. 检查更新（GitHub Releases 地址，点击调用默认浏览器打开）
+        item(key = "check_update_card") {
+            SettingsLinkCard(
+                icon = Icons.Rounded.SystemUpdateAlt,
+                iconTint = statusGreen,
+                title = "检查更新",
+                badgeText = "Release",
+                url = GITHUB_RELEASES_URL,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    openUrlInDefaultBrowser(context, GITHUB_RELEASES_URL, onFeedbackMessage)
+                }
+            )
         }
     }
 
@@ -775,6 +835,116 @@ fun SettingsScreen(
             onRestoreItem = onRestorePickedUpItem,
             onDeleteItem = onDeletePickedUpItem
         )
+    }
+}
+
+@Composable
+private fun SettingsLinkCard(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    badgeText: String,
+    url: String,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(cornerRadius = AppleCorners.OuterCard)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(iconTint.copy(alpha = 0.14f))
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        softWrap = false,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(AppleCorners.Pill))
+                            .background(iconTint.copy(alpha = 0.14f))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = badgeText,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            ),
+                            color = iconTint,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = url,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+            contentDescription = "在默认浏览器打开",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+private fun openUrlInDefaultBrowser(
+    context: Context,
+    url: String,
+    onError: (String) -> Unit
+) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+        addCategory(Intent.CATEGORY_BROWSABLE)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        onError("未检测到可用浏览器")
+    } catch (_: Exception) {
+        onError("无法打开浏览器链接")
     }
 }
 
@@ -995,7 +1165,9 @@ private fun EditStationRuleDialog(
                 Text(
                     text = "配置识别规则",
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    softWrap = false,
+                    maxLines = 1
                 )
             }
             Spacer(modifier = Modifier.height(14.dp))
@@ -1153,7 +1325,9 @@ private fun AddNewStationDialog(
             Text(
                 text = "添加快递房",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                softWrap = false,
+                maxLines = 1
             )
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -1237,13 +1411,20 @@ private fun ImportStationRulesDialog(
                 Text(
                     text = "导入识别规则",
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    softWrap = false,
+                    maxLines = 1
                 )
 
                 TextButton(
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                        val clipText = clipboard?.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+                        val clip = clipboard?.primaryClip
+                        val clipText = if (clip != null && clip.itemCount > 0) {
+                            clip.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
+                        } else {
+                            ""
+                        }
                         if (clipText.isNotBlank()) {
                             inputToken = clipText
                         }
@@ -1314,16 +1495,20 @@ private fun PickedUpHistoryDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "7天内已取记录",
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        softWrap = false,
+                        maxLines = 1
                     )
                     Text(
                         text = "共 ${pickedUpItems.size} 件 · 满 7 天自动清理",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -1348,7 +1533,9 @@ private fun PickedUpHistoryDialog(
                     Text(
                         text = "最近 7 天暂无已取件记录",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        softWrap = false,
+                        maxLines = 1
                     )
                 }
             } else {

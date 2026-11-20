@@ -24,9 +24,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,11 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -106,8 +105,6 @@ fun HomeScreen(
     onQuickAddClick: () -> Unit,
     onQuickAddToStation: (Int) -> Unit,
     onToggleSelectItem: (PickupItemEntity) -> Unit,
-    onQuickMarkPickedUp: (PickupItemEntity) -> Unit,
-    onQuickDeleteItem: (PickupItemEntity) -> Unit,
     onLongPressItem: (PickupItemEntity) -> Unit,
     onClickMoreActions: (PickupItemEntity) -> Unit,
     onClickProductRemark: (PickupItemEntity) -> Unit,
@@ -116,14 +113,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
-    var activeSwipedItemId by remember { mutableStateOf<Long?>(null) }
-
-    // 列表滚动时优雅自动收起已左滑展开的卡片
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress && activeSwipedItemId != null) {
-            activeSwipedItemId = null
-        }
-    }
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     val pendingItems = remember(items) {
         items.filter { !it.isPickedUp }
@@ -183,7 +173,7 @@ fun HomeScreen(
             start = 16.dp,
             end = 16.dp,
             top = 12.dp,
-            bottom = 104.dp
+            bottom = 104.dp + navBarBottom
         ),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -207,30 +197,12 @@ fun HomeScreen(
                 isShareSelectionMode = isShareSelectionMode,
                 shareSelectedCount = activeShareSelectedCount,
                 allSelectedForShare = pendingCount > 0 && activeShareSelectedCount == pendingCount,
-                onOpenSettings = {
-                    activeSwipedItemId = null
-                    onOpenSettings()
-                },
-                onEnterShareMode = {
-                    activeSwipedItemId = null
-                    onEnterShareMode()
-                },
-                onExitShareMode = {
-                    activeSwipedItemId = null
-                    onExitShareMode()
-                },
-                onToggleSelectAllForShare = {
-                    activeSwipedItemId = null
-                    onToggleSelectAllForShare()
-                },
-                onToggleSelectAllForPickup = {
-                    activeSwipedItemId = null
-                    onToggleSelectAllForPickup()
-                },
-                onClearPickupSelection = {
-                    activeSwipedItemId = null
-                    onClearPickupSelection()
-                },
+                onOpenSettings = onOpenSettings,
+                onEnterShareMode = onEnterShareMode,
+                onExitShareMode = onExitShareMode,
+                onToggleSelectAllForShare = onToggleSelectAllForShare,
+                onToggleSelectAllForPickup = onToggleSelectAllForPickup,
+                onClearPickupSelection = onClearPickupSelection,
                 onRequestSmsPermission = onRequestSmsPermission,
                 isDark = isDark
             )
@@ -267,20 +239,11 @@ fun HomeScreen(
                     items = section.items,
                     selectedItemIds = if (isShareSelectionMode) shareSelectedIds else selectedItemIds,
                     isShareSelectionMode = isShareSelectionMode,
-                    activeSwipedItemId = activeSwipedItemId,
-                    onSwipeOpenChange = { id, open ->
-                        activeSwipedItemId = if (open) id else if (activeSwipedItemId == id) null else activeSwipedItemId
-                    },
                     onToggleSelectItem = if (isShareSelectionMode) onToggleShareItem else onToggleSelectItem,
-                    onQuickMarkPickedUp = onQuickMarkPickedUp,
-                    onQuickDeleteItem = onQuickDeleteItem,
                     onLongPressItem = onLongPressItem,
                     onClickMoreActions = onClickMoreActions,
                     onClickProductRemark = onClickProductRemark,
-                    onQuickAddToStation = {
-                        activeSwipedItemId = null
-                        onQuickAddToStation(section.stationNumber)
-                    },
+                    onQuickAddToStation = { onQuickAddToStation(section.stationNumber) },
                     modifier = Modifier.animateItem(
                         placementSpec = spring(
                             dampingRatio = 0.86f,

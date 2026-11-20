@@ -156,7 +156,7 @@ class PickupViewModel(
     }
 
     /**
-     * 左滑或长按单条取件码直接标记为已取（同样支持 3 秒底部撤销）
+     * 长按单条取件码直接标记为已取（同样支持 3 秒底部撤销）
      */
     fun markSingleItemPickedUp(item: PickupItemEntity) {
         _selectedItemIds.value = _selectedItemIds.value - item.id

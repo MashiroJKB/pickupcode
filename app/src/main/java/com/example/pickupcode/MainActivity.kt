@@ -439,8 +439,6 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                             showAddOrPasteDialog = true
                         },
                         onToggleSelectItem = viewModel::toggleSelectItem,
-                        onQuickMarkPickedUp = viewModel::markSingleItemPickedUp,
-                        onQuickDeleteItem = viewModel::deleteItem,
                         onLongPressItem = { activeLongPressItem = it },
                         onClickMoreActions = { activeDetailItem = it },
                         onClickProductRemark = { activeEditProductItem = it },
@@ -493,7 +491,6 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         },
                         onRequestSmsPermission = requestSmsPermissions,
                         onRequestNotificationPermission = requestNotificationPermission,
-                        onOpenBadgeSettings = { AppBadgeManager.openNotificationAndBadgeSettings(context) },
                         onToggleTaobaoBanner = viewModel::setShowTaobaoIdentityBanner,
                         onToggleCainiaoBanner = viewModel::setShowCainiaoIdentityBanner,
                         onTogglePinduoduoBanner = viewModel::setShowPinduoduoIdentityBanner,
@@ -508,6 +505,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         onImportStationRules = viewModel::importStationRulesFromText,
                         onRestorePickedUpItem = viewModel::restorePickedUpItem,
                         onDeletePickedUpItem = viewModel::deleteItem,
+                        onFeedbackMessage = viewModel::showCapsuleToast,
                         listState = settingsListState
                     )
                 }
