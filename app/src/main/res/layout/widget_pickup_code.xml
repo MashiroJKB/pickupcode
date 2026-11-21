@@ -7,10 +7,11 @@
     android:orientation="vertical"
     android:padding="12dp">
 
-    <!-- 顶部栏：固定 36dp 高度，确保改变小组件高度时标题与图标尺寸、位置纹丝不动 -->
+    <!-- 顶部栏：固定 42dp 高度，确保标题与大尺寸防误触图标光学居中且不挤压列表 -->
     <LinearLayout
+        android:id="@+id/widget_header_bar"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
+        android:layout_height="42dp"
         android:layout_marginBottom="8dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
@@ -31,7 +32,7 @@
                 android:maxLines="1"
                 android:text="取件码"
                 android:textColor="@color/widget_text_primary"
-                android:textSize="16dp"
+                android:textSize="17dp"
                 android:textStyle="bold" />
 
             <TextView
@@ -50,44 +51,44 @@
 
         <ImageView
             android:id="@+id/widget_btn_cainiao_app"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginStart="5dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="12dp"
             android:contentDescription="菜鸟APP"
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
         <ImageView
             android:id="@+id/widget_btn_cainiao"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginStart="5dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="12dp"
             android:contentDescription="菜鸟身份码"
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
         <ImageView
             android:id="@+id/widget_btn_taobao"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginStart="5dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="12dp"
             android:contentDescription="淘宝身份码"
             android:scaleType="fitCenter" />
 
         <ImageView
             android:id="@+id/widget_btn_pdd"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginStart="5dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="12dp"
             android:contentDescription="拼多多取件码"
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
         <ImageView
             android:id="@+id/widget_btn_jd"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginStart="5dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="12dp"
             android:contentDescription="京东身份码"
             android:scaleType="fitCenter"
             android:visibility="gone" />

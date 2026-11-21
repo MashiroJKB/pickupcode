@@ -2,6 +2,7 @@ package com.example.pickupcode
 
 import com.example.pickupcode.ui.components.IdentityCodeType
 import com.example.pickupcode.ui.components.TaobaoDeepLinkLauncher
+import com.example.pickupcode.widget.PickupWidgetProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,5 +37,14 @@ class IdentityCodeConfigTest {
             TaobaoDeepLinkLauncher.JD_IDENTITY_DEEPLINK
         )
         assertTrue(TaobaoDeepLinkLauncher.JD_IDENTITY_DEEPLINK.startsWith("openapp.jdmobile://virtual?"))
+    }
+
+    @Test
+    fun `adapts desktop widget shortcut icon sizes and spacing by enabled count`() {
+        assertEquals(Triple(36f, 12f, 8f), PickupWidgetProvider.resolveWidgetShortcutLayout(1))
+        assertEquals(Triple(36f, 12f, 8f), PickupWidgetProvider.resolveWidgetShortcutLayout(2))
+        assertEquals(Triple(36f, 12f, 8f), PickupWidgetProvider.resolveWidgetShortcutLayout(3))
+        assertEquals(Triple(32f, 9f, 8f), PickupWidgetProvider.resolveWidgetShortcutLayout(4))
+        assertEquals(Triple(28f, 6f, 6f), PickupWidgetProvider.resolveWidgetShortcutLayout(5))
     }
 }

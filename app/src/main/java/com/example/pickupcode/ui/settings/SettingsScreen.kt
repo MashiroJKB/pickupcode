@@ -187,9 +187,9 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.5.7" }
+            info.versionName.orEmpty().ifBlank { "2.5.8" }
         } catch (_: Exception) {
-            "2.5.7"
+            "2.5.8"
         }
     }
 
@@ -408,7 +408,7 @@ fun SettingsScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(AppleCorners.Pill))
+                                .clip(AppleCorners.PillShape)
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
                                 .clickable { showAddStationDialog = true }
                                 .padding(horizontal = 11.dp, vertical = 6.dp)
@@ -434,7 +434,7 @@ fun SettingsScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(AppleCorners.Pill))
+                                .clip(AppleCorners.PillShape)
                                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
                                 .clickable(onClick = onResetStationRules)
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
@@ -985,7 +985,7 @@ private fun SettingsLinkCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(AppleCorners.Pill))
+                        .clip(AppleCorners.PillShape)
                         .background(badgeAccent.copy(alpha = 0.14f))
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
@@ -1055,7 +1055,7 @@ private fun UpdateChannelRow(
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(AppleCorners.Pill))
+                        .clip(AppleCorners.PillShape)
                         .background(accentColor.copy(alpha = 0.14f))
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
@@ -1138,9 +1138,9 @@ private fun PermissionStatusCard(
 
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(AppleCorners.Pill))
+                .clip(AppleCorners.PillShape)
                 .background(accentColor.copy(alpha = 0.16f))
-                .border(0.8.dp, accentColor.copy(alpha = 0.4f), RoundedCornerShape(AppleCorners.Pill))
+                .border(0.8.dp, accentColor.copy(alpha = 0.4f), AppleCorners.PillShape)
                 .clickable(onClick = onClick)
                 .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
@@ -1324,7 +1324,7 @@ private fun EditStationRuleDialog(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(AppleCorners.Pill))
+                                    .clip(AppleCorners.PillShape)
                                     .background(accent.copy(alpha = if (isDark) 0.20f else 0.12f))
                                     .padding(start = 11.dp, end = 7.dp, top = 5.dp, bottom = 5.dp)
                             ) {
@@ -1724,7 +1724,7 @@ private fun PickedUpHistoryDialog(
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(AppleCorners.Pill))
+                                            .clip(AppleCorners.PillShape)
                                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
                                             .clickable {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)

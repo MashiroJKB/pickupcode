@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
@@ -341,16 +340,16 @@ private fun CenterActionPill(
             .height(48.dp)
             .shadow(
                 elevation = 12.dp,
-                shape = RoundedCornerShape(AppleCorners.Pill),
+                shape = AppleCorners.PillShape,
                 ambientColor = accentColor.copy(alpha = 0.35f),
                 spotColor = accentColor.copy(alpha = 0.35f)
             )
-            .clip(RoundedCornerShape(AppleCorners.Pill))
+            .clip(AppleCorners.PillShape)
             .background(accentColor)
             .border(
                 width = 1.dp,
                 color = Color.White.copy(alpha = 0.35f),
-                shape = RoundedCornerShape(AppleCorners.Pill)
+                shape = AppleCorners.PillShape
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp)

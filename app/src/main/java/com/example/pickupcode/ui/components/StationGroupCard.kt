@@ -196,7 +196,7 @@ fun StationGroupCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(AppleCorners.Pill))
+                        .clip(AppleCorners.PillShape)
                         .background(accentColor)
                         .padding(horizontal = 11.dp, vertical = 4.dp)
                 ) {

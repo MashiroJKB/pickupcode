@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material3.Icon
@@ -410,7 +409,7 @@ fun IdentityCodeBanner(
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(AppleCorners.Pill))
+                                .clip(AppleCorners.PillShape)
                                 .background(type.primaryColor.copy(alpha = 0.16f))
                                 .padding(horizontal = 7.dp, vertical = 2.dp)
                         ) {

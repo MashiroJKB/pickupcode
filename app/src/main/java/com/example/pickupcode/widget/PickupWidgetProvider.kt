@@ -212,11 +212,11 @@ class PickupWidgetProvider : AppWidgetProvider() {
                 } else {
                     val appContext = context.applicationContext
                     WidgetBrandIconCache(
-                        cainiaoApp = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.CAINIAO_APP, 112),
-                        cainiao = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.CAINIAO, 112),
-                        taobao = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.TAOBAO, 112),
-                        pinduoduo = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.PINDUODUO, 112),
-                        jd = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.JD, 112)
+                        cainiaoApp = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.CAINIAO_APP, 144),
+                        cainiao = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.CAINIAO, 144),
+                        taobao = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.TAOBAO, 144),
+                        pinduoduo = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.PINDUODUO, 144),
+                        jd = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.JD, 144)
                     ).also { cachedIcons = it }
                 }
             }
@@ -254,7 +254,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
             val rows = snapshot.rows
             val views = RemoteViews(context.packageName, R.layout.widget_pickup_code)
 
-            views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_DIP, 16f)
+            views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_DIP, 17f)
             views.setTextViewText(R.id.widget_pending_count, "待取 $pendingCount 件")
             views.setTextViewTextSize(R.id.widget_pending_count, TypedValue.COMPLEX_UNIT_DIP, 12f)
             views.setTextViewTextSize(R.id.widget_empty_view, TypedValue.COMPLEX_UNIT_DIP, 13f)
@@ -270,13 +270,44 @@ class PickupWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_header_title_area, openAppPendingIntent)
             views.setOnClickPendingIntent(R.id.widget_empty_view, openAppPendingIntent)
 
+            // 按当前已开启数量自适应图标尺寸与间距：1~3 枚放大至 36dp + 12dp 宽间距防误触；4 枚 32dp + 9dp；5 枚 28dp + 6dp
+            val enabledShortcutCount =
+                (if (snapshot.showCainiaoApp) 1 else 0) +
+                    (if (snapshot.showCainiao) 1 else 0) +
+                    (if (snapshot.showTaobao) 1 else 0) +
+                    (if (snapshot.showPinduoduo) 1 else 0) +
+                    (if (snapshot.showJd) 1 else 0)
+            val (iconSizeDp, iconGapDp, firstGapDp) = resolveWidgetShortcutLayout(enabledShortcutCount)
+            var isFirstVisibleShortcut = true
+
+            fun bindVisibleShortcut(
+                viewId: Int,
+                bitmap: Bitmap,
+                pendingIntent: PendingIntent
+            ) {
+                views.setViewVisibility(viewId, View.VISIBLE)
+                views.setImageViewBitmap(viewId, bitmap)
+                views.setOnClickPendingIntent(viewId, pendingIntent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    views.setViewLayoutWidth(viewId, iconSizeDp, TypedValue.COMPLEX_UNIT_DIP)
+                    views.setViewLayoutHeight(viewId, iconSizeDp, TypedValue.COMPLEX_UNIT_DIP)
+                    val marginStart = if (isFirstVisibleShortcut) firstGapDp else iconGapDp
+                    views.setViewLayoutMargin(
+                        viewId,
+                        RemoteViews.MARGIN_START,
+                        marginStart,
+                        TypedValue.COMPLEX_UNIT_DIP
+                    )
+                }
+                isFirstVisibleShortcut = false
+            }
+
             // 顶部原生 Apple 连续圆角应用图标（严格按设置页「身份码跳转链路」开关与顺序动态显隐）
             if (snapshot.showCainiaoApp) {
-                views.setViewVisibility(R.id.widget_btn_cainiao_app, View.VISIBLE)
-                views.setImageViewBitmap(R.id.widget_btn_cainiao_app, brandIcons.cainiaoApp)
-                views.setOnClickPendingIntent(
-                    R.id.widget_btn_cainiao_app,
-                    createDirectPackageLaunchOrFallbackPendingIntent(
+                bindVisibleShortcut(
+                    viewId = R.id.widget_btn_cainiao_app,
+                    bitmap = brandIcons.cainiaoApp,
+                    pendingIntent = createDirectPackageLaunchOrFallbackPendingIntent(
                         context = context,
                         targetPackage = TaobaoDeepLinkLauncher.CAINIAO_APP_PACKAGE,
                         fallbackBroadcastAction = ACTION_LAUNCH_CAINIAO_APP,
@@ -288,11 +319,10 @@ class PickupWidgetProvider : AppWidgetProvider() {
             }
 
             if (snapshot.showCainiao) {
-                views.setViewVisibility(R.id.widget_btn_cainiao, View.VISIBLE)
-                views.setImageViewBitmap(R.id.widget_btn_cainiao, brandIcons.cainiao)
-                views.setOnClickPendingIntent(
-                    R.id.widget_btn_cainiao,
-                    createDirectLaunchOrFallbackPendingIntent(
+                bindVisibleShortcut(
+                    viewId = R.id.widget_btn_cainiao,
+                    bitmap = brandIcons.cainiao,
+                    pendingIntent = createDirectLaunchOrFallbackPendingIntent(
                         context = context,
                         primaryUri = TaobaoDeepLinkLauncher.CAINIAO_IDENTITY_DEEPLINK,
                         fallbackUri = TaobaoDeepLinkLauncher.TAOBAO_IDENTITY_DEEPLINK,
@@ -307,11 +337,10 @@ class PickupWidgetProvider : AppWidgetProvider() {
             }
 
             if (snapshot.showTaobao) {
-                views.setViewVisibility(R.id.widget_btn_taobao, View.VISIBLE)
-                views.setImageViewBitmap(R.id.widget_btn_taobao, brandIcons.taobao)
-                views.setOnClickPendingIntent(
-                    R.id.widget_btn_taobao,
-                    createDirectLaunchOrFallbackPendingIntent(
+                bindVisibleShortcut(
+                    viewId = R.id.widget_btn_taobao,
+                    bitmap = brandIcons.taobao,
+                    pendingIntent = createDirectLaunchOrFallbackPendingIntent(
                         context = context,
                         primaryUri = TaobaoDeepLinkLauncher.TAOBAO_IDENTITY_DEEPLINK,
                         fallbackUri = TaobaoDeepLinkLauncher.CAINIAO_IDENTITY_DEEPLINK,
@@ -326,11 +355,10 @@ class PickupWidgetProvider : AppWidgetProvider() {
             }
 
             if (snapshot.showPinduoduo) {
-                views.setViewVisibility(R.id.widget_btn_pdd, View.VISIBLE)
-                views.setImageViewBitmap(R.id.widget_btn_pdd, brandIcons.pinduoduo)
-                views.setOnClickPendingIntent(
-                    R.id.widget_btn_pdd,
-                    createDirectLaunchOrFallbackPendingIntent(
+                bindVisibleShortcut(
+                    viewId = R.id.widget_btn_pdd,
+                    bitmap = brandIcons.pinduoduo,
+                    pendingIntent = createDirectLaunchOrFallbackPendingIntent(
                         context = context,
                         primaryUri = TaobaoDeepLinkLauncher.PINDUODUO_IDENTITY_DEEPLINK,
                         fallbackUri = null,
@@ -345,11 +373,10 @@ class PickupWidgetProvider : AppWidgetProvider() {
             }
 
             if (snapshot.showJd) {
-                views.setViewVisibility(R.id.widget_btn_jd, View.VISIBLE)
-                views.setImageViewBitmap(R.id.widget_btn_jd, brandIcons.jd)
-                views.setOnClickPendingIntent(
-                    R.id.widget_btn_jd,
-                    createDirectLaunchOrFallbackPendingIntent(
+                bindVisibleShortcut(
+                    viewId = R.id.widget_btn_jd,
+                    bitmap = brandIcons.jd,
+                    pendingIntent = createDirectLaunchOrFallbackPendingIntent(
                         context = context,
                         primaryUri = TaobaoDeepLinkLauncher.JD_IDENTITY_DEEPLINK,
                         fallbackUri = null,
@@ -404,6 +431,16 @@ class PickupWidgetProvider : AppWidgetProvider() {
 
             return views
         }
+
+        /**
+         * 按桌面小组件当前启用的身份码入口数量返回自适应 (图标尺寸dp, 图标间距dp, 首图标左间距dp)
+         */
+        internal fun resolveWidgetShortcutLayout(enabledCount: Int): Triple<Float, Float, Float> =
+            when {
+                enabledCount >= 5 -> Triple(28f, 6f, 6f)
+                enabledCount == 4 -> Triple(32f, 9f, 8f)
+                else -> Triple(36f, 12f, 8f)
+            }
 
         private fun createDirectPackageLaunchOrFallbackPendingIntent(
             context: Context,

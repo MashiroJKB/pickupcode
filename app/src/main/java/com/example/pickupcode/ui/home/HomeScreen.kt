@@ -38,7 +38,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DoneAll
@@ -343,7 +342,7 @@ private fun HomeTopHeader(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .height(36.dp)
-                            .clip(RoundedCornerShape(AppleCorners.Pill))
+                            .clip(AppleCorners.PillShape)
                             .background(
                                 if (displayedAllSelected) primaryColor
                                 else primaryColor.copy(alpha = 0.14f)
@@ -390,7 +389,7 @@ private fun HomeTopHeader(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(AppleCorners.Pill))
+                                    .clip(AppleCorners.PillShape)
                                     .background(statusAmber.copy(alpha = 0.15f))
                                     .clickable(onClick = onRequestSmsPermission)
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -441,7 +440,7 @@ private fun HomeTopHeader(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .height(36.dp)
-                                .clip(RoundedCornerShape(AppleCorners.Pill))
+                                .clip(AppleCorners.PillShape)
                                 .background(primaryColor.copy(alpha = 0.14f))
                                 .clickable {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -519,7 +518,7 @@ private fun HomeTopHeader(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .height(36.dp)
-                                .clip(RoundedCornerShape(AppleCorners.Pill))
+                                .clip(AppleCorners.PillShape)
                                 .background(
                                     MaterialTheme.colorScheme.onSurface.copy(
                                         alpha = if (isDark) 0.14f else 0.08f

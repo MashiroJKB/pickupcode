@@ -538,7 +538,7 @@ fun AddOrPastePickupDialog(
                     Box(
                         modifier = Modifier
                             .weight(1f, fill = false)
-                            .clip(RoundedCornerShape(AppleCorners.Pill))
+                            .clip(AppleCorners.PillShape)
                             .background(targetStationAccent.copy(alpha = 0.14f))
                             .padding(horizontal = 9.dp, vertical = 3.dp)
                     ) {
@@ -1005,7 +1005,7 @@ fun SmsOnboardingPermissionDialog(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(AppleCorners.Pill))
+                                        .clip(AppleCorners.PillShape)
                                         .background(primaryColor.copy(alpha = 0.12f))
                                         .padding(horizontal = 9.dp, vertical = 3.dp)
                                 ) {
@@ -1385,7 +1385,7 @@ private fun OnboardingStepIndicatorRow(
                 .weight(1f)
                 .padding(horizontal = 10.dp)
                 .height(1.5.dp)
-                .clip(RoundedCornerShape(AppleCorners.Pill))
+                .clip(AppleCorners.PillShape)
                 .background(connectorColor)
         )
 
