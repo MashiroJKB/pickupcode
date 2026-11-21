@@ -8,31 +8,163 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 
 /**
- * Apple Concentric & Continuous Corners 圆角规范
+ * Apple 连续圆角（iOS CALayerCornerCurve.continuous / G2 曲率平滑超椭圆）通用形状：
+ * - 当圆角半径 r <= min(w, h) / 2 / 1.52866 时，严格采用 iOS 原生三段三次贝塞尔连续曲线；
+ * - 当圆角趋近短边一半时平滑过渡至标准半圆胶囊（零自交、零折角），兼顾卡片、按钮与胶囊。
+ */
+@Immutable
+class AppleContinuousCornerShape(
+    val cornerRadius: Dp
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val w = size.width
+        val h = size.height
+        if (w <= 0f || h <= 0f) {
+            return Outline.Rectangle(androidx.compose.ui.geometry.Rect(0f, 0f, w, h))
+        }
+        val halfMin = minOf(w, h) * 0.5f
+        val rPx = with(density) { cornerRadius.toPx() }.coerceAtLeast(0f)
+        if (rPx <= 0.01f) {
+            return Outline.Rectangle(androidx.compose.ui.geometry.Rect(0f, 0f, w, h))
+        }
+        if (rPx >= halfMin * 0.99f) {
+            return Outline.Rounded(
+                RoundRect(
+                    left = 0f,
+                    top = 0f,
+                    right = w,
+                    bottom = h,
+                    cornerRadius = CornerRadius(halfMin, halfMin)
+                )
+            )
+        }
+        val path = Path().apply {
+            addAppleContinuousRectPath(w = w, h = h, cornerRadiusPx = rPx)
+        }
+        return Outline.Generic(path)
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        return other is AppleContinuousCornerShape && cornerRadius == other.cornerRadius
+    }
+
+    override fun hashCode(): Int = cornerRadius.hashCode()
+}
+
+/**
+ * 在 Compose [Path] 上绘制严格对齐 iOS 原生连续曲率（CALayerCornerCurve.continuous）的圆角矩形路径
+ */
+fun Path.addAppleContinuousRectPath(w: Float, h: Float, cornerRadiusPx: Float) {
+    val halfMin = minOf(w, h) * 0.5f
+    val r = cornerRadiusPx.coerceIn(0f, halfMin)
+    if (r <= 0.01f) {
+        addRect(androidx.compose.ui.geometry.Rect(0f, 0f, w, h))
+        return
+    }
+
+    // Apple 原生连续圆角延伸系数 p = 1.52866483 * r；当延伸超过短边一半时平滑向标准圆弧收敛
+    val maxContinuousR = halfMin / 1.52866483f
+    val smooth = if (r <= maxContinuousR) {
+        1f
+    } else {
+        ((halfMin - r) / (halfMin - maxContinuousR)).coerceIn(0f, 1f)
+    }
+
+    fun lerp(a0: Float, a1: Float): Float = a0 + (a1 - a0) * smooth
+
+    val p = (lerp(1.00000000f, 1.52866483f) * r).coerceAtMost(halfMin)
+    val a = lerp(1.00000000f, 1.08849323f) * r
+    val b = lerp(1.00000000f, 0.86840689f) * r
+    val c = lerp(1.00000000f, 0.63149399f) * r
+    val d = lerp(0.00000000f, 0.07491176f) * r
+    val e = lerp(0.44771525f, 0.37282392f) * r
+    val f = lerp(0.00000000f, 0.16906013f) * r
+
+    moveTo(p, 0f)
+    lineTo(w - p, 0f)
+
+    // 右上角（3 段 G2 连续曲线）
+    cubicTo(w - a, 0f, w - b, 0f, w - c, d)
+    cubicTo(w - e, f, w - f, e, w - d, c)
+    cubicTo(w, b, w, a, w, p)
+
+    lineTo(w, h - p)
+
+    // 右下角
+    cubicTo(w, h - a, w, h - b, w - d, h - c)
+    cubicTo(w - f, h - e, w - e, h - f, w - c, h - d)
+    cubicTo(w - b, h, w - a, h, w - p, h)
+
+    lineTo(p, h)
+
+    // 左下角
+    cubicTo(a, h, b, h, c, h - d)
+    cubicTo(e, h - f, f, h - e, d, h - c)
+    cubicTo(0f, h - b, 0f, h - a, 0f, h - p)
+
+    lineTo(0f, p)
+
+    // 左上角
+    cubicTo(0f, a, 0f, b, d, c)
+    cubicTo(f, e, e, f, c, d)
+    cubicTo(b, 0f, a, 0f, p, 0f)
+
+    close()
+}
+
+/**
+ * Apple Concentric & Continuous Corners 圆角规范（全局统一单例缓存，零重组开销）
  */
 object AppleCorners {
     val OuterCard = 24.dp
     val InnerCard = 16.dp
     val SmallElement = 12.dp
     val Pill = 999.dp
+
+    val OuterCardShape: Shape = AppleContinuousCornerShape(OuterCard)
+    val InnerCardShape: Shape = AppleContinuousCornerShape(InnerCard)
+    val SmallElementShape: Shape = AppleContinuousCornerShape(SmallElement)
+    val PillShape: Shape = RoundedCornerShape(Pill)
+
+    fun shapeFor(cornerRadius: Dp): Shape = when (cornerRadius) {
+        OuterCard -> OuterCardShape
+        InnerCard -> InnerCardShape
+        SmallElement -> SmallElementShape
+        Pill -> PillShape
+        else -> AppleContinuousCornerShape(cornerRadius)
+    }
 }
 
 /**
  * 120Hz 高帧率优化版液态玻璃（Liquid Glass）修饰符
  *
- * 采用预缓存 Shape 与 Brush，移除滚动列表中的重度离屏阴影与实时模糊开销，确保 120 帧丝滑滚动。
+ * 采用预缓存 Apple 连续圆角 Shape 与 Brush，移除滚动列表中的重度离屏阴影与实时模糊开销，确保 120 帧丝滑滚动。
  */
 @Composable
 fun Modifier.liquidGlass(
@@ -40,7 +172,7 @@ fun Modifier.liquidGlass(
     tintColor: Color = Color.Unspecified
 ): Modifier {
     val isDark = isSystemInDarkTheme()
-    val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
+    val shape = remember(cornerRadius) { AppleCorners.shapeFor(cornerRadius) }
 
     val surfaceBrush = remember(isDark, tintColor) {
         val topSurface = if (isDark) {
@@ -96,7 +228,7 @@ fun Modifier.liquidGlassInnerCard(
     accentTint: Color = Color.Unspecified
 ): Modifier {
     val isDark = isSystemInDarkTheme()
-    val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
+    val shape = remember(cornerRadius) { AppleCorners.shapeFor(cornerRadius) }
 
     val surfaceBrush = remember(isDark, accentTint) {
         val topFill = if (isDark) {

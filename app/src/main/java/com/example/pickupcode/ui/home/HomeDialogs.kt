@@ -266,7 +266,7 @@ fun RawMessageDetailDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 220.dp)
-                    .clip(RoundedCornerShape(AppleCorners.InnerCard))
+                    .clip(AppleCorners.InnerCardShape)
                     .background(
                         MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f)
                     )
@@ -305,7 +305,7 @@ fun RawMessageDetailDialog(
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                                .clip(AppleCorners.SmallElementShape)
                                 .background(
                                     if (selected) numAccent else numAccent.copy(alpha = 0.12f)
                                 )
@@ -372,7 +372,7 @@ fun RawMessageDetailDialog(
 
                     Button(
                         onClick = onDismiss,
-                        shape = RoundedCornerShape(AppleCorners.InnerCard)
+                        shape = AppleCorners.InnerCardShape
                     ) {
                         Text(
                             text = "完成",
@@ -457,7 +457,7 @@ fun EditProductRemarkDialog(
                         onConfirm(text.trim())
                         onDismiss()
                     },
-                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                    shape = AppleCorners.InnerCardShape
                 ) {
                     Text("保存", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                 }
@@ -559,7 +559,7 @@ fun AddOrPastePickupDialog(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(AppleCorners.InnerCard))
+                    .clip(AppleCorners.InnerCardShape)
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
                     .padding(4.dp)
             ) {
@@ -569,7 +569,7 @@ fun AddOrPastePickupDialog(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                            .clip(AppleCorners.SmallElementShape)
                             .background(
                                 if (selected) primaryColor else Color.Transparent
                             )
@@ -630,7 +630,7 @@ fun AddOrPastePickupDialog(
                                         Box(
                                             contentAlignment = Alignment.Center,
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                                                .clip(AppleCorners.SmallElementShape)
                                                 .background(if (selected) accent else accent.copy(alpha = 0.14f))
                                                 .clickable { manualStation = 0 }
                                                 .padding(horizontal = 10.dp, vertical = 7.dp)
@@ -657,7 +657,7 @@ fun AddOrPastePickupDialog(
                                     Box(
                                         contentAlignment = Alignment.Center,
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                                            .clip(AppleCorners.SmallElementShape)
                                             .background(if (selected) accent else accent.copy(alpha = 0.14f))
                                             .clickable { manualStation = num }
                                             .padding(horizontal = 10.dp, vertical = 7.dp)
@@ -702,7 +702,7 @@ fun AddOrPastePickupDialog(
                                 onManualAdd(manualCode, manualStation, manualProduct)
                                 onDismiss()
                             },
-                            shape = RoundedCornerShape(AppleCorners.InnerCard)
+                            shape = AppleCorners.InnerCardShape
                         ) {
                             Text("保存取件码", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
@@ -750,7 +750,7 @@ fun AddOrPastePickupDialog(
                                 onPasteParse(rawSmsInput, initialStationNumber)
                                 onDismiss()
                             },
-                            shape = RoundedCornerShape(AppleCorners.InnerCard)
+                            shape = AppleCorners.InnerCardShape
                         ) {
                             Text("智能解析入库", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
@@ -811,7 +811,7 @@ fun LongPressQuickActionDialog(
                         onDismiss()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = checkGreen),
-                    shape = RoundedCornerShape(AppleCorners.InnerCard),
+                    shape = AppleCorners.InnerCardShape,
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
@@ -838,7 +838,7 @@ fun LongPressQuickActionDialog(
                         onDismiss()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = deleteRed),
-                    shape = RoundedCornerShape(AppleCorners.InnerCard),
+                    shape = AppleCorners.InnerCardShape,
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
@@ -1069,12 +1069,12 @@ fun SmsOnboardingPermissionDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(top = 10.dp)
-                                        .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                                        .clip(AppleCorners.SmallElementShape)
                                         .background(statusAmber.copy(alpha = 0.12f))
                                         .border(
                                             width = 0.8.dp,
                                             color = statusAmber.copy(alpha = 0.30f),
-                                            shape = RoundedCornerShape(AppleCorners.SmallElement)
+                                            shape = AppleCorners.SmallElementShape
                                         )
                                         .padding(horizontal = 12.dp, vertical = 9.dp)
                                 ) {
@@ -1127,7 +1127,7 @@ fun SmsOnboardingPermissionDialog(
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         onOpenAppInfo()
                                     },
-                                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                                    shape = AppleCorners.InnerCardShape
                                 ) {
                                     Text(
                                         text = if (returnedWithoutLift) "再次前往" else "前往应用信息",
@@ -1239,12 +1239,12 @@ fun SmsOnboardingPermissionDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(top = 10.dp)
-                                        .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                                        .clip(AppleCorners.SmallElementShape)
                                         .background(statusAmber.copy(alpha = 0.12f))
                                         .border(
                                             width = 0.8.dp,
                                             color = statusAmber.copy(alpha = 0.30f),
-                                            shape = RoundedCornerShape(AppleCorners.SmallElement)
+                                            shape = AppleCorners.SmallElementShape
                                         )
                                         .padding(horizontal = 12.dp, vertical = 9.dp)
                                 ) {
@@ -1280,7 +1280,7 @@ fun SmsOnboardingPermissionDialog(
                                             onRequestSmsPermission()
                                         }
                                     },
-                                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                                    shape = AppleCorners.InnerCardShape
                                 ) {
                                     Text(
                                         text = if (isSmsPermanentlyDenied) "前往应用信息" else "授予短信权限",
@@ -1477,7 +1477,7 @@ private fun OnboardingFeatureRow(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(34.dp)
-                .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                .clip(AppleCorners.SmallElementShape)
                 .background(accentColor.copy(alpha = 0.15f))
         ) {
             Icon(
@@ -1691,7 +1691,7 @@ private fun ShareOptionCard(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(38.dp)
-                .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                .clip(AppleCorners.SmallElementShape)
                 .background(accent.copy(alpha = 0.16f))
         ) {
             Icon(
@@ -1776,7 +1776,7 @@ fun StationCountSetupDialog(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                            .clip(AppleCorners.SmallElementShape)
                             .background(
                                 if (selected) primaryColor else primaryColor.copy(alpha = 0.12f)
                             )
@@ -1826,7 +1826,7 @@ fun StationCountSetupDialog(
                     onClick = {
                         parsedCount?.let { onConfirmCount(it) }
                     },
-                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                    shape = AppleCorners.InnerCardShape
                 ) {
                     Text("确认配置", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                 }

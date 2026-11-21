@@ -90,9 +90,10 @@ fun HomeScreen(
     selectedItemIds: Set<Long>,
     isShareSelectionMode: Boolean,
     shareSelectedIds: Set<Long>,
-    showTaobaoIdentityBanner: Boolean,
     showCainiaoIdentityBanner: Boolean,
+    showTaobaoIdentityBanner: Boolean,
     showPinduoduoIdentityBanner: Boolean,
+    showJdIdentityBanner: Boolean,
     hasSmsPermission: Boolean,
     onOpenSettings: () -> Unit,
     onEnterShareMode: () -> Unit,
@@ -124,14 +125,16 @@ fun HomeScreen(
     }
 
     val enabledIdentityTypes = remember(
-        showTaobaoIdentityBanner,
         showCainiaoIdentityBanner,
-        showPinduoduoIdentityBanner
+        showTaobaoIdentityBanner,
+        showPinduoduoIdentityBanner,
+        showJdIdentityBanner
     ) {
         buildList {
-            if (showTaobaoIdentityBanner) add(IdentityCodeType.TAOBAO)
             if (showCainiaoIdentityBanner) add(IdentityCodeType.CAINIAO)
+            if (showTaobaoIdentityBanner) add(IdentityCodeType.TAOBAO)
             if (showPinduoduoIdentityBanner) add(IdentityCodeType.PINDUODUO)
+            if (showJdIdentityBanner) add(IdentityCodeType.JD)
         }
     }
 
@@ -656,7 +659,7 @@ private fun EmptyPickupStateCard(
 
         Button(
             onClick = if (hasSmsPermission) onQuickAddClick else onRequestSmsPermission,
-            shape = RoundedCornerShape(AppleCorners.InnerCard)
+            shape = AppleCorners.InnerCardShape
         ) {
             Icon(
                 imageVector = if (hasSmsPermission) Icons.Rounded.Add else Icons.Rounded.Security,

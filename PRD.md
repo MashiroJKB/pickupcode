@@ -1,13 +1,13 @@
 # 「取件码」（`PickupCode`）Android 原生应用完整产品与技术规范文档（PRD）
 
-> **目标版本**：`2.5.4`（`versionCode = 30`）  
+> **目标版本**：`2.5.5`（`versionCode = 31`）  
 > **文档定位**：本文档为面向 AI 编码引擎与原生 Android 工程师的**1:1 复现级完整工程规格说明书**，完整沉淀了产品定位、视觉规范、交互细节、动画参数、解析引擎、桌面生态及全部已知避坑约束，阅读本文档即可从零完整重构出一模一样的应用程序。
 
 ---
 
 ## 1. 产品定位与核心原则
 
-**「取件码」** 是一款极简、高颜值的 Android 本地取件码管理工具。纯本地离线运行，每次打开自动扫描最近 7 天短信，智能拆分并过滤干扰短信，按快递房顺序与货架号自然排序整理，同时提供淘宝/菜鸟/拼多多身份码快捷直达、批量勾选核销、图片分享清单与 4×4 桌面液态玻璃小组件。
+**「取件码」** 是一款极简、高颜值的 Android 本地取件码管理工具。纯本地离线运行，每次打开自动扫描最近 7 天短信，智能拆分并过滤干扰短信，按快递房顺序与货架号自然排序整理，同时提供菜鸟/淘宝/拼多多/京东身份码快捷直达、批量勾选核销、图片分享清单与 4×4 桌面液态玻璃小组件。
 
 ### 1.1 绝对隐私与离线约束
 1. **严格零联网权限**：`AndroidManifest.xml` 中**绝不声明** `INTERNET`、`ACCESS_NETWORK_STATE` 或任何网络通信权限；不声明 `POST_NOTIFICATIONS` 或任何桌面图标角标权限；同样不声明任何相册/外部存储读写权限（仅使用 `FileProvider` 在分享图片时授权单次临时只读 URI，保存支持海报使用 Android 10+ `MediaStore` 分区存储）。
@@ -15,7 +15,7 @@
    - `android.permission.READ_SMS`
    - `android.permission.RECEIVE_SMS`
    - 声明 `<uses-feature android:name="android.hardware.telephony" android:required="false" />`。
-   - 声明 `<queries>` 包可见性：`com.taobao.taobao`、`com.xunmeng.pinduoduo`。
+   - 声明 `<queries>` 包可见性：`com.taobao.taobao`、`com.xunmeng.pinduoduo`、`com.jingdong.app.mall`（及 `openapp.jdmobile` scheme intent）。
 3. **禁止展示或识别快递品牌/代收点别名**：不识别、不存储、不显示任何快递品牌（如“中通快递”、“京东快递”）或代收点名称；数据库预留字段 `expressCompany` 始终置空 `""`。
 
 ### 1.2 明确排除项（禁止擅自添加）
@@ -32,7 +32,7 @@
 
 ### 2.1 SDK 与核心依赖版本
 - **包名（`applicationId` / `namespace`）**：`com.example.pickupcode`
-- **版本配置**：`versionCode = 30`，`versionName = "2.5.4"`
+- **版本配置**：`versionCode = 31`，`versionName = "2.5.5"`
 - **SDK 配置**：`minSdk = 29`（Android 10）、`targetSdk = 35`、`compileSdk = 37`、`buildToolsVersion = "36.0.0"`、`JavaVersion.VERSION_17`
 - **Gradle 与插件版本**（`gradle/libs.versions.toml`）：
   - AGP：`9.5.1`（`com.android.application`）
@@ -63,9 +63,10 @@ app/src/main/
 │   │   ├── widget_glass_bg.xml         # 小组件外框 24dp 液态玻璃渐变背景
 │   │   └── widget_row_bg.xml           # 小组件内行 14dp 卡片背景
 │   ├── drawable-nodpi/
-│   │   ├── ic_brand_cainiao.png        # 菜鸟应用图标（原生大图）
-│   │   ├── ic_brand_pinduoduo.png      # 拼多多应用图标（原生大图）
-│   │   ├── ic_brand_taobao.webp        # 淘宝应用图标（原生大图）
+│   │   ├── ic_brand_cainiao.png        # 菜鸟应用图标（480×480 原生全出血方图）
+│   │   ├── ic_brand_taobao.png         # 淘宝应用图标（480×480 原生全出血方图）
+│   │   ├── ic_brand_pinduoduo.png      # 拼多多应用图标（原生全出血方图）
+│   │   ├── ic_brand_jd.png             # 京东应用图标（480×480 全出血方图）
 │   │   └── img_support_alipay.jpg      # 设置页「支持」支付宝扫码领红包海报
 │   ├── layout/
 │   │   ├── widget_pickup_code.xml      # 桌面小组件整体布局
@@ -155,12 +156,10 @@ app/src/main/
   - `InnerCard = 16.dp`（取件码内卡片、输入框、普通按钮、紧凑格内嵌卡）
   - `SmallElement = 12.dp`（标签、Tab 选中滑块、小元素）
   - `Pill = 999.dp`（悬浮胶囊按钮、计数角标、状态标签）
-- **应用图标苹果连续圆角（`AppleIconSquircleShape`）**：
-  - **严禁**在淘宝/菜鸟/拼多多应用图标外围叠加任何额外白框、圆环、投影底衬或背景边框，直接保持原生正方形图标并按 **iOS Squircle 连续圆角曲率**裁剪（`ContentScale.Crop`）：
-    - `r = min(w, h) * 0.2237f`
-    - `c = r * 1.28f`（直线切点）
-    - `k = r * 0.44f`（三次贝塞尔曲线控制点，实现平滑 G2 曲率过渡）
-  - 桌面小组件同样调用 `loadAppleRoundedIconBitmapForWidget` 对 `ic_brand_taobao.webp`、`ic_brand_cainiao.png`、`ic_brand_pinduoduo.png` 按 `inSampleSize` 降采样后使用同一套 Squircle 路径裁成高清 `Bitmap`（`72px`）。
+- **应用图标与卡片的严格 Apple 连续圆角（`AppleIconSquircleShape` & `AppleContinuousCornerShape`）**：
+  - **严禁**在菜鸟/淘宝/拼多多/京东应用图标外围叠加任何额外白框、圆环、投影底衬或背景边框，直接保持原生全出血正方形图标并按 **iOS `CALayerCornerCurve.continuous` 三段三次贝塞尔连续曲率**（`r = 0.2237 * s`、`p = 1.52866483 * r`、与真机 App Store 图标误差 `< 0.001`）裁剪（`ContentScale.Crop`）。
+  - 全局卡片（`OuterCardShape`）、内嵌子卡（`InnerCardShape`）、按钮与标签（`SmallElementShape`）统一复用 `AppleContinuousCornerShape`（`OutlinedTextField` 保留 `RoundedCornerShape` 以确保 Material 3 标签缺口描边无异常）。
+  - 桌面小组件同样调用 `loadAppleRoundedIconBitmapForWidget` 对 `ic_brand_cainiao.png`、`ic_brand_taobao.png`、`ic_brand_pinduoduo.png`、`ic_brand_jd.png` 按 `inSampleSize` 降采样后使用同一套三段 Apple Squircle 路径裁成高清 `Bitmap`（`112px`）。
 
 ### 3.2.1 自适应矢量桌面图标与自定义 Canvas 矢量精确规范
 1. **自适应矢量图标（`ic_launcher.xml` & `ic_launcher_round.xml`）**：均使用 `<adaptive-icon>` 同时配置 `<background android:drawable="@color/launcher_icon_bg" />`、`<foreground android:drawable="@drawable/ic_launcher_foreground" />` 与 `<monochrome android:drawable="@drawable/ic_launcher_foreground" />`。
@@ -205,18 +204,19 @@ app/src/main/
 - `BackHandler` 优先级：处于设置页时按返回退出设置页；处于 `SHARE_SELECT` 时按返回退出分享模式；处于 `PICKUP_SELECT` 时按返回清空当前普通勾选。
 
 ### 4.2 身份码 / 取件码快捷入口（`IdentityCodeBannersSection`）
-设置页中有 3 个独立开关：淘宝身份码（默认开启）、菜鸟身份码（默认关闭）、拼多多取件码（默认关闭）。
+设置页中有 4 个独立开关，固定按 **菜鸟 → 淘宝 → 拼多多 → 京东** 顺序排列：菜鸟身份码（默认关闭）、淘宝身份码（默认开启）、拼多多取件码（默认关闭）、京东身份码（默认关闭）。
 1. **开启 0 个**：隐藏入口区块。
 2. **开启 1 个（完整单栏 Banner）**：
    - `liquidGlass(OuterCard, tintColor = brandPrimary)`，水平内边距 `18.dp`、垂直 `14.dp`，按压缩放 `0.97f`。
-   - 左侧 `AppBrandIcon(46.dp)` + 标题 + 浅底 `扫码出库` 小标签 + 副标题（如 `一键直达淘宝驿站身份码`）+ 右侧品牌渐变 `打开 >` 按钮。
-3. **开启 2 个或 3 个（紧凑并排模式 `CompactIdentityCodeBar`）**：
-   - 整个外框 `liquidGlass(OuterCard)`，左上角统一显示小标题 **`身份码/取件码`**（`16.sp` Bold）。
-   - 下方为一行等宽（`Modifier.weight(1f)`，间距 `12.dp`）的 **2～3 格 `68.dp` 液态玻璃内嵌方块**，每格内部**只居中使用对应尺寸为 `48.dp` 的原生苹果圆角 `AppBrandIcon`**，没有任何附加文字、副标题或多余边框，最大程度释放首屏垂直空间。按压缩放 `0.94f`。
+   - 左侧 `AppBrandIcon(46.dp)` + 标题 + 浅底 `扫码出库` 小标签 + 副标题（如 `一键直达京东驿站身份码`）+ 右侧品牌渐变 `打开 >` 按钮。
+3. **开启 2～4 个（无框对称图标模式 `CompactIdentityCodeBar`）**：
+   - 整个外框 `liquidGlass(OuterCard)`，左上角统一显示小标题 **`身份码/取件码`**（`titleMedium`）。
+   - 下方直接以 `Arrangement.SpaceEvenly` 等距对称排布 2～4 枚无外框的原生 Apple 连续圆角 `AppBrandIcon`（2～3 枚为 `54.dp`，4 枚自适应 `50.dp` 保持 360dp 屏幕宽敞留白），按压缩放 `0.91f`。
 4. **Exact DeepLink 跳转与容错逻辑**：
-   - 淘宝：优先 `taobao://m.taobao.com/tbopen/index.html?h5Url=https://pages-fast.m.taobao.com/wow/z/uniapp/1011717/last-mile-fe/end-collect-platform/identity-code`，失败尝试菜鸟地址，指定包名 `com.taobao.taobao`。未安装时顶部胶囊提示 `"未检测到淘宝客户端，请先安装手机淘宝后再试"`。
    - 菜鸟：优先 `tbopen://m.taobao.com/tbopen/index.html?h5Url=https://market.m.taobao.com/app/cn-yz/multi-activity/authCode.html`，失败尝试淘宝地址，指定包名 `com.taobao.taobao`。
-   - 拼多多：`pinduoduo://com.xunmeng.pinduoduo/mdkd/package`，指定包名 `com.xunmeng.pinduoduo`（异常再尝试不指定包名调起）。未安装时提示 `"未检测到拼多多客户端，请先安装拼多多后再试"`。
+   - 淘宝：优先 `taobao://m.taobao.com/tbopen/index.html?h5Url=https://pages-fast.m.taobao.com/wow/z/uniapp/1011717/last-mile-fe/end-collect-platform/identity-code`，失败尝试菜鸟地址，指定包名 `com.taobao.taobao`。未安装时提示 `"未检测到淘宝客户端，请先安装后再试"`。
+   - 拼多多：`pinduoduo://com.xunmeng.pinduoduo/mdkd/package`，指定包名 `com.xunmeng.pinduoduo`（异常再尝试不指定包名调起）。未安装时提示 `"未检测到拼多多客户端，请先安装后再试"`。
+   - 京东：`openapp.jdmobile://virtual?params=%7B%22category%22%3A%22jump%22%2C%22des%22%3A%22m%22%2C%22url%22%3A%22https%3A%2F%2Fconvenient-h5.jd.com%2FidentityCode%3Fchannel%3Dxueshengjirukou%22%7D`，指定包名 `com.jingdong.app.mall`（异常再尝试不指定包名调起）。未安装时提示 `"未检测到京东客户端，请先安装后再试"`。
 
 ### 4.3 快递房分组卡片与快捷 `+` 添加（`StationGroupCard`）
 - **列表分组排序**：所有 `stationNumber == 0` 的待分类记录作为第一组；其余快递房严格遵循用户在设置页调整后的 `stationRules` 顺序排列。空列表时展示 `EmptyPickupStateCard`（有短信权限提示点击 `+` 添加，无权限引导授权短信）。
@@ -343,5 +343,5 @@ app/src/main/
 ### 7.2 桌面液态玻璃小组件（`PickupWidgetProvider` & `PickupWidgetService`）
 - **布局与外观**：严格锁定 `4×4` 尺寸（`minWidth=296dp`、`minHeight=296dp`、`targetCellWidth=4`、`targetCellHeight=4`、`resizeMode="none"`），圆角 `24dp` 磨砂渐变外框（支持浅/深色 `values`/`values-night` 资源），使用 `@android:id/background` 适配系统桌面容器，`ListView` 包裹在 `FrameLayout(0dp, weight=1)` 内；内部列表行 `widget_item_root` 采用固定 `56dp` 行高（`14dp` 浅层圆角背景）并统一使用 `dp` 字号与 `TypedValue.COMPLEX_UNIT_DIP` 显式锁定。
 - **零抖动列表更新**：Android 12+（`API >= 31`）使用单一 `RemoteViews` + `RemoteViews.RemoteCollectionItems` 原子更新列表数据，所有后台查询均在 `goAsync()` 协程中完成。
-- **顶部三枚身份码直达图标**：使用 `loadAppleRoundedIconBitmapForWidget`（`fitCenter` `112px` 降采样）生成三枚 `28dp` 原生苹果连续圆角图标（淘宝、菜鸟、拼多多）。为绕过 **Android 12+ 后台启动 Activity 限制**，优先绑定直接 `PendingIntent.getActivity(...)` + `setPackage(...)` 唤起对应客户端；若未检测到包名，则回退绑定 `PendingIntent.getBroadcast` 在接收器中提示 `"未检测到...客户端"`。
+- **顶部四枚身份码直达图标**：按 **菜鸟 / 淘宝 / 拼多多 / 京东** 顺序使用 `loadAppleRoundedIconBitmapForWidget`（`112px` 降采样 + 三段 Apple 连续圆角裁剪）生成四枚 `28dp` 图标（间距 `6dp`）。为绕过 **Android 12+ 后台启动 Activity 限制**，优先绑定直接 `PendingIntent.getActivity(...)` + `setPackage(...)`（拼多多与京东兼容无包名隐式回退）唤起对应客户端；若未检测到包名，则回退绑定 `PendingIntent.getBroadcast` 在接收器中提示 `"未检测到...客户端"`。
 - **桌面交互与数据联动**：点击小组件左上角标题区或空视图打开主页面；点击列表行「已取」直接在小组件后台 `goAsync()` 核销该条目并刷新全部小组件列表；数据在主页或 `SmsReceiver` 发生任何变更后亦主动调用 `PickupWidgetProvider.notifyWidgetDataChanged(context)`。

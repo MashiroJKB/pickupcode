@@ -36,15 +36,17 @@ data class StationRule(
 /**
  * 应用全局设置快照
  * - stationCountPrompted: 新安装时是否已询问过学校快递房数量
- * - showTaobaoIdentityBanner: 是否开启「淘宝身份码」Banner（默认开启）
  * - showCainiaoIdentityBanner: 是否开启「菜鸟身份码」Banner
+ * - showTaobaoIdentityBanner: 是否开启「淘宝身份码」Banner（默认开启）
  * - showPinduoduoIdentityBanner: 是否开启「拼多多取件码」Banner
+ * - showJdIdentityBanner: 是否开启「京东身份码」Banner
  */
 data class AppSettings(
     val stationCountPrompted: Boolean = false,
-    val showTaobaoIdentityBanner: Boolean = true,
     val showCainiaoIdentityBanner: Boolean = false,
+    val showTaobaoIdentityBanner: Boolean = true,
     val showPinduoduoIdentityBanner: Boolean = false,
+    val showJdIdentityBanner: Boolean = false,
     val stationRules: List<StationRule> = SettingsDataStore.defaultStationRules()
 )
 
@@ -53,9 +55,10 @@ class SettingsDataStore(private val context: Context) {
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
         val rulesJson = prefs[KEY_STATION_RULES_JSON]
         val stationCountPrompted = prefs[KEY_STATION_COUNT_PROMPTED] ?: (rulesJson != null)
-        val showTaobao = prefs[KEY_SHOW_TAOBAO_IDENTITY] ?: true
         val showCainiao = prefs[KEY_SHOW_CAINIAO_IDENTITY] ?: false
+        val showTaobao = prefs[KEY_SHOW_TAOBAO_IDENTITY] ?: true
         val showPinduoduo = prefs[KEY_SHOW_PINDUODUO_IDENTITY] ?: false
+        val showJd = prefs[KEY_SHOW_JD_IDENTITY] ?: false
         val stationRules = if (rulesJson.isNullOrBlank()) {
             defaultStationRules()
         } else {
@@ -64,9 +67,10 @@ class SettingsDataStore(private val context: Context) {
 
         AppSettings(
             stationCountPrompted = stationCountPrompted,
-            showTaobaoIdentityBanner = showTaobao,
             showCainiaoIdentityBanner = showCainiao,
+            showTaobaoIdentityBanner = showTaobao,
             showPinduoduoIdentityBanner = showPinduoduo,
+            showJdIdentityBanner = showJd,
             stationRules = stationRules
         )
     }
@@ -89,21 +93,27 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
-    suspend fun setShowTaobaoIdentityBanner(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[KEY_SHOW_TAOBAO_IDENTITY] = enabled
-        }
-    }
-
     suspend fun setShowCainiaoIdentityBanner(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_SHOW_CAINIAO_IDENTITY] = enabled
         }
     }
 
+    suspend fun setShowTaobaoIdentityBanner(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_SHOW_TAOBAO_IDENTITY] = enabled
+        }
+    }
+
     suspend fun setShowPinduoduoIdentityBanner(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_SHOW_PINDUODUO_IDENTITY] = enabled
+        }
+    }
+
+    suspend fun setShowJdIdentityBanner(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_SHOW_JD_IDENTITY] = enabled
         }
     }
 
@@ -276,9 +286,10 @@ class SettingsDataStore(private val context: Context) {
         const val DEFAULT_SMS_SCAN_DAYS = 7
 
         private val KEY_STATION_COUNT_PROMPTED = booleanPreferencesKey("station_count_prompted")
-        private val KEY_SHOW_TAOBAO_IDENTITY = booleanPreferencesKey("show_taobao_identity_banner")
         private val KEY_SHOW_CAINIAO_IDENTITY = booleanPreferencesKey("show_cainiao_identity_banner")
+        private val KEY_SHOW_TAOBAO_IDENTITY = booleanPreferencesKey("show_taobao_identity_banner")
         private val KEY_SHOW_PINDUODUO_IDENTITY = booleanPreferencesKey("show_pinduoduo_identity_banner")
+        private val KEY_SHOW_JD_IDENTITY = booleanPreferencesKey("show_jd_identity_banner")
         private val KEY_STATION_RULES_JSON = stringPreferencesKey("station_rules_json_v4")
 
         private val CHINESE_NUMERALS = mapOf(

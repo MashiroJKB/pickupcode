@@ -49,26 +49,34 @@
         </LinearLayout>
 
         <ImageView
-            android:id="@+id/widget_btn_taobao"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:contentDescription="淘宝身份码"
-            android:scaleType="fitCenter" />
-
-        <ImageView
             android:id="@+id/widget_btn_cainiao"
             android:layout_width="28dp"
             android:layout_height="28dp"
-            android:layout_marginStart="8dp"
             android:contentDescription="菜鸟身份码"
+            android:scaleType="fitCenter" />
+
+        <ImageView
+            android:id="@+id/widget_btn_taobao"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="6dp"
+            android:contentDescription="淘宝身份码"
             android:scaleType="fitCenter" />
 
         <ImageView
             android:id="@+id/widget_btn_pdd"
             android:layout_width="28dp"
             android:layout_height="28dp"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="6dp"
             android:contentDescription="拼多多取件码"
+            android:scaleType="fitCenter" />
+
+        <ImageView
+            android:id="@+id/widget_btn_jd"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="6dp"
+            android:contentDescription="京东身份码"
             android:scaleType="fitCenter" />
     </LinearLayout>
 

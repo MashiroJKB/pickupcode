@@ -147,9 +147,10 @@ fun SettingsScreen(
     hasSmsPermission: Boolean,
     onBack: () -> Unit,
     onRequestSmsPermission: () -> Unit,
-    onToggleTaobaoBanner: (Boolean) -> Unit,
     onToggleCainiaoBanner: (Boolean) -> Unit,
+    onToggleTaobaoBanner: (Boolean) -> Unit,
     onTogglePinduoduoBanner: (Boolean) -> Unit,
+    onToggleJdBanner: (Boolean) -> Unit,
     onAddStation: (displayName: String, badgeNumber: Int?, keywords: List<String>) -> Unit,
     onDeleteStation: (stationNumber: Int) -> Unit,
     onReorderStations: (List<StationRule>) -> Unit,
@@ -185,9 +186,9 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.5.4" }
+            info.versionName.orEmpty().ifBlank { "2.5.5" }
         } catch (_: Exception) {
-            "2.5.4"
+            "2.5.5"
         }
     }
 
@@ -469,7 +470,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                            .clip(AppleCorners.SmallElementShape)
                             .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -500,7 +501,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                            .clip(AppleCorners.SmallElementShape)
                             .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -724,15 +725,6 @@ fun SettingsScreen(
 
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     IdentitySwitchRow(
-                        type = IdentityCodeType.TAOBAO,
-                        checked = settings.showTaobaoIdentityBanner,
-                        onCheckedChange = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onToggleTaobaoBanner(it)
-                        }
-                    )
-
-                    IdentitySwitchRow(
                         type = IdentityCodeType.CAINIAO,
                         checked = settings.showCainiaoIdentityBanner,
                         onCheckedChange = {
@@ -742,11 +734,29 @@ fun SettingsScreen(
                     )
 
                     IdentitySwitchRow(
+                        type = IdentityCodeType.TAOBAO,
+                        checked = settings.showTaobaoIdentityBanner,
+                        onCheckedChange = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleTaobaoBanner(it)
+                        }
+                    )
+
+                    IdentitySwitchRow(
                         type = IdentityCodeType.PINDUODUO,
                         checked = settings.showPinduoduoIdentityBanner,
                         onCheckedChange = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onTogglePinduoduoBanner(it)
+                        }
+                    )
+
+                    IdentitySwitchRow(
+                        type = IdentityCodeType.JD,
+                        checked = settings.showJdIdentityBanner,
+                        onCheckedChange = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleJdBanner(it)
                         }
                     )
                 }
@@ -1281,7 +1291,7 @@ private fun EditStationRuleDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 56.dp, max = 160.dp)
-                    .clip(RoundedCornerShape(AppleCorners.InnerCard))
+                    .clip(AppleCorners.InnerCardShape)
                     .background(
                         MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f)
                     )
@@ -1349,7 +1359,7 @@ private fun EditStationRuleDialog(
                         onSaveRuleInfo(finalName, previewBadgeNum, newKeyword.trim())
                         onDismiss()
                     },
-                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                    shape = AppleCorners.InnerCardShape
                 ) {
                     Text("保存", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                 }
@@ -1432,7 +1442,7 @@ private fun AddNewStationDialog(
                         val badgeNum = badgeNumberText.trim().toIntOrNull()?.takeIf { it in 1..20 }
                         onConfirm(displayName.trim(), badgeNum, kws)
                     },
-                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                    shape = AppleCorners.InnerCardShape
                 ) {
                     Text("添加", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                 }
@@ -1513,7 +1523,7 @@ private fun ImportStationRulesDialog(
                 Button(
                     enabled = inputToken.isNotBlank(),
                     onClick = { onImport(inputToken) },
-                    shape = RoundedCornerShape(AppleCorners.InnerCard)
+                    shape = AppleCorners.InnerCardShape
                 ) {
                     Text("导入规则", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                 }
@@ -1833,7 +1843,7 @@ private fun SupportPosterDialog(
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .aspectRatio(705f / 1024f)
-                        .clip(RoundedCornerShape(AppleCorners.InnerCard))
+                        .clip(AppleCorners.InnerCardShape)
                 )
             }
 
@@ -1844,7 +1854,7 @@ private fun SupportPosterDialog(
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(AppleCorners.InnerCard))
+                    .clip(AppleCorners.InnerCardShape)
                     .background(
                         if (saveSucceeded) {
                             statusGreen.copy(alpha = 0.16f)

@@ -11,10 +11,15 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
-    <!-- Android 11+ 包可见性声明：用于直接唤起淘宝/拼多多 DeepLink -->
+    <!-- Android 11+ 包可见性声明：用于直接唤起菜鸟/淘宝/拼多多/京东 DeepLink -->
     <queries>
         <package android:name="com.taobao.taobao" />
         <package android:name="com.xunmeng.pinduoduo" />
+        <package android:name="com.jingdong.app.mall" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="openapp.jdmobile" />
+        </intent>
     </queries>
 
     <application
@@ -54,9 +59,10 @@
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.example.pickupcode.widget.ACTION_LAUNCH_TAOBAO" />
                 <action android:name="com.example.pickupcode.widget.ACTION_LAUNCH_CAINIAO" />
+                <action android:name="com.example.pickupcode.widget.ACTION_LAUNCH_TAOBAO" />
                 <action android:name="com.example.pickupcode.widget.ACTION_LAUNCH_PINDUODUO" />
+                <action android:name="com.example.pickupcode.widget.ACTION_LAUNCH_JD" />
                 <action android:name="com.example.pickupcode.widget.ACTION_ITEM_CLICK" />
             </intent-filter>
             <meta-data

@@ -448,9 +448,10 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         selectedItemIds = selectedItemIds,
                         isShareSelectionMode = isShareSelectionMode,
                         shareSelectedIds = shareSelectedIds,
-                        showTaobaoIdentityBanner = settings.showTaobaoIdentityBanner,
                         showCainiaoIdentityBanner = settings.showCainiaoIdentityBanner,
+                        showTaobaoIdentityBanner = settings.showTaobaoIdentityBanner,
                         showPinduoduoIdentityBanner = settings.showPinduoduoIdentityBanner,
+                        showJdIdentityBanner = settings.showJdIdentityBanner,
                         hasSmsPermission = hasSmsPermission,
                         onOpenSettings = {
                             if (!showSettingsScreen) showSettingsScreen = true
@@ -546,9 +547,10 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                             if (showSettingsScreen) showSettingsScreen = false
                         },
                         onRequestSmsPermission = requestSmsPermissions,
-                        onToggleTaobaoBanner = viewModel::setShowTaobaoIdentityBanner,
                         onToggleCainiaoBanner = viewModel::setShowCainiaoIdentityBanner,
+                        onToggleTaobaoBanner = viewModel::setShowTaobaoIdentityBanner,
                         onTogglePinduoduoBanner = viewModel::setShowPinduoduoIdentityBanner,
+                        onToggleJdBanner = viewModel::setShowJdIdentityBanner,
                         onAddStation = viewModel::addStationRule,
                         onDeleteStation = viewModel::deleteStationRule,
                         onReorderStations = viewModel::reorderStationRules,

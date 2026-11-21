@@ -297,15 +297,6 @@ class PickupViewModel(
         }
     }
 
-    fun setShowTaobaoIdentityBanner(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsDataStore.setShowTaobaoIdentityBanner(enabled)
-            showCapsuleToast(
-                if (enabled) "已开启：淘宝身份码" else "已关闭：淘宝身份码"
-            )
-        }
-    }
-
     fun setShowCainiaoIdentityBanner(enabled: Boolean) {
         viewModelScope.launch {
             settingsDataStore.setShowCainiaoIdentityBanner(enabled)
@@ -315,11 +306,29 @@ class PickupViewModel(
         }
     }
 
+    fun setShowTaobaoIdentityBanner(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setShowTaobaoIdentityBanner(enabled)
+            showCapsuleToast(
+                if (enabled) "已开启：淘宝身份码" else "已关闭：淘宝身份码"
+            )
+        }
+    }
+
     fun setShowPinduoduoIdentityBanner(enabled: Boolean) {
         viewModelScope.launch {
             settingsDataStore.setShowPinduoduoIdentityBanner(enabled)
             showCapsuleToast(
                 if (enabled) "已开启：拼多多取件码" else "已关闭：拼多多取件码"
+            )
+        }
+    }
+
+    fun setShowJdIdentityBanner(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setShowJdIdentityBanner(enabled)
+            showCapsuleToast(
+                if (enabled) "已开启：京东身份码" else "已关闭：京东身份码"
             )
         }
     }

@@ -59,35 +59,46 @@ val CainiaoBlueEnd = Color(0xFF0055D4)
 val PinduoduoRedStart = Color(0xFFE12A1F)
 val PinduoduoRedEnd = Color(0xFFC8161D)
 
+// 京东品牌图标红
+val JdRedStart = Color(0xFFFF301A)
+val JdRedEnd = Color(0xFFE01F14)
+
 enum class IdentityCodeType(
     val title: String,
     val subtitle: String,
     val primaryColor: Color,
     val secondaryColor: Color
 ) {
-    TAOBAO(
-        title = "淘宝身份码",
-        subtitle = "一键直达淘宝驿站身份码",
-        primaryColor = TaobaoOrangeStart,
-        secondaryColor = TaobaoOrangeEnd
-    ),
     CAINIAO(
         title = "菜鸟身份码",
         subtitle = "一键直达菜鸟驿站身份码",
         primaryColor = CainiaoBlueStart,
         secondaryColor = CainiaoBlueEnd
     ),
+    TAOBAO(
+        title = "淘宝身份码",
+        subtitle = "一键直达淘宝驿站身份码",
+        primaryColor = TaobaoOrangeStart,
+        secondaryColor = TaobaoOrangeEnd
+    ),
     PINDUODUO(
         title = "拼多多取件码",
         subtitle = "一键直达拼多多驿站取件码",
         primaryColor = PinduoduoRedStart,
         secondaryColor = PinduoduoRedEnd
+    ),
+    JD(
+        title = "京东身份码",
+        subtitle = "一键直达京东驿站身份码",
+        primaryColor = JdRedStart,
+        secondaryColor = JdRedEnd
     )
 }
 
 object TaobaoDeepLinkLauncher {
     const val TAOBAO_PACKAGE = "com.taobao.taobao"
     const val PINDUODUO_PACKAGE = "com.xunmeng.pinduoduo"
+    const val JD_PACKAGE = "com.jingdong.app.mall"
 
     // 菜鸟身份码 DeepLink
     const val CAINIAO_IDENTITY_DEEPLINK =
@@ -101,21 +112,25 @@ object TaobaoDeepLinkLauncher {
     const val PINDUODUO_IDENTITY_DEEPLINK =
         "pinduoduo://com.xunmeng.pinduoduo/mdkd/package"
 
+    // 京东身份码 DeepLink
+    const val JD_IDENTITY_DEEPLINK =
+        "openapp.jdmobile://virtual?params=%7B%22category%22%3A%22jump%22%2C%22des%22%3A%22m%22%2C%22url%22%3A%22https%3A%2F%2Fconvenient-h5.jd.com%2FidentityCode%3Fchannel%3Dxueshengjirukou%22%7D"
+
     fun launchIdentityCode(
         context: Context,
         type: IdentityCodeType,
         onFeedbackMessage: (String) -> Unit
     ) {
         when (type) {
-            IdentityCodeType.TAOBAO -> {
-                if (tryStartAppUri(context, TAOBAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
-                if (tryStartAppUri(context, CAINIAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
-                onFeedbackMessage("未检测到淘宝客户端，请先安装后再试")
-            }
-
             IdentityCodeType.CAINIAO -> {
                 if (tryStartAppUri(context, CAINIAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
                 if (tryStartAppUri(context, TAOBAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
+                onFeedbackMessage("未检测到淘宝客户端，请先安装后再试")
+            }
+
+            IdentityCodeType.TAOBAO -> {
+                if (tryStartAppUri(context, TAOBAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
+                if (tryStartAppUri(context, CAINIAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
                 onFeedbackMessage("未检测到淘宝客户端，请先安装后再试")
             }
 
@@ -123,6 +138,12 @@ object TaobaoDeepLinkLauncher {
                 if (tryStartAppUri(context, PINDUODUO_IDENTITY_DEEPLINK, PINDUODUO_PACKAGE)) return
                 if (tryStartAppUri(context, PINDUODUO_IDENTITY_DEEPLINK, null)) return
                 onFeedbackMessage("未检测到拼多多客户端，请先安装后再试")
+            }
+
+            IdentityCodeType.JD -> {
+                if (tryStartAppUri(context, JD_IDENTITY_DEEPLINK, JD_PACKAGE)) return
+                if (tryStartAppUri(context, JD_IDENTITY_DEEPLINK, null)) return
+                onFeedbackMessage("未检测到京东客户端，请先安装后再试")
             }
         }
     }
@@ -152,7 +173,7 @@ object TaobaoDeepLinkLauncher {
 /**
  * 首页顶部身份码/取件码入口容器：
  * - 当仅开启 1 个开关时，展示完整单栏液态玻璃 Banner
- * - 当同时开启 2 个或 3 个开关时，自动切换为标题为「身份码/取件码」的对称无框图标模式（均匀排布原生 Apple 连续圆角应用图标）
+ * - 当同时开启 2～4 个开关时，自动切换为标题为「身份码/取件码」的对称无框图标模式（均匀排布原生 Apple 连续圆角应用图标）
  */
 @Composable
 fun IdentityCodeBannersSection(
@@ -180,7 +201,7 @@ fun IdentityCodeBannersSection(
 /**
  * 多个身份码/取件码对称图标模式：
  * 仅保留外层液态玻璃卡片与统一层级标题「身份码/取件码」，去除图标外层小框，
- * 2～3 枚统一 Apple 连续圆角应用图标等距对称排布，兼顾美观与大面积舒适点按。
+ * 2～4 枚统一 Apple 连续圆角应用图标等距对称排布，兼顾美观与大面积舒适点按。
  */
 @Composable
 fun CompactIdentityCodeBar(
@@ -191,6 +212,8 @@ fun CompactIdentityCodeBar(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val latestFeedback by rememberUpdatedState(onFeedbackMessage)
+    val iconSize = if (enabledTypes.size >= 4) 50.dp else 54.dp
+    val iconHorizontalPad = if (enabledTypes.size >= 4) 4.dp else 8.dp
 
     Column(
         modifier = modifier
@@ -248,11 +271,11 @@ fun CompactIdentityCodeBar(
                                     }
                                 )
                             }
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                            .padding(horizontal = iconHorizontalPad, vertical = 2.dp)
                     ) {
                         AppBrandIcon(
                             type = type,
-                            size = 54.dp
+                            size = iconSize
                         )
                     }
                 }
@@ -262,7 +285,7 @@ fun CompactIdentityCodeBar(
 }
 
 /**
- * 单个身份码液态玻璃快捷 Banner（使用对应淘宝/菜鸟/拼多多应用图标）
+ * 单个身份码液态玻璃快捷 Banner（使用对应菜鸟/淘宝/拼多多/京东应用图标）
  */
 @Composable
 fun IdentityCodeBanner(
@@ -374,14 +397,14 @@ fun IdentityCodeBanner(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(AppleCorners.SmallElement))
+                    .clip(AppleCorners.SmallElementShape)
                     .background(brush = brandGradient)
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         TaobaoDeepLinkLauncher.launchIdentityCode(
                             context = context,
                             type = type,
-                            onFeedbackMessage = onFeedbackMessage
+                            onFeedbackMessage = latestFeedback
                         )
                     }
                     .padding(horizontal = 12.dp, vertical = 8.dp)
