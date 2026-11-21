@@ -1,6 +1,6 @@
 # 「取件码」（`PickupCode`）Android 原生应用完整产品与技术规范文档（PRD）
 
-> **目标版本**：`2.5.6`（`versionCode = 32`）  
+> **目标版本**：`2.5.7`（`versionCode = 33`）  
 > **文档定位**：本文档为面向 AI 编码引擎与原生 Android 工程师的**1:1 复现级完整工程规格说明书**，完整沉淀了产品定位、视觉规范、交互细节、动画参数、解析引擎、桌面生态及全部已知避坑约束，阅读本文档即可从零完整重构出一模一样的应用程序。
 
 ---
@@ -15,7 +15,7 @@
    - `android.permission.READ_SMS`
    - `android.permission.RECEIVE_SMS`
    - 声明 `<uses-feature android:name="android.hardware.telephony" android:required="false" />`。
-   - 声明 `<queries>` 包可见性：`com.taobao.taobao`、`com.xunmeng.pinduoduo`、`com.jingdong.app.mall`（及 `openapp.jdmobile` scheme intent）。
+   - 声明 `<queries>` 包可见性：`com.cainiao.wireless`、`com.taobao.taobao`、`com.xunmeng.pinduoduo`、`com.jingdong.app.mall`（及 `openapp.jdmobile` scheme intent）。
 3. **禁止展示或识别快递品牌/代收点别名**：不识别、不存储、不显示任何快递品牌（如“中通快递”、“京东快递”）或代收点名称；数据库预留字段 `expressCompany` 始终置空 `""`。
 
 ### 1.2 明确排除项（禁止擅自添加）
@@ -32,7 +32,7 @@
 
 ### 2.1 SDK 与核心依赖版本
 - **包名（`applicationId` / `namespace`）**：`com.example.pickupcode`
-- **版本配置**：`versionCode = 32`，`versionName = "2.5.6"`
+- **版本配置**：`versionCode = 33`，`versionName = "2.5.7"`
 - **SDK 配置**：`minSdk = 29`（Android 10）、`targetSdk = 35`、`compileSdk = 37`、`buildToolsVersion = "36.0.0"`、`JavaVersion.VERSION_17`
 - **Gradle 与插件版本**（`gradle/libs.versions.toml`）：
   - AGP：`9.5.1`（`com.android.application`）
@@ -63,7 +63,8 @@ app/src/main/
 │   │   ├── widget_glass_bg.xml         # 小组件外框 24dp 液态玻璃渐变背景
 │   │   └── widget_row_bg.xml           # 小组件内行 14dp 卡片背景
 │   ├── drawable-nodpi/
-│   │   ├── ic_brand_cainiao.png        # 菜鸟应用图标（480×480 原生全出血方图）
+│   │   ├── ic_brand_cainiao_app.png    # 菜鸟APP应用图标（256×256 全出血方图）
+│   │   ├── ic_brand_cainiao.png        # 菜鸟身份码应用图标（480×480 原生全出血方图）
 │   │   ├── ic_brand_taobao.png         # 淘宝应用图标（480×480 原生全出血方图）
 │   │   ├── ic_brand_pinduoduo.png      # 拼多多应用图标（原生全出血方图）
 │   │   ├── ic_brand_jd.png             # 京东应用图标（480×480 全出血方图）
@@ -204,19 +205,20 @@ app/src/main/
 - `BackHandler` 优先级：处于设置页时按返回退出设置页；处于 `SHARE_SELECT` 时按返回退出分享模式；处于 `PICKUP_SELECT` 时按返回清空当前普通勾选。
 
 ### 4.2 身份码 / 取件码快捷入口（`IdentityCodeBannersSection`）
-设置页中有 4 个独立开关，固定按 **菜鸟 → 淘宝 → 拼多多 → 京东** 顺序排列：菜鸟身份码（默认关闭）、淘宝身份码（默认开启）、拼多多取件码（默认关闭）、京东身份码（默认关闭）。
+设置页中有 5 个独立开关，固定按 **菜鸟APP → 菜鸟身份码 → 淘宝身份码 → 拼多多取件码 → 京东身份码** 顺序排列：菜鸟APP（默认关闭）、菜鸟身份码（默认关闭）、淘宝身份码（默认开启）、拼多多取件码（默认关闭）、京东身份码（默认关闭）。
 1. **开启 0 个**：隐藏入口区块。
 2. **开启 1 个（完整单栏 Banner）**：
    - `liquidGlass(OuterCard, tintColor = brandPrimary)`，水平内边距 `18.dp`、垂直 `14.dp`，按压缩放 `0.97f`。
-   - 左侧 `AppBrandIcon(46.dp)` + 标题 + 浅底 `扫码出库` 小标签 + 副标题（如 `一键直达京东驿站身份码`）+ 右侧品牌渐变 `打开 >` 按钮。
-3. **开启 2～4 个（无框对称图标模式 `CompactIdentityCodeBar`）**：
+   - 左侧 `AppBrandIcon(46.dp)` + 标题 + 浅底标签（菜鸟APP 显示 `快捷打开`，其余显示 `扫码出库`）+ 副标题 + 右侧品牌渐变 `打开 >` 按钮。
+3. **开启 2～5 个（无框对称图标模式 `CompactIdentityCodeBar`）**：
    - 整个外框 `liquidGlass(OuterCard)`，左上角统一显示小标题 **`身份码/取件码`**（`titleMedium`）。
-   - 下方直接以 `Arrangement.SpaceEvenly` 等距对称排布 2～4 枚无外框的原生 Apple 连续圆角 `AppBrandIcon`（2～3 枚为 `54.dp`，4 枚自适应 `50.dp` 保持 360dp 屏幕宽敞留白），按压缩放 `0.91f`。
-4. **Exact DeepLink 跳转与容错逻辑**：
-   - 菜鸟：优先 `tbopen://m.taobao.com/tbopen/index.html?h5Url=https://market.m.taobao.com/app/cn-yz/multi-activity/authCode.html`，失败尝试淘宝地址，指定包名 `com.taobao.taobao`。
-   - 淘宝：优先 `taobao://m.taobao.com/tbopen/index.html?h5Url=https://pages-fast.m.taobao.com/wow/z/uniapp/1011717/last-mile-fe/end-collect-platform/identity-code`，失败尝试菜鸟地址，指定包名 `com.taobao.taobao`。未安装时提示 `"未检测到淘宝客户端，请先安装后再试"`。
-   - 拼多多：`pinduoduo://com.xunmeng.pinduoduo/mdkd/package`，指定包名 `com.xunmeng.pinduoduo`（异常再尝试不指定包名调起）。未安装时提示 `"未检测到拼多多客户端，请先安装后再试"`。
-   - 京东：`openapp.jdmobile://virtual?params=%7B%22category%22%3A%22jump%22%2C%22des%22%3A%22m%22%2C%22url%22%3A%22https%3A%2F%2Fconvenient-h5.jd.com%2FidentityCode%3Fchannel%3Dxueshengjirukou%22%7D`，指定包名 `com.jingdong.app.mall`（异常再尝试不指定包名调起）。未安装时提示 `"未检测到京东客户端，请先安装后再试"`。
+   - 下方直接以 `Arrangement.SpaceEvenly` 等距对称排布 2～5 枚无外框的原生 Apple 连续圆角 `AppBrandIcon`（2～3 枚 `54.dp`、4 枚 `50.dp`、5 枚 `46.dp` 保持 360dp 屏幕宽敞留白），按压缩放 `0.91f`。
+4. **Exact 启动 / DeepLink 跳转与容错逻辑**：
+   - 菜鸟APP：通过 `PackageManager.getLaunchIntentForPackage("com.cainiao.wireless")` 直接唤起菜鸟客户端；未安装时提示 `"未检测到菜鸟客户端，请先安装后再试"`。
+   - 菜鸟身份码：优先 `tbopen://m.taobao.com/tbopen/index.html?h5Url=https://market.m.taobao.com/app/cn-yz/multi-activity/authCode.html`，失败尝试淘宝地址，指定包名 `com.taobao.taobao`。
+   - 淘宝身份码：优先 `taobao://m.taobao.com/tbopen/index.html?h5Url=https://pages-fast.m.taobao.com/wow/z/uniapp/1011717/last-mile-fe/end-collect-platform/identity-code`，失败尝试菜鸟地址，指定包名 `com.taobao.taobao`。未安装时提示 `"未检测到淘宝客户端，请先安装后再试"`。
+   - 拼多多取件码：`pinduoduo://com.xunmeng.pinduoduo/mdkd/package`，指定包名 `com.xunmeng.pinduoduo`（异常再尝试不指定包名调起）。未安装时提示 `"未检测到拼多多客户端，请先安装后再试"`。
+   - 京东身份码：`openapp.jdmobile://virtual?params=%7B%22category%22%3A%22jump%22%2C%22des%22%3A%22m%22%2C%22url%22%3A%22https%3A%2F%2Fconvenient-h5.jd.com%2FidentityCode%3Fchannel%3Dxueshengjirukou%22%7D`，指定包名 `com.jingdong.app.mall`（异常再尝试不指定包名调起）。未安装时提示 `"未检测到京东客户端，请先安装后再试"`。
 
 ### 4.3 快递房分组卡片与快捷 `+` 添加（`StationGroupCard`）
 - **列表分组排序**：所有 `stationNumber == 0` 的待分类记录作为第一组；其余快递房严格遵循用户在设置页调整后的 `stationRules` 顺序排列。空列表时展示 `EmptyPickupStateCard`（有短信权限提示点击 `+` 添加，无权限引导授权短信）。
@@ -343,5 +345,5 @@ app/src/main/
 ### 7.2 桌面液态玻璃小组件（`PickupWidgetProvider` & `PickupWidgetService`）
 - **布局与外观**：严格锁定 `4×4` 尺寸（`minWidth=296dp`、`minHeight=296dp`、`targetCellWidth=4`、`targetCellHeight=4`、`resizeMode="none"`），圆角 `24dp` 磨砂渐变外框（支持浅/深色 `values`/`values-night` 资源），使用 `@android:id/background` 适配系统桌面容器，`ListView` 包裹在 `FrameLayout(0dp, weight=1)` 内；内部列表行 `widget_item_root` 采用固定 `56dp` 行高（`14dp` 浅层圆角背景）并统一使用 `dp` 字号与 `TypedValue.COMPLEX_UNIT_DIP` 显式锁定。
 - **零抖动列表更新**：Android 12+（`API >= 31`）使用单一 `RemoteViews` + `RemoteViews.RemoteCollectionItems` 原子更新列表数据，所有后台查询均在 `goAsync()` 协程中完成。
-- **顶部身份码直达图标（跟随设置开关动态显隐）**：按 **菜鸟 / 淘宝 / 拼多多 / 京东** 顺序严格同步设置页「身份码跳转链路」的四个开关（开启即展示 `28dp` 三段 Apple 连续圆角图标，关闭则 `View.GONE` 自动收起且实时刷新）。为绕过 **Android 12+ 后台启动 Activity 限制**，优先绑定直接 `PendingIntent.getActivity(...)` + `setPackage(...)`（拼多多与京东兼容无包名隐式回退）唤起对应客户端；若未检测到包名，则回退绑定 `PendingIntent.getBroadcast` 在接收器中提示 `"未检测到...客户端"`。
+- **顶部身份码直达图标（跟随设置开关动态显隐）**：按 **菜鸟APP / 菜鸟身份码 / 淘宝身份码 / 拼多多取件码 / 京东身份码** 顺序严格同步设置页「身份码跳转链路」的五个开关（开启即展示 `26dp` 三段 Apple 连续圆角图标，间距 `5dp`，5 枚全开亦不挤压标题；关闭则 `View.GONE` 自动收起且实时刷新）。为绕过 **Android 12+ 后台启动 Activity 限制**，优先绑定直接 `PendingIntent.getActivity(...)`（菜鸟APP 经 `getLaunchIntentForPackage`，其余经 DeepLink + `setPackage`，拼多多与京东兼容无包名隐式回退）唤起对应客户端；若未检测到客户端，则回退绑定 `PendingIntent.getBroadcast` 在接收器中提示 `"未检测到...客户端"`。
 - **桌面交互与数据联动**：点击小组件左上角标题区或空视图打开主页面；点击列表行「已取」直接在小组件后台 `goAsync()` 核销该条目并刷新全部小组件列表；数据在主页或 `SmsReceiver` 发生任何变更后亦主动调用 `PickupWidgetProvider.notifyWidgetDataChanged(context)`。

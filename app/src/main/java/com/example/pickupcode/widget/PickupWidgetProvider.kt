@@ -32,7 +32,7 @@ import kotlinx.coroutines.runBlocking
  * - 严格锁定 4×4 尺寸（targetCellWidth=4, targetCellHeight=4, minWidth/minHeight=296dp, resizeMode=none），
  *   彻底杜绝拖动缩放带来的部件大小变化与排版挤压；
  * - Android 12+ 使用单一灵活 RemoteViews + RemoteCollectionItems 原子更新列表，零跨进程重绘抖动；
- * - 顶部提供高清 Apple 连续圆角裁剪的菜鸟 / 淘宝 / 拼多多 / 京东图标快捷入口，绕过 Android 12+ 后台启动限制；
+ * - 顶部提供高清 Apple 连续圆角裁剪的菜鸟APP / 菜鸟 / 淘宝 / 拼多多 / 京东图标快捷入口（跟随设置开关动态显隐），绕过 Android 12+ 后台启动限制；
  * - 列表按快递房顺序与货架号自然升序排列，支持直接点击「已取」并同步刷新小组件。
  */
 class PickupWidgetProvider : AppWidgetProvider() {
@@ -91,6 +91,16 @@ class PickupWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         when (intent.action) {
+            ACTION_LAUNCH_CAINIAO_APP -> {
+                TaobaoDeepLinkLauncher.launchIdentityCode(
+                    context = context,
+                    type = IdentityCodeType.CAINIAO_APP,
+                    onFeedbackMessage = { msg ->
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+
             ACTION_LAUNCH_CAINIAO -> {
                 TaobaoDeepLinkLauncher.launchIdentityCode(
                     context = context,
@@ -160,6 +170,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
+        const val ACTION_LAUNCH_CAINIAO_APP = "com.example.pickupcode.widget.ACTION_LAUNCH_CAINIAO_APP"
         const val ACTION_LAUNCH_CAINIAO = "com.example.pickupcode.widget.ACTION_LAUNCH_CAINIAO"
         const val ACTION_LAUNCH_TAOBAO = "com.example.pickupcode.widget.ACTION_LAUNCH_TAOBAO"
         const val ACTION_LAUNCH_PINDUODUO = "com.example.pickupcode.widget.ACTION_LAUNCH_PINDUODUO"
@@ -169,13 +180,18 @@ class PickupWidgetProvider : AppWidgetProvider() {
         const val EXTRA_MARK_DONE = "extra_mark_done"
 
         private data class WidgetBrandIconCache(
+            val cainiaoApp: Bitmap,
             val cainiao: Bitmap,
             val taobao: Bitmap,
             val pinduoduo: Bitmap,
             val jd: Bitmap
         ) {
             fun isValid(): Boolean =
-                !cainiao.isRecycled && !taobao.isRecycled && !pinduoduo.isRecycled && !jd.isRecycled
+                !cainiaoApp.isRecycled &&
+                    !cainiao.isRecycled &&
+                    !taobao.isRecycled &&
+                    !pinduoduo.isRecycled &&
+                    !jd.isRecycled
         }
 
         private val widgetRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -196,6 +212,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
                 } else {
                     val appContext = context.applicationContext
                     WidgetBrandIconCache(
+                        cainiaoApp = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.CAINIAO_APP, 112),
                         cainiao = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.CAINIAO, 112),
                         taobao = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.TAOBAO, 112),
                         pinduoduo = loadAppleRoundedIconBitmapForWidget(appContext, IdentityCodeType.PINDUODUO, 112),
@@ -254,6 +271,22 @@ class PickupWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_empty_view, openAppPendingIntent)
 
             // 顶部原生 Apple 连续圆角应用图标（严格按设置页「身份码跳转链路」开关与顺序动态显隐）
+            if (snapshot.showCainiaoApp) {
+                views.setViewVisibility(R.id.widget_btn_cainiao_app, View.VISIBLE)
+                views.setImageViewBitmap(R.id.widget_btn_cainiao_app, brandIcons.cainiaoApp)
+                views.setOnClickPendingIntent(
+                    R.id.widget_btn_cainiao_app,
+                    createDirectPackageLaunchOrFallbackPendingIntent(
+                        context = context,
+                        targetPackage = TaobaoDeepLinkLauncher.CAINIAO_APP_PACKAGE,
+                        fallbackBroadcastAction = ACTION_LAUNCH_CAINIAO_APP,
+                        requestCode = 100
+                    )
+                )
+            } else {
+                views.setViewVisibility(R.id.widget_btn_cainiao_app, View.GONE)
+            }
+
             if (snapshot.showCainiao) {
                 views.setViewVisibility(R.id.widget_btn_cainiao, View.VISIBLE)
                 views.setImageViewBitmap(R.id.widget_btn_cainiao, brandIcons.cainiao)
@@ -370,6 +403,39 @@ class PickupWidgetProvider : AppWidgetProvider() {
             views.setPendingIntentTemplate(R.id.widget_list_view, itemClickPendingIntent)
 
             return views
+        }
+
+        private fun createDirectPackageLaunchOrFallbackPendingIntent(
+            context: Context,
+            targetPackage: String,
+            fallbackBroadcastAction: String,
+            requestCode: Int
+        ): PendingIntent {
+            val launchIntent = try {
+                context.packageManager.getLaunchIntentForPackage(targetPackage)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            } catch (_: Exception) {
+                null
+            }
+            if (launchIntent != null) {
+                return PendingIntent.getActivity(
+                    context,
+                    requestCode,
+                    launchIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+
+            val broadcastIntent = Intent(context, PickupWidgetProvider::class.java).apply {
+                action = fallbackBroadcastAction
+            }
+            return PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                broadcastIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
         private fun createDirectLaunchOrFallbackPendingIntent(

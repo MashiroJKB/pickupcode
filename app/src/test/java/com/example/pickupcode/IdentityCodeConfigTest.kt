@@ -9,9 +9,10 @@ import org.junit.Test
 class IdentityCodeConfigTest {
 
     @Test
-    fun `maintains exact four-brand identity code ordering`() {
+    fun `maintains exact five-brand identity code ordering`() {
         assertEquals(
             listOf(
+                IdentityCodeType.CAINIAO_APP,
                 IdentityCodeType.CAINIAO,
                 IdentityCodeType.TAOBAO,
                 IdentityCodeType.PINDUODUO,
@@ -19,10 +20,12 @@ class IdentityCodeConfigTest {
             ),
             IdentityCodeType.entries
         )
+        assertEquals("菜鸟APP", IdentityCodeType.CAINIAO_APP.title)
         assertEquals("菜鸟身份码", IdentityCodeType.CAINIAO.title)
         assertEquals("淘宝身份码", IdentityCodeType.TAOBAO.title)
         assertEquals("拼多多取件码", IdentityCodeType.PINDUODUO.title)
         assertEquals("京东身份码", IdentityCodeType.JD.title)
+        assertEquals("com.cainiao.wireless", TaobaoDeepLinkLauncher.CAINIAO_APP_PACKAGE)
     }
 
     @Test

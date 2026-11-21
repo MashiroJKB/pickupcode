@@ -147,6 +147,7 @@ fun SettingsScreen(
     hasSmsPermission: Boolean,
     onBack: () -> Unit,
     onRequestSmsPermission: () -> Unit,
+    onToggleCainiaoAppBanner: (Boolean) -> Unit,
     onToggleCainiaoBanner: (Boolean) -> Unit,
     onToggleTaobaoBanner: (Boolean) -> Unit,
     onTogglePinduoduoBanner: (Boolean) -> Unit,
@@ -186,9 +187,9 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.5.6" }
+            info.versionName.orEmpty().ifBlank { "2.5.7" }
         } catch (_: Exception) {
-            "2.5.6"
+            "2.5.7"
         }
     }
 
@@ -724,6 +725,15 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    IdentitySwitchRow(
+                        type = IdentityCodeType.CAINIAO_APP,
+                        checked = settings.showCainiaoAppIdentityBanner,
+                        onCheckedChange = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleCainiaoAppBanner(it)
+                        }
+                    )
+
                     IdentitySwitchRow(
                         type = IdentityCodeType.CAINIAO,
                         checked = settings.showCainiaoIdentityBanner,

@@ -297,6 +297,15 @@ class PickupViewModel(
         }
     }
 
+    fun setShowCainiaoAppIdentityBanner(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setShowCainiaoAppIdentityBanner(enabled)
+            showCapsuleToast(
+                if (enabled) "已开启：菜鸟APP" else "已关闭：菜鸟APP"
+            )
+        }
+    }
+
     fun setShowCainiaoIdentityBanner(enabled: Boolean) {
         viewModelScope.launch {
             settingsDataStore.setShowCainiaoIdentityBanner(enabled)

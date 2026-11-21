@@ -90,6 +90,7 @@ fun HomeScreen(
     selectedItemIds: Set<Long>,
     isShareSelectionMode: Boolean,
     shareSelectedIds: Set<Long>,
+    showCainiaoAppIdentityBanner: Boolean,
     showCainiaoIdentityBanner: Boolean,
     showTaobaoIdentityBanner: Boolean,
     showPinduoduoIdentityBanner: Boolean,
@@ -125,12 +126,14 @@ fun HomeScreen(
     }
 
     val enabledIdentityTypes = remember(
+        showCainiaoAppIdentityBanner,
         showCainiaoIdentityBanner,
         showTaobaoIdentityBanner,
         showPinduoduoIdentityBanner,
         showJdIdentityBanner
     ) {
         buildList {
+            if (showCainiaoAppIdentityBanner) add(IdentityCodeType.CAINIAO_APP)
             if (showCainiaoIdentityBanner) add(IdentityCodeType.CAINIAO)
             if (showTaobaoIdentityBanner) add(IdentityCodeType.TAOBAO)
             if (showPinduoduoIdentityBanner) add(IdentityCodeType.PINDUODUO)

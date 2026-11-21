@@ -24,6 +24,7 @@ internal data class WidgetDisplayRow(
 internal data class WidgetSnapshot(
     val totalPendingCount: Int,
     val rows: List<WidgetDisplayRow>,
+    val showCainiaoApp: Boolean = false,
     val showCainiao: Boolean = false,
     val showTaobao: Boolean = true,
     val showPinduoduo: Boolean = false,
@@ -76,6 +77,7 @@ internal suspend fun loadWidgetSnapshot(context: Context): WidgetSnapshot =
                         return@withContext WidgetSnapshot(
                             totalPendingCount = totalCount,
                             rows = result,
+                            showCainiaoApp = settings.showCainiaoAppIdentityBanner,
                             showCainiao = settings.showCainiaoIdentityBanner,
                             showTaobao = settings.showTaobaoIdentityBanner,
                             showPinduoduo = settings.showPinduoduoIdentityBanner,
@@ -87,6 +89,7 @@ internal suspend fun loadWidgetSnapshot(context: Context): WidgetSnapshot =
             WidgetSnapshot(
                 totalPendingCount = totalCount,
                 rows = result,
+                showCainiaoApp = settings.showCainiaoAppIdentityBanner,
                 showCainiao = settings.showCainiaoIdentityBanner,
                 showTaobao = settings.showTaobaoIdentityBanner,
                 showPinduoduo = settings.showPinduoduoIdentityBanner,

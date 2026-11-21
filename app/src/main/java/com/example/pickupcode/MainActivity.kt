@@ -448,6 +448,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                         selectedItemIds = selectedItemIds,
                         isShareSelectionMode = isShareSelectionMode,
                         shareSelectedIds = shareSelectedIds,
+                        showCainiaoAppIdentityBanner = settings.showCainiaoAppIdentityBanner,
                         showCainiaoIdentityBanner = settings.showCainiaoIdentityBanner,
                         showTaobaoIdentityBanner = settings.showTaobaoIdentityBanner,
                         showPinduoduoIdentityBanner = settings.showPinduoduoIdentityBanner,
@@ -547,6 +548,7 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                             if (showSettingsScreen) showSettingsScreen = false
                         },
                         onRequestSmsPermission = requestSmsPermissions,
+                        onToggleCainiaoAppBanner = viewModel::setShowCainiaoAppIdentityBanner,
                         onToggleCainiaoBanner = viewModel::setShowCainiaoIdentityBanner,
                         onToggleTaobaoBanner = viewModel::setShowTaobaoIdentityBanner,
                         onTogglePinduoduoBanner = viewModel::setShowPinduoduoIdentityBanner,

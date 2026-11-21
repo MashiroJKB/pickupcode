@@ -78,6 +78,7 @@ private fun buildAndroidAppleSquirclePath(sizePx: Float): AndroidPath {
 }
 
 private fun brandDrawableRes(type: IdentityCodeType): Int = when (type) {
+    IdentityCodeType.CAINIAO_APP -> R.drawable.ic_brand_cainiao_app
     IdentityCodeType.CAINIAO -> R.drawable.ic_brand_cainiao
     IdentityCodeType.TAOBAO -> R.drawable.ic_brand_taobao
     IdentityCodeType.PINDUODUO -> R.drawable.ic_brand_pinduoduo
@@ -85,8 +86,8 @@ private fun brandDrawableRes(type: IdentityCodeType): Int = when (type) {
 }
 
 /**
- * 菜鸟 / 淘宝 / 拼多多 / 京东 原生应用图标组件：
- * - 加载统一全出血正方形品牌图标资源（ic_brand_cainiao / ic_brand_taobao / ic_brand_pinduoduo / ic_brand_jd）
+ * 菜鸟APP / 菜鸟 / 淘宝 / 拼多多 / 京东 原生应用图标组件：
+ * - 加载统一全出血正方形品牌图标资源（ic_brand_cainiao_app / ic_brand_cainiao / ic_brand_taobao / ic_brand_pinduoduo / ic_brand_jd）
  * - 统一使用严格 Apple iOS 连续圆角（AppleIconSquircleShape）裁剪，无任何多余外圈或系统主题边框
  */
 @Composable

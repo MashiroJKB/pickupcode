@@ -66,36 +66,49 @@ val JdRedEnd = Color(0xFFE01F14)
 enum class IdentityCodeType(
     val title: String,
     val subtitle: String,
+    val badgeLabel: String,
     val primaryColor: Color,
     val secondaryColor: Color
 ) {
+    CAINIAO_APP(
+        title = "菜鸟APP",
+        subtitle = "一键打开菜鸟客户端",
+        badgeLabel = "快捷打开",
+        primaryColor = CainiaoBlueStart,
+        secondaryColor = CainiaoBlueEnd
+    ),
     CAINIAO(
         title = "菜鸟身份码",
         subtitle = "一键直达菜鸟驿站身份码",
+        badgeLabel = "扫码出库",
         primaryColor = CainiaoBlueStart,
         secondaryColor = CainiaoBlueEnd
     ),
     TAOBAO(
         title = "淘宝身份码",
         subtitle = "一键直达淘宝驿站身份码",
+        badgeLabel = "扫码出库",
         primaryColor = TaobaoOrangeStart,
         secondaryColor = TaobaoOrangeEnd
     ),
     PINDUODUO(
         title = "拼多多取件码",
         subtitle = "一键直达拼多多驿站取件码",
+        badgeLabel = "扫码出库",
         primaryColor = PinduoduoRedStart,
         secondaryColor = PinduoduoRedEnd
     ),
     JD(
         title = "京东身份码",
         subtitle = "一键直达京东驿站身份码",
+        badgeLabel = "扫码出库",
         primaryColor = JdRedStart,
         secondaryColor = JdRedEnd
     )
 }
 
 object TaobaoDeepLinkLauncher {
+    const val CAINIAO_APP_PACKAGE = "com.cainiao.wireless"
     const val TAOBAO_PACKAGE = "com.taobao.taobao"
     const val PINDUODUO_PACKAGE = "com.xunmeng.pinduoduo"
     const val JD_PACKAGE = "com.jingdong.app.mall"
@@ -122,6 +135,11 @@ object TaobaoDeepLinkLauncher {
         onFeedbackMessage: (String) -> Unit
     ) {
         when (type) {
+            IdentityCodeType.CAINIAO_APP -> {
+                if (tryStartAppPackage(context, CAINIAO_APP_PACKAGE)) return
+                onFeedbackMessage("未检测到菜鸟客户端，请先安装后再试")
+            }
+
             IdentityCodeType.CAINIAO -> {
                 if (tryStartAppUri(context, CAINIAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
                 if (tryStartAppUri(context, TAOBAO_IDENTITY_DEEPLINK, TAOBAO_PACKAGE)) return
@@ -145,6 +163,23 @@ object TaobaoDeepLinkLauncher {
                 if (tryStartAppUri(context, JD_IDENTITY_DEEPLINK, null)) return
                 onFeedbackMessage("未检测到京东客户端，请先安装后再试")
             }
+        }
+    }
+
+    private fun tryStartAppPackage(
+        context: Context,
+        packageName: String
+    ): Boolean {
+        return try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+                ?: return false
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(launchIntent)
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -201,7 +236,7 @@ fun IdentityCodeBannersSection(
 /**
  * 多个身份码/取件码对称图标模式：
  * 仅保留外层液态玻璃卡片与统一层级标题「身份码/取件码」，去除图标外层小框，
- * 2～4 枚统一 Apple 连续圆角应用图标等距对称排布，兼顾美观与大面积舒适点按。
+ * 2～5 枚统一 Apple 连续圆角应用图标等距对称排布，兼顾美观与大面积舒适点按。
  */
 @Composable
 fun CompactIdentityCodeBar(
@@ -212,8 +247,16 @@ fun CompactIdentityCodeBar(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val latestFeedback by rememberUpdatedState(onFeedbackMessage)
-    val iconSize = if (enabledTypes.size >= 4) 50.dp else 54.dp
-    val iconHorizontalPad = if (enabledTypes.size >= 4) 4.dp else 8.dp
+    val iconSize = when {
+        enabledTypes.size >= 5 -> 46.dp
+        enabledTypes.size == 4 -> 50.dp
+        else -> 54.dp
+    }
+    val iconHorizontalPad = when {
+        enabledTypes.size >= 5 -> 2.dp
+        enabledTypes.size == 4 -> 4.dp
+        else -> 8.dp
+    }
 
     Column(
         modifier = modifier
@@ -372,7 +415,7 @@ fun IdentityCodeBanner(
                                 .padding(horizontal = 7.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "扫码出库",
+                                text = type.badgeLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = type.primaryColor,
                                 softWrap = false,
