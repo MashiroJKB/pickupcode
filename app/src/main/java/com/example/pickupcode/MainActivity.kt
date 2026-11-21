@@ -384,9 +384,9 @@ fun PickupMainApp(viewModel: PickupViewModel) {
         }
     }
 
-    // 根据待取快递数量实时更新桌面液态玻璃小组件（等待数据库首帧加载完成后再同步）
-    LaunchedEffect(isItemsLoaded, items, settings.stationRules) {
-        if (!isItemsLoaded) return@LaunchedEffect
+    // 根据待取快递数量与设置页开关（识别规则、身份码跳转链路）实时更新桌面液态玻璃小组件
+    LaunchedEffect(isItemsLoaded, isSettingsLoaded, items, settings) {
+        if (!isItemsLoaded || !isSettingsLoaded) return@LaunchedEffect
         val pendingCount = items.count { !it.isPickedUp }
         PickupWidgetProvider.notifyWidgetDataChanged(context, pendingCountOverride = pendingCount)
     }

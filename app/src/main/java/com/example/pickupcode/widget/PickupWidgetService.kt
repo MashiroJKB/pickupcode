@@ -23,7 +23,11 @@ internal data class WidgetDisplayRow(
 
 internal data class WidgetSnapshot(
     val totalPendingCount: Int,
-    val rows: List<WidgetDisplayRow>
+    val rows: List<WidgetDisplayRow>,
+    val showCainiao: Boolean = false,
+    val showTaobao: Boolean = true,
+    val showPinduoduo: Boolean = false,
+    val showJd: Boolean = false
 )
 
 private const val MAX_WIDGET_ROWS = 100
@@ -69,11 +73,25 @@ internal suspend fun loadWidgetSnapshot(context: Context): WidgetSnapshot =
                         )
                     )
                     if (result.size >= MAX_WIDGET_ROWS) {
-                        return@withContext WidgetSnapshot(totalCount, result)
+                        return@withContext WidgetSnapshot(
+                            totalPendingCount = totalCount,
+                            rows = result,
+                            showCainiao = settings.showCainiaoIdentityBanner,
+                            showTaobao = settings.showTaobaoIdentityBanner,
+                            showPinduoduo = settings.showPinduoduoIdentityBanner,
+                            showJd = settings.showJdIdentityBanner
+                        )
                     }
                 }
             }
-            WidgetSnapshot(totalCount, result)
+            WidgetSnapshot(
+                totalPendingCount = totalCount,
+                rows = result,
+                showCainiao = settings.showCainiaoIdentityBanner,
+                showTaobao = settings.showTaobaoIdentityBanner,
+                showPinduoduo = settings.showPinduoduoIdentityBanner,
+                showJd = settings.showJdIdentityBanner
+            )
         } catch (_: Exception) {
             WidgetSnapshot(0, emptyList())
         }

@@ -1,6 +1,6 @@
 # 「取件码」（`PickupCode`）Android 原生应用完整产品与技术规范文档（PRD）
 
-> **目标版本**：`2.5.5`（`versionCode = 31`）  
+> **目标版本**：`2.5.6`（`versionCode = 32`）  
 > **文档定位**：本文档为面向 AI 编码引擎与原生 Android 工程师的**1:1 复现级完整工程规格说明书**，完整沉淀了产品定位、视觉规范、交互细节、动画参数、解析引擎、桌面生态及全部已知避坑约束，阅读本文档即可从零完整重构出一模一样的应用程序。
 
 ---
@@ -32,7 +32,7 @@
 
 ### 2.1 SDK 与核心依赖版本
 - **包名（`applicationId` / `namespace`）**：`com.example.pickupcode`
-- **版本配置**：`versionCode = 31`，`versionName = "2.5.5"`
+- **版本配置**：`versionCode = 32`，`versionName = "2.5.6"`
 - **SDK 配置**：`minSdk = 29`（Android 10）、`targetSdk = 35`、`compileSdk = 37`、`buildToolsVersion = "36.0.0"`、`JavaVersion.VERSION_17`
 - **Gradle 与插件版本**（`gradle/libs.versions.toml`）：
   - AGP：`9.5.1`（`com.android.application`）
@@ -343,5 +343,5 @@ app/src/main/
 ### 7.2 桌面液态玻璃小组件（`PickupWidgetProvider` & `PickupWidgetService`）
 - **布局与外观**：严格锁定 `4×4` 尺寸（`minWidth=296dp`、`minHeight=296dp`、`targetCellWidth=4`、`targetCellHeight=4`、`resizeMode="none"`），圆角 `24dp` 磨砂渐变外框（支持浅/深色 `values`/`values-night` 资源），使用 `@android:id/background` 适配系统桌面容器，`ListView` 包裹在 `FrameLayout(0dp, weight=1)` 内；内部列表行 `widget_item_root` 采用固定 `56dp` 行高（`14dp` 浅层圆角背景）并统一使用 `dp` 字号与 `TypedValue.COMPLEX_UNIT_DIP` 显式锁定。
 - **零抖动列表更新**：Android 12+（`API >= 31`）使用单一 `RemoteViews` + `RemoteViews.RemoteCollectionItems` 原子更新列表数据，所有后台查询均在 `goAsync()` 协程中完成。
-- **顶部四枚身份码直达图标**：按 **菜鸟 / 淘宝 / 拼多多 / 京东** 顺序使用 `loadAppleRoundedIconBitmapForWidget`（`112px` 降采样 + 三段 Apple 连续圆角裁剪）生成四枚 `28dp` 图标（间距 `6dp`）。为绕过 **Android 12+ 后台启动 Activity 限制**，优先绑定直接 `PendingIntent.getActivity(...)` + `setPackage(...)`（拼多多与京东兼容无包名隐式回退）唤起对应客户端；若未检测到包名，则回退绑定 `PendingIntent.getBroadcast` 在接收器中提示 `"未检测到...客户端"`。
+- **顶部身份码直达图标（跟随设置开关动态显隐）**：按 **菜鸟 / 淘宝 / 拼多多 / 京东** 顺序严格同步设置页「身份码跳转链路」的四个开关（开启即展示 `28dp` 三段 Apple 连续圆角图标，关闭则 `View.GONE` 自动收起且实时刷新）。为绕过 **Android 12+ 后台启动 Activity 限制**，优先绑定直接 `PendingIntent.getActivity(...)` + `setPackage(...)`（拼多多与京东兼容无包名隐式回退）唤起对应客户端；若未检测到包名，则回退绑定 `PendingIntent.getBroadcast` 在接收器中提示 `"未检测到...客户端"`。
 - **桌面交互与数据联动**：点击小组件左上角标题区或空视图打开主页面；点击列表行「已取」直接在小组件后台 `goAsync()` 核销该条目并刷新全部小组件列表；数据在主页或 `SmsReceiver` 发生任何变更后亦主动调用 `PickupWidgetProvider.notifyWidgetDataChanged(context)`。

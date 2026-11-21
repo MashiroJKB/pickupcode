@@ -49,11 +49,11 @@ class PickupWidgetProvider : AppWidgetProvider() {
             try {
                 val snapshot = loadWidgetSnapshot(appContext)
                 for (appWidgetId in appWidgetIds) {
-                    updateAppWidgetWithRows(
+                    updateAppWidgetWithSnapshot(
                         context = appContext,
                         appWidgetManager = appWidgetManager,
                         appWidgetId = appWidgetId,
-                        rows = snapshot.rows,
+                        snapshot = snapshot,
                         pendingCount = snapshot.totalPendingCount
                     )
                 }
@@ -75,11 +75,11 @@ class PickupWidgetProvider : AppWidgetProvider() {
         widgetRefreshScope.launch {
             try {
                 val snapshot = loadWidgetSnapshot(appContext)
-                updateAppWidgetWithRows(
+                updateAppWidgetWithSnapshot(
                     context = appContext,
                     appWidgetManager = appWidgetManager,
                     appWidgetId = appWidgetId,
-                    rows = snapshot.rows,
+                    snapshot = snapshot,
                     pendingCount = snapshot.totalPendingCount
                 )
             } finally {
@@ -205,18 +205,18 @@ class PickupWidgetProvider : AppWidgetProvider() {
             }
         }
 
-        private fun updateAppWidgetWithRows(
+        private fun updateAppWidgetWithSnapshot(
             context: Context,
             appWidgetManager: AppWidgetManager,
             appWidgetId: Int,
-            rows: List<WidgetDisplayRow>,
+            snapshot: WidgetSnapshot,
             pendingCount: Int
         ) {
             val brandIcons = getCachedBrandIcons(context)
             val views = buildWidgetRemoteViews(
                 context = context,
                 appWidgetId = appWidgetId,
-                rows = rows,
+                snapshot = snapshot,
                 pendingCount = pendingCount,
                 brandIcons = brandIcons
             )
@@ -230,10 +230,11 @@ class PickupWidgetProvider : AppWidgetProvider() {
         private fun buildWidgetRemoteViews(
             context: Context,
             appWidgetId: Int,
-            rows: List<WidgetDisplayRow>,
+            snapshot: WidgetSnapshot,
             pendingCount: Int,
             brandIcons: WidgetBrandIconCache
         ): RemoteViews {
+            val rows = snapshot.rows
             val views = RemoteViews(context.packageName, R.layout.widget_pickup_code)
 
             views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_DIP, 16f)
@@ -252,60 +253,82 @@ class PickupWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_header_title_area, openAppPendingIntent)
             views.setOnClickPendingIntent(R.id.widget_empty_view, openAppPendingIntent)
 
-            // 顶部原生 Apple 连续圆角应用图标（菜鸟 / 淘宝 / 拼多多 / 京东）
-            views.setImageViewBitmap(R.id.widget_btn_cainiao, brandIcons.cainiao)
-            views.setImageViewBitmap(R.id.widget_btn_taobao, brandIcons.taobao)
-            views.setImageViewBitmap(R.id.widget_btn_pdd, brandIcons.pinduoduo)
-            views.setImageViewBitmap(R.id.widget_btn_jd, brandIcons.jd)
+            // 顶部原生 Apple 连续圆角应用图标（严格按设置页「身份码跳转链路」开关与顺序动态显隐）
+            if (snapshot.showCainiao) {
+                views.setViewVisibility(R.id.widget_btn_cainiao, View.VISIBLE)
+                views.setImageViewBitmap(R.id.widget_btn_cainiao, brandIcons.cainiao)
+                views.setOnClickPendingIntent(
+                    R.id.widget_btn_cainiao,
+                    createDirectLaunchOrFallbackPendingIntent(
+                        context = context,
+                        primaryUri = TaobaoDeepLinkLauncher.CAINIAO_IDENTITY_DEEPLINK,
+                        fallbackUri = TaobaoDeepLinkLauncher.TAOBAO_IDENTITY_DEEPLINK,
+                        targetPackage = TaobaoDeepLinkLauncher.TAOBAO_PACKAGE,
+                        allowImplicitFallback = false,
+                        fallbackBroadcastAction = ACTION_LAUNCH_CAINIAO,
+                        requestCode = 101
+                    )
+                )
+            } else {
+                views.setViewVisibility(R.id.widget_btn_cainiao, View.GONE)
+            }
 
-            views.setOnClickPendingIntent(
-                R.id.widget_btn_cainiao,
-                createDirectLaunchOrFallbackPendingIntent(
-                    context = context,
-                    primaryUri = TaobaoDeepLinkLauncher.CAINIAO_IDENTITY_DEEPLINK,
-                    fallbackUri = TaobaoDeepLinkLauncher.TAOBAO_IDENTITY_DEEPLINK,
-                    targetPackage = TaobaoDeepLinkLauncher.TAOBAO_PACKAGE,
-                    allowImplicitFallback = false,
-                    fallbackBroadcastAction = ACTION_LAUNCH_CAINIAO,
-                    requestCode = 101
+            if (snapshot.showTaobao) {
+                views.setViewVisibility(R.id.widget_btn_taobao, View.VISIBLE)
+                views.setImageViewBitmap(R.id.widget_btn_taobao, brandIcons.taobao)
+                views.setOnClickPendingIntent(
+                    R.id.widget_btn_taobao,
+                    createDirectLaunchOrFallbackPendingIntent(
+                        context = context,
+                        primaryUri = TaobaoDeepLinkLauncher.TAOBAO_IDENTITY_DEEPLINK,
+                        fallbackUri = TaobaoDeepLinkLauncher.CAINIAO_IDENTITY_DEEPLINK,
+                        targetPackage = TaobaoDeepLinkLauncher.TAOBAO_PACKAGE,
+                        allowImplicitFallback = false,
+                        fallbackBroadcastAction = ACTION_LAUNCH_TAOBAO,
+                        requestCode = 102
+                    )
                 )
-            )
-            views.setOnClickPendingIntent(
-                R.id.widget_btn_taobao,
-                createDirectLaunchOrFallbackPendingIntent(
-                    context = context,
-                    primaryUri = TaobaoDeepLinkLauncher.TAOBAO_IDENTITY_DEEPLINK,
-                    fallbackUri = TaobaoDeepLinkLauncher.CAINIAO_IDENTITY_DEEPLINK,
-                    targetPackage = TaobaoDeepLinkLauncher.TAOBAO_PACKAGE,
-                    allowImplicitFallback = false,
-                    fallbackBroadcastAction = ACTION_LAUNCH_TAOBAO,
-                    requestCode = 102
+            } else {
+                views.setViewVisibility(R.id.widget_btn_taobao, View.GONE)
+            }
+
+            if (snapshot.showPinduoduo) {
+                views.setViewVisibility(R.id.widget_btn_pdd, View.VISIBLE)
+                views.setImageViewBitmap(R.id.widget_btn_pdd, brandIcons.pinduoduo)
+                views.setOnClickPendingIntent(
+                    R.id.widget_btn_pdd,
+                    createDirectLaunchOrFallbackPendingIntent(
+                        context = context,
+                        primaryUri = TaobaoDeepLinkLauncher.PINDUODUO_IDENTITY_DEEPLINK,
+                        fallbackUri = null,
+                        targetPackage = TaobaoDeepLinkLauncher.PINDUODUO_PACKAGE,
+                        allowImplicitFallback = true,
+                        fallbackBroadcastAction = ACTION_LAUNCH_PINDUODUO,
+                        requestCode = 103
+                    )
                 )
-            )
-            views.setOnClickPendingIntent(
-                R.id.widget_btn_pdd,
-                createDirectLaunchOrFallbackPendingIntent(
-                    context = context,
-                    primaryUri = TaobaoDeepLinkLauncher.PINDUODUO_IDENTITY_DEEPLINK,
-                    fallbackUri = null,
-                    targetPackage = TaobaoDeepLinkLauncher.PINDUODUO_PACKAGE,
-                    allowImplicitFallback = true,
-                    fallbackBroadcastAction = ACTION_LAUNCH_PINDUODUO,
-                    requestCode = 103
+            } else {
+                views.setViewVisibility(R.id.widget_btn_pdd, View.GONE)
+            }
+
+            if (snapshot.showJd) {
+                views.setViewVisibility(R.id.widget_btn_jd, View.VISIBLE)
+                views.setImageViewBitmap(R.id.widget_btn_jd, brandIcons.jd)
+                views.setOnClickPendingIntent(
+                    R.id.widget_btn_jd,
+                    createDirectLaunchOrFallbackPendingIntent(
+                        context = context,
+                        primaryUri = TaobaoDeepLinkLauncher.JD_IDENTITY_DEEPLINK,
+                        fallbackUri = null,
+                        targetPackage = TaobaoDeepLinkLauncher.JD_PACKAGE,
+                        allowImplicitFallback = true,
+                        fallbackBroadcastAction = ACTION_LAUNCH_JD,
+                        requestCode = 104
+                    )
                 )
-            )
-            views.setOnClickPendingIntent(
-                R.id.widget_btn_jd,
-                createDirectLaunchOrFallbackPendingIntent(
-                    context = context,
-                    primaryUri = TaobaoDeepLinkLauncher.JD_IDENTITY_DEEPLINK,
-                    fallbackUri = null,
-                    targetPackage = TaobaoDeepLinkLauncher.JD_PACKAGE,
-                    allowImplicitFallback = true,
-                    fallbackBroadcastAction = ACTION_LAUNCH_JD,
-                    requestCode = 104
-                )
-            )
+            } else {
+                views.setViewVisibility(R.id.widget_btn_jd, View.GONE)
+            }
 
             // 绑定列表数据：Android 12+ 使用原子 RemoteCollectionItems，避免改变高度时跨进程列表重载错位
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -425,11 +448,11 @@ class PickupWidgetProvider : AppWidgetProvider() {
                     }
                     val count = pendingCountOverride ?: snapshot.totalPendingCount
                     for (id in ids) {
-                        updateAppWidgetWithRows(
+                        updateAppWidgetWithSnapshot(
                             context = appContext,
                             appWidgetManager = manager,
                             appWidgetId = id,
-                            rows = snapshot.rows,
+                            snapshot = snapshot,
                             pendingCount = count
                         )
                     }
