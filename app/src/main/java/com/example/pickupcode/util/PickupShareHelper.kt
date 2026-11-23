@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.FileProvider
 import com.example.pickupcode.data.local.PickupItemEntity
 import com.example.pickupcode.data.local.StationRule
+import com.example.pickupcode.ui.theme.buildAndroidAppleContinuousRectPath
 import com.example.pickupcode.ui.theme.stationAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -266,9 +267,15 @@ object PickupShareHelper {
                 (group.items.size - 1).coerceAtLeast(0) * itemRowSpacing
             val cardH = cardInnerPadY * 2f + groupHeaderH + 16f + itemsHeight
 
-            val cardRect = RectF(outerPad, cursorY, outerPad + cardWidth, cursorY + cardH)
-            canvas.drawRoundRect(cardRect, 36f, 36f, cardFillPaint)
-            canvas.drawRoundRect(cardRect, 36f, 36f, cardBorderPaint)
+            val cardPath = buildAndroidAppleContinuousRectPath(
+                left = outerPad,
+                top = cursorY,
+                right = outerPad + cardWidth,
+                bottom = cursorY + cardH,
+                cornerRadiusPx = 36f
+            )
+            canvas.drawPath(cardPath, cardFillPaint)
+            canvas.drawPath(cardPath, cardBorderPaint)
 
             // 快递房标题行
             val headerCenterY = cursorY + cardInnerPadY + groupHeaderH / 2f
@@ -316,8 +323,15 @@ object PickupShareHelper {
                     outerPad + cardWidth - cardInnerPadX,
                     rowY + rh
                 )
-                canvas.drawRoundRect(rowRect, 24f, 24f, rowFillPaint)
-                canvas.drawRoundRect(rowRect, 24f, 24f, rowBorderPaint)
+                val rowPath = buildAndroidAppleContinuousRectPath(
+                    left = rowRect.left,
+                    top = rowRect.top,
+                    right = rowRect.right,
+                    bottom = rowRect.bottom,
+                    cornerRadiusPx = 24f
+                )
+                canvas.drawPath(rowPath, rowFillPaint)
+                canvas.drawPath(rowPath, rowBorderPaint)
 
                 val rowLeft = rowRect.left + 26f
                 val rowRight = rowRect.right - 26f

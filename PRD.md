@@ -1,6 +1,6 @@
 # 「取件码」（`PickupCode`）Android 原生应用完整产品与技术规范文档（PRD）
 
-> **目标版本**：`2.5.8`（`versionCode = 34`）  
+> **目标版本**：`2.5.9`（`versionCode = 35`）  
 > **文档定位**：本文档为面向 AI 编码引擎与原生 Android 工程师的**1:1 复现级完整工程规格说明书**，完整沉淀了产品定位、视觉规范、交互细节、动画参数、解析引擎、桌面生态及全部已知避坑约束，阅读本文档即可从零完整重构出一模一样的应用程序。
 
 ---
@@ -32,7 +32,7 @@
 
 ### 2.1 SDK 与核心依赖版本
 - **包名（`applicationId` / `namespace`）**：`com.example.pickupcode`
-- **版本配置**：`versionCode = 34`，`versionName = "2.5.8"`
+- **版本配置**：`versionCode = 35`，`versionName = "2.5.9"`
 - **SDK 配置**：`minSdk = 29`（Android 10）、`targetSdk = 35`、`compileSdk = 37`、`buildToolsVersion = "36.0.0"`、`JavaVersion.VERSION_17`
 - **Gradle 与插件版本**（`gradle/libs.versions.toml`）：
   - AGP：`9.5.1`（`com.android.application`）
@@ -159,7 +159,7 @@ app/src/main/
   - `Pill = 999.dp`（悬浮胶囊按钮、计数角标、状态标签）
 - **应用图标与卡片的严格 Apple 连续圆角（`AppleIconSquircleShape` & `AppleContinuousCornerShape`）**：
   - **严禁**在菜鸟/淘宝/拼多多/京东应用图标外围叠加任何额外白框、圆环、投影底衬或背景边框，直接保持原生全出血正方形图标并按 **iOS `CALayerCornerCurve.continuous` 三段三次贝塞尔连续曲率**（`r = 0.2237 * s`、`p = 1.52866483 * r`、与真机 App Store 图标误差 `< 0.001`）裁剪（`ContentScale.Crop`）。
-  - 全局卡片（`OuterCardShape`）、内嵌子卡（`InnerCardShape`）、按钮与标签（`SmallElementShape`）统一复用 `AppleContinuousCornerShape`（`OutlinedTextField` 保留 `RoundedCornerShape` 以确保 Material 3 标签缺口描边无异常）。
+  - 全局卡片（`OuterCardShape`）、内嵌子卡（`InnerCardShape`）、按钮与标签（`SmallElementShape` / `MicroElementShape`）以及分享清单长图卡片均统一采用三段 `AppleContinuousCornerShape` / `buildAndroidAppleContinuousRectPath`（`OutlinedTextField` 保留 `RoundedCornerShape` 以确保 Material 3 标签缺口描边无异常）。
   - 桌面小组件同样调用 `loadAppleRoundedIconBitmapForWidget` 对 `ic_brand_cainiao.png`、`ic_brand_taobao.png`、`ic_brand_pinduoduo.png`、`ic_brand_jd.png` 按 `inSampleSize` 降采样后使用同一套三段 Apple Squircle 路径裁成高清 `Bitmap`（`112px`）。
 
 ### 3.2.1 自适应矢量桌面图标与自定义 Canvas 矢量精确规范
@@ -285,7 +285,7 @@ app/src/main/
    - 下方 3 格统计卡：**待取包裹**、**7天内已取**（可点击弹出 `PickedUpHistoryDialog` 列表，按取件时间倒序展示，每条支持「恢复」回待取列表或彻底「删除」）、**覆盖快递房**。
 3. **权限卡片**：未开短信读取权限时展示「短信读取权限未开启 -> 开启权限」（已授权后自动隐藏；无通知与桌面角标权限卡片）。
 4. **识别规则卡片（支持默认 1～8 号、长按拖动排序与口令分享）**：
-   - 标题栏右侧提供 `添加快递房` 蓝胶囊与 `重置` 灰胶囊（重置即清除 DataStore 恢复默认 1～8 号）。
+   - 标题栏右侧提供 `添加快递房` 蓝胶囊与 `重置` 灰胶囊（点击「重置」先弹出 `ResetStationRulesConfirmDialog` 二次确认防误触，确认后清除 DataStore 恢复默认 1～8 号）。
    - 下方提供并排 `导出规则口令` / `导入规则口令`（导出格式为 `【取件码识别规则】` + JSON 数组并自动写入系统剪贴板；导入支持识别并校验任意含 JSON 数组的口令文本）。
    - 规则列表支持 **`detectDragGesturesAfterLongPress`** 长按整行平滑拖拽重排（`scale = 1.03f` + 跨越行高 `0.55f` 时交换并触发轻震动反馈，松手即持久化排序并自动重算首页分组顺序与重分类待取件）。
    - 每行右侧配置圆形笔按钮（编辑弹窗内可修改显示名称、数字序号 `1~20` 或留空为实心圆、新增或点击 `×` 删除匹配关键词，点击「保存」即使文本框有未点添加的关键词也会一并自动收纳保存，并立即调用 `reapplyStationRules`）及圆形删除按钮（删除后原先属于该号房的待取件按新规则重分类或进入待分类）。

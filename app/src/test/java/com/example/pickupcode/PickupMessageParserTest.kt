@@ -234,4 +234,21 @@ class PickupMessageParserTest {
         assertEquals("7-2-6612", resultsChinese[0].code)
         assertEquals(0, resultsChinese[0].stationNumber)
     }
+
+    @Test
+    fun `extracts bracketed and quoted pickup codes`() {
+        val sms1 = "【丰巢】您的包裹已投递，请凭取件码【682914】到1号快递房领取。"
+        val sms2 = "【兔喜】包裹已到2号房，提货码「520131」请及时自提。"
+        val sms3 = "【菜鸟驿站】请凭开箱码(889900)到快递柜取件。"
+
+        val r1 = PickupMessageParser.parse(sms1, defaultRules)
+        val r2 = PickupMessageParser.parse(sms2, defaultRules)
+        val r3 = PickupMessageParser.parse(sms3, defaultRules)
+
+        assertEquals(listOf("682914"), r1.map { it.code })
+        assertEquals(1, r1.single().stationNumber)
+        assertEquals(listOf("520131"), r2.map { it.code })
+        assertEquals(2, r2.single().stationNumber)
+        assertEquals(listOf("889900"), r3.map { it.code })
+    }
 }

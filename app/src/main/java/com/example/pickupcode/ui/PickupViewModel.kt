@@ -273,12 +273,14 @@ class PickupViewModel(
         val cleanCode = code.trim().uppercase()
         if (cleanCode.isEmpty()) return
         viewModelScope.launch {
-            repository.addManualPickupCode(
+            val added = repository.addManualPickupCode(
                 code = cleanCode,
                 stationNumber = stationNumber,
                 productName = productName
             )
-            showCapsuleToast("已添加取件码 $cleanCode")
+            showCapsuleToast(
+                if (added) "已添加取件码 $cleanCode" else "取件码 $cleanCode 已在待取列表中"
+            )
         }
     }
 
@@ -393,14 +395,24 @@ class PickupViewModel(
     }
 
     fun addStationKeyword(stationNumber: Int, keyword: String) {
+        val trimmed = keyword.trim()
+        if (trimmed.isEmpty()) return
+        val existingKeywords = settingsState.value.stationRules
+            .firstOrNull { it.stationNumber == stationNumber }
+            ?.keywords
+            .orEmpty()
+        if (existingKeywords.any { it.equals(trimmed, ignoreCase = true) }) {
+            showCapsuleToast("关键词「$trimmed」已存在")
+            return
+        }
         viewModelScope.launch {
-            settingsDataStore.addKeywordToStation(stationNumber, keyword)
+            settingsDataStore.addKeywordToStation(stationNumber, trimmed)
             repository.reapplyStationRules()
             val symbol = settingsState.value.stationRules
                 .firstOrNull { it.stationNumber == stationNumber }
                 ?.circleSymbol
                 ?: PickupItemEntity.stationCircleSymbolFor(stationNumber)
-            showCapsuleToast("已将「$keyword」添加至 $symbol")
+            showCapsuleToast("已将「$trimmed」添加至 $symbol")
         }
     }
 

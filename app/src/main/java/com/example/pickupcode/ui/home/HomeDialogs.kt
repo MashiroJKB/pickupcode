@@ -302,13 +302,21 @@ fun RawMessageDetailDialog(
                         val num = rule.stationNumber
                         val selected = item.stationNumber == num
                         val numAccent = stationAccentColor(rule.badgeNumber ?: num, isDark)
+                        val chipBg by animateColorAsState(
+                            targetValue = if (selected) numAccent else numAccent.copy(alpha = 0.12f),
+                            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                            label = "detail_station_chip_bg"
+                        )
+                        val chipTextColor by animateColorAsState(
+                            targetValue = if (selected) Color.White else numAccent,
+                            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                            label = "detail_station_chip_fg"
+                        )
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .clip(AppleCorners.SmallElementShape)
-                                .background(
-                                    if (selected) numAccent else numAccent.copy(alpha = 0.12f)
-                                )
+                                .background(chipBg)
                                 .clickable { onChangeStation(num) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
@@ -317,7 +325,7 @@ fun RawMessageDetailDialog(
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = if (selected) Color.White else numAccent,
+                                color = chipTextColor,
                                 softWrap = false,
                                 maxLines = 1
                             )
@@ -565,14 +573,22 @@ fun AddOrPastePickupDialog(
             ) {
                 listOf("手动输入取件码", "粘贴短信解析").forEachIndexed { idx, title ->
                     val selected = tabIndex == idx
+                    val tabBg by animateColorAsState(
+                        targetValue = if (selected) primaryColor else Color.Transparent,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "add_tab_bg_$idx"
+                    )
+                    val tabTextColor by animateColorAsState(
+                        targetValue = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "add_tab_fg_$idx"
+                    )
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .weight(1f)
                             .clip(AppleCorners.SmallElementShape)
-                            .background(
-                                if (selected) primaryColor else Color.Transparent
-                            )
+                            .background(tabBg)
                             .clickable { tabIndex = idx }
                             .padding(vertical = 8.dp)
                     ) {
@@ -582,7 +598,7 @@ fun AddOrPastePickupDialog(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             ),
-                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = tabTextColor,
                             softWrap = false,
                             maxLines = 1
                         )
@@ -592,167 +608,196 @@ fun AddOrPastePickupDialog(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Column(
-                verticalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 276.dp)
-            ) {
-                if (tabIndex == 0) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = manualCode,
-                            onValueChange = { manualCode = it.take(20) },
-                            label = { Text("取件码") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(AppleCorners.InnerCard),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        if (stationRules.isNotEmpty() || initialStationNumber == 0) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "选择快递房：",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            LazyRow(
-                                state = stationListState,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            AnimatedContent(
+                targetState = tabIndex,
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing))) togetherWith
+                        (fadeOut(animationSpec = tween(durationMillis = 110, easing = FastOutSlowInEasing)))
+                },
+                label = "add_dialog_tab_transition"
+            ) { currentTab ->
+                Column(
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 276.dp)
+                ) {
+                    if (currentTab == 0) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = manualCode,
+                                onValueChange = { manualCode = it.take(20) },
+                                label = { Text("取件码") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(AppleCorners.InnerCard),
                                 modifier = Modifier.fillMaxWidth()
-                            ) {
-                                if (initialStationNumber == 0) {
-                                    item(key = "station_chip_0") {
-                                        val selected = manualStation == 0
-                                        val accent = stationAccentColor(0, isDark)
+                            )
+                            if (stationRules.isNotEmpty() || initialStationNumber == 0) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "选择快递房：",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    softWrap = false,
+                                    maxLines = 1
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                LazyRow(
+                                    state = stationListState,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (initialStationNumber == 0) {
+                                        item(key = "station_chip_0") {
+                                            val selected = manualStation == 0
+                                            val accent = stationAccentColor(0, isDark)
+                                            val chipBg by animateColorAsState(
+                                                targetValue = if (selected) accent else accent.copy(alpha = 0.14f),
+                                                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                                                label = "manual_station_0_bg"
+                                            )
+                                            val chipFg by animateColorAsState(
+                                                targetValue = if (selected) Color.White else accent,
+                                                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                                                label = "manual_station_0_fg"
+                                            )
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier
+                                                    .clip(AppleCorners.SmallElementShape)
+                                                    .background(chipBg)
+                                                    .clickable { manualStation = 0 }
+                                                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                                            ) {
+                                                Text(
+                                                    text = "？ 待分类",
+                                                    style = MaterialTheme.typography.labelMedium.copy(
+                                                        fontWeight = FontWeight.Bold
+                                                    ),
+                                                    color = chipFg,
+                                                    softWrap = false,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                    }
+                                    items(
+                                        items = stationRules,
+                                        key = { "station_chip_${it.stationNumber}" }
+                                    ) { rule ->
+                                        val num = rule.stationNumber
+                                        val selected = manualStation == num
+                                        val accent = stationAccentColor(rule.badgeNumber ?: num, isDark)
+                                        val chipBg by animateColorAsState(
+                                            targetValue = if (selected) accent else accent.copy(alpha = 0.14f),
+                                            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                                            label = "manual_station_chip_bg"
+                                        )
+                                        val chipFg by animateColorAsState(
+                                            targetValue = if (selected) Color.White else accent,
+                                            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                                            label = "manual_station_chip_fg"
+                                        )
                                         Box(
                                             contentAlignment = Alignment.Center,
                                             modifier = Modifier
                                                 .clip(AppleCorners.SmallElementShape)
-                                                .background(if (selected) accent else accent.copy(alpha = 0.14f))
-                                                .clickable { manualStation = 0 }
+                                                .background(chipBg)
+                                                .clickable { manualStation = num }
                                                 .padding(horizontal = 10.dp, vertical = 7.dp)
                                         ) {
                                             Text(
-                                                text = "？ 待分类",
+                                                text = "${rule.circleSymbol} ${rule.displayName}",
                                                 style = MaterialTheme.typography.labelMedium.copy(
                                                     fontWeight = FontWeight.Bold
                                                 ),
-                                                color = if (selected) Color.White else accent,
+                                                color = chipFg,
                                                 softWrap = false,
                                                 maxLines = 1
                                             )
                                         }
                                     }
                                 }
-                                items(
-                                    items = stationRules,
-                                    key = { "station_chip_${it.stationNumber}" }
-                                ) { rule ->
-                                    val num = rule.stationNumber
-                                    val selected = manualStation == num
-                                    val accent = stationAccentColor(rule.badgeNumber ?: num, isDark)
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier
-                                            .clip(AppleCorners.SmallElementShape)
-                                            .background(if (selected) accent else accent.copy(alpha = 0.14f))
-                                            .clickable { manualStation = num }
-                                            .padding(horizontal = 10.dp, vertical = 7.dp)
-                                    ) {
-                                        Text(
-                                            text = "${rule.circleSymbol} ${rule.displayName}",
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                fontWeight = FontWeight.Bold
-                                            ),
-                                            color = if (selected) Color.White else accent,
-                                            softWrap = false,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedTextField(
+                                value = manualProduct,
+                                onValueChange = { manualProduct = it.take(24) },
+                                label = { Text("商品备注（选填）") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(AppleCorners.InnerCard),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.End,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 14.dp)
+                        ) {
+                            TextButton(onClick = onDismiss) {
+                                Text("取消", softWrap = false, maxLines = 1)
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Button(
+                                enabled = manualCode.isNotBlank(),
+                                onClick = {
+                                    onManualAdd(manualCode, manualStation, manualProduct)
+                                    onDismiss()
+                                },
+                                shape = AppleCorners.InnerCardShape
+                            ) {
+                                Text("保存取件码", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                             }
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedTextField(
-                            value = manualProduct,
-                            onValueChange = { manualProduct = it.take(24) },
-                            label = { Text("商品备注（选填）") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(AppleCorners.InnerCard),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                    } else {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = if (targetStationLabel != null) {
+                                    "粘贴短信解析后将直接归入「$targetStationLabel」"
+                                } else {
+                                    "支持多码合并短信，自动拆分为独立记录"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedTextField(
+                                value = rawSmsInput,
+                                onValueChange = { rawSmsInput = it },
+                                placeholder = {
+                                    Text("在此粘贴快递短信全文...")
+                                },
+                                minLines = 4,
+                                maxLines = 5,
+                                shape = RoundedCornerShape(AppleCorners.InnerCard),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
 
-                    Row(
-                        horizontalArrangement = Arrangement.End,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 14.dp)
-                    ) {
-                        TextButton(onClick = onDismiss) {
-                            Text("取消", softWrap = false, maxLines = 1)
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Button(
-                            enabled = manualCode.isNotBlank(),
-                            onClick = {
-                                onManualAdd(manualCode, manualStation, manualProduct)
-                                onDismiss()
-                            },
-                            shape = AppleCorners.InnerCardShape
+                        Row(
+                            horizontalArrangement = Arrangement.End,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 14.dp)
                         ) {
-                            Text("保存取件码", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
-                        }
-                    }
-                } else {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = if (targetStationLabel != null) {
-                                "粘贴短信解析后将直接归入「$targetStationLabel」"
-                            } else {
-                                "支持多码合并短信，自动拆分为独立记录"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedTextField(
-                            value = rawSmsInput,
-                            onValueChange = { rawSmsInput = it },
-                            placeholder = {
-                                Text("在此粘贴快递短信全文...")
-                            },
-                            minLines = 4,
-                            maxLines = 5,
-                            shape = RoundedCornerShape(AppleCorners.InnerCard),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    Row(
-                        horizontalArrangement = Arrangement.End,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 14.dp)
-                    ) {
-                        TextButton(onClick = onDismiss) {
-                            Text("取消", softWrap = false, maxLines = 1)
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Button(
-                            enabled = rawSmsInput.isNotBlank(),
-                            onClick = {
-                                onPasteParse(rawSmsInput, initialStationNumber)
-                                onDismiss()
-                            },
-                            shape = AppleCorners.InnerCardShape
-                        ) {
-                            Text("智能解析入库", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
+                            TextButton(onClick = onDismiss) {
+                                Text("取消", softWrap = false, maxLines = 1)
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Button(
+                                enabled = rawSmsInput.isNotBlank(),
+                                onClick = {
+                                    onPasteParse(rawSmsInput, initialStationNumber)
+                                    onDismiss()
+                                },
+                                shape = AppleCorners.InnerCardShape
+                            ) {
+                                Text("智能解析入库", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
+                            }
                         }
                     }
                 }
@@ -1772,14 +1817,22 @@ fun StationCountSetupDialog(
             ) {
                 listOf(4, 6, 8, 10, 12).forEach { preset ->
                     val selected = parsedCount == preset
+                    val presetBg by animateColorAsState(
+                        targetValue = if (selected) primaryColor else primaryColor.copy(alpha = 0.12f),
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "station_preset_bg_$preset"
+                    )
+                    val presetFg by animateColorAsState(
+                        targetValue = if (selected) Color.White else primaryColor,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "station_preset_fg_$preset"
+                    )
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .weight(1f)
                             .clip(AppleCorners.SmallElementShape)
-                            .background(
-                                if (selected) primaryColor else primaryColor.copy(alpha = 0.12f)
-                            )
+                            .background(presetBg)
                             .clickable { countText = preset.toString() }
                             .padding(vertical = 8.dp)
                     ) {
@@ -1788,7 +1841,7 @@ fun StationCountSetupDialog(
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = if (selected) Color.White else primaryColor,
+                            color = presetFg,
                             softWrap = false,
                             maxLines = 1
                         )

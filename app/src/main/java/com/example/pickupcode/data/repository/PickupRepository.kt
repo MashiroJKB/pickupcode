@@ -74,7 +74,9 @@ class PickupRepository(
 
         ingestMutex.withLock {
             var affectedCount = 0
-            val windowStart = System.currentTimeMillis() - RETENTION_SEVEN_DAYS_MILLIS
+            val windowStart = minOf(messageTimestamp, System.currentTimeMillis()) -
+                RETENTION_SEVEN_DAYS_MILLIS -
+                DEDUPE_BUFFER_MILLIS
 
             for (parsed in effectiveParsedList) {
                 val recentCandidates = pickupDao.findRecentByCode(
@@ -341,15 +343,15 @@ class PickupRepository(
     }
 
     /**
-     * 手动新增一条取件码记录
+     * 手动新增一条取件码记录（若同一快递房已存在未取同码则原地合并备注并返回 false，避免重复插入）
      */
     suspend fun addManualPickupCode(
         code: String,
         stationNumber: Int,
         productName: String
-    ) = withContext(Dispatchers.IO) {
+    ): Boolean = withContext(Dispatchers.IO) {
         val cleanCode = code.trim().uppercase()
-        if (cleanCode.isEmpty()) return@withContext
+        if (cleanCode.isEmpty()) return@withContext false
         val safeStation = stationNumber.coerceIn(0, 100)
         val settings = settingsDataStore.settingsFlow.first()
         val stationLabel = if (safeStation > 0) {
@@ -361,6 +363,26 @@ class PickupRepository(
         val cleanProduct = productName.trim()
         val now = System.currentTimeMillis()
         ingestMutex.withLock {
+            val recentCandidates = pickupDao.findRecentByCode(
+                code = cleanCode,
+                sinceTimestamp = now - RETENTION_SEVEN_DAYS_MILLIS - DEDUPE_BUFFER_MILLIS
+            )
+            val existingPending = recentCandidates.firstOrNull { candidate ->
+                !candidate.isPickedUp && candidate.stationNumber == safeStation
+            }
+            if (existingPending != null) {
+                if (cleanProduct.isNotEmpty() && existingPending.productName != cleanProduct) {
+                    pickupDao.update(
+                        existingPending.copy(
+                            productName = cleanProduct,
+                            isCustomRemark = true,
+                            updatedAt = now
+                        )
+                    )
+                }
+                return@withLock false
+            }
+
             pickupDao.insert(
                 PickupItemEntity(
                     code = cleanCode,
@@ -379,6 +401,7 @@ class PickupRepository(
                     updatedAt = now
                 )
             )
+            true
         }
     }
 
@@ -392,7 +415,8 @@ class PickupRepository(
     }
 
     companion object {
-        // 已取件记录与扫描去重统一保留 7 天
+        // 已取件记录与扫描去重统一保留 7 天，并预留 24 小时边界缓冲防止临界时间戳重复复活
         const val RETENTION_SEVEN_DAYS_MILLIS = 7L * 24L * 60L * 60L * 1000L
+        private const val DEDUPE_BUFFER_MILLIS = 24L * 60L * 60L * 1000L
     }
 }

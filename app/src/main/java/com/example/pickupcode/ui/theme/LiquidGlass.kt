@@ -1,5 +1,6 @@
 package com.example.pickupcode.ui.theme
 
+import android.graphics.Path as AndroidPath
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -139,23 +140,98 @@ fun Path.addAppleContinuousRectPath(w: Float, h: Float, cornerRadiusPx: Float) {
 }
 
 /**
+ * 构建 Android 原生 Canvas 用的严格 Apple 连续圆角矩形 [AndroidPath]（桌面小组件图标与分享长图卡片共用）
+ */
+fun buildAndroidAppleContinuousRectPath(
+    left: Float,
+    top: Float,
+    right: Float,
+    bottom: Float,
+    cornerRadiusPx: Float
+): AndroidPath {
+    val w = (right - left).coerceAtLeast(0f)
+    val h = (bottom - top).coerceAtLeast(0f)
+    val path = AndroidPath()
+    if (w <= 0f || h <= 0f) return path
+
+    val halfMin = minOf(w, h) * 0.5f
+    val r = cornerRadiusPx.coerceIn(0f, halfMin)
+    if (r <= 0.01f) {
+        path.addRect(left, top, right, bottom, AndroidPath.Direction.CW)
+        return path
+    }
+
+    val maxContinuousR = halfMin / 1.52866483f
+    val smooth = if (r <= maxContinuousR) {
+        1f
+    } else {
+        ((halfMin - r) / (halfMin - maxContinuousR)).coerceIn(0f, 1f)
+    }
+
+    fun lerp(a0: Float, a1: Float): Float = a0 + (a1 - a0) * smooth
+
+    val p = (lerp(1.00000000f, 1.52866483f) * r).coerceAtMost(halfMin)
+    val a = lerp(1.00000000f, 1.08849323f) * r
+    val b = lerp(1.00000000f, 0.86840689f) * r
+    val c = lerp(1.00000000f, 0.63149399f) * r
+    val d = lerp(0.00000000f, 0.07491176f) * r
+    val e = lerp(0.44771525f, 0.37282392f) * r
+    val f = lerp(0.00000000f, 0.16906013f) * r
+
+    path.moveTo(left + p, top)
+    path.lineTo(right - p, top)
+
+    // 右上角
+    path.cubicTo(right - a, top, right - b, top, right - c, top + d)
+    path.cubicTo(right - e, top + f, right - f, top + e, right - d, top + c)
+    path.cubicTo(right, top + b, right, top + a, right, top + p)
+
+    path.lineTo(right, bottom - p)
+
+    // 右下角
+    path.cubicTo(right, bottom - a, right, bottom - b, right - d, bottom - c)
+    path.cubicTo(right - f, bottom - e, right - e, bottom - f, right - c, bottom - d)
+    path.cubicTo(right - b, bottom, right - a, bottom, right - p, bottom)
+
+    path.lineTo(left + p, bottom)
+
+    // 左下角
+    path.cubicTo(left + a, bottom, left + b, bottom, left + c, bottom - d)
+    path.cubicTo(left + e, bottom - f, left + f, bottom - e, left + d, bottom - c)
+    path.cubicTo(left, bottom - b, left, bottom - a, left, bottom - p)
+
+    path.lineTo(left, top + p)
+
+    // 左上角
+    path.cubicTo(left, top + a, left, top + b, left + d, top + c)
+    path.cubicTo(left + f, top + e, left + e, top + f, left + c, top + d)
+    path.cubicTo(left + b, top, left + a, top, left + p, top)
+
+    path.close()
+    return path
+}
+
+/**
  * Apple Concentric & Continuous Corners 圆角规范（全局统一单例缓存，零重组开销）
  */
 object AppleCorners {
     val OuterCard = 24.dp
     val InnerCard = 16.dp
     val SmallElement = 12.dp
+    val MicroElement = 8.dp
     val Pill = 999.dp
 
     val OuterCardShape: Shape = AppleContinuousCornerShape(OuterCard)
     val InnerCardShape: Shape = AppleContinuousCornerShape(InnerCard)
     val SmallElementShape: Shape = AppleContinuousCornerShape(SmallElement)
+    val MicroElementShape: Shape = AppleContinuousCornerShape(MicroElement)
     val PillShape: Shape = RoundedCornerShape(Pill)
 
     fun shapeFor(cornerRadius: Dp): Shape = when (cornerRadius) {
         OuterCard -> OuterCardShape
         InnerCard -> InnerCardShape
         SmallElement -> SmallElementShape
+        MicroElement -> MicroElementShape
         Pill -> PillShape
         else -> AppleContinuousCornerShape(cornerRadius)
     }

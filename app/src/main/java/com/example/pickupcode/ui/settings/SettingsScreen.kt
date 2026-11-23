@@ -65,6 +65,7 @@ import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -187,15 +188,16 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.5.8" }
+            info.versionName.orEmpty().ifBlank { "2.5.9" }
         } catch (_: Exception) {
-            "2.5.8"
+            "2.5.9"
         }
     }
 
     var editingStationNumber by remember { mutableStateOf<Int?>(null) }
     var showAddStationDialog by remember { mutableStateOf(false) }
     var showImportRulesDialog by remember { mutableStateOf(false) }
+    var showResetRulesConfirmDialog by remember { mutableStateOf(false) }
     var showPickedUpHistoryDialog by remember { mutableStateOf(false) }
     var showSupportPosterDialog by remember { mutableStateOf(false) }
 
@@ -436,7 +438,10 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .clip(AppleCorners.PillShape)
                                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
-                                .clickable(onClick = onResetStationRules)
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showResetRulesConfirmDialog = true
+                                }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Icon(
@@ -705,7 +710,7 @@ fun SettingsScreen(
             }
         }
 
-        // 4. 身份码跳转链路卡片（淘宝身份码、菜鸟身份码、拼多多取件码三开关独立控制）
+        // 4. 身份码跳转链路卡片（菜鸟APP、菜鸟身份码、淘宝身份码、拼多多取件码、京东身份码五开关独立控制）
         item(key = "identity_code_switches_card") {
             Column(
                 modifier = Modifier
@@ -951,6 +956,17 @@ fun SettingsScreen(
         SupportPosterDialog(
             onDismiss = { showSupportPosterDialog = false },
             onFeedbackMessage = onFeedbackMessage
+        )
+    }
+
+    // 重置默认识别规则确认弹窗（防止误触直接清空自定义配置）
+    if (showResetRulesConfirmDialog) {
+        ResetStationRulesConfirmDialog(
+            onDismiss = { showResetRulesConfirmDialog = false },
+            onConfirmReset = {
+                showResetRulesConfirmDialog = false
+                onResetStationRules()
+            }
         )
     }
 }
@@ -1251,6 +1267,7 @@ private fun EditStationRuleDialog(
             Spacer(modifier = Modifier.height(12.dp))
 
             // 在快递房显示名称后新添加一栏：输入 1 即显示 ①，留空则为实心等大圆
+            val isBadgeInvalid = badgeNumberText.isNotEmpty() && previewBadgeNum == null
             OutlinedTextField(
                 value = badgeNumberText,
                 onValueChange = { input ->
@@ -1259,6 +1276,7 @@ private fun EditStationRuleDialog(
                 label = { Text("序号（1~20，留空为实心圆）", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
+                isError = isBadgeInvalid,
                 shape = RoundedCornerShape(AppleCorners.InnerCard),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1364,6 +1382,7 @@ private fun EditStationRuleDialog(
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Button(
+                    enabled = badgeNumberText.isEmpty() || previewBadgeNum != null,
                     onClick = {
                         val finalName = displayName.trim().ifEmpty { rule.displayName }
                         onSaveRuleInfo(finalName, previewBadgeNum, newKeyword.trim())
@@ -1383,19 +1402,30 @@ private fun AddNewStationDialog(
     onDismiss: () -> Unit,
     onConfirm: (displayName: String, badgeNumber: Int?, keywords: List<String>) -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     var displayName by remember { mutableStateOf("") }
     var badgeNumberText by remember { mutableStateOf("") }
     var keywordsText by remember { mutableStateOf("") }
+    val previewBadgeNum = badgeNumberText.trim().toIntOrNull()?.takeIf { it in 1..20 }
+    val isBadgeInvalid = badgeNumberText.isNotEmpty() && previewBadgeNum == null
+    val previewAccent = stationAccentColor(previewBadgeNum ?: 1, isDark)
 
     SpringGlassDialog(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "添加快递房",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                softWrap = false,
-                maxLines = 1
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StationBadgeSymbol(
+                    badgeNumber = previewBadgeNum,
+                    accentColor = previewAccent
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "添加快递房",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    softWrap = false,
+                    maxLines = 1
+                )
+            }
             Spacer(modifier = Modifier.height(14.dp))
 
             OutlinedTextField(
@@ -1417,6 +1447,7 @@ private fun AddNewStationDialog(
                 label = { Text("序号（1~20，留空为实心圆）", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
+                isError = isBadgeInvalid,
                 shape = RoundedCornerShape(AppleCorners.InnerCard),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1444,17 +1475,71 @@ private fun AddNewStationDialog(
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Button(
+                    enabled = !isBadgeInvalid,
                     onClick = {
                         val kws = keywordsText
                             .split(Regex("""[、,，/\s]+"""))
                             .map { it.trim() }
                             .filter { it.isNotEmpty() }
-                        val badgeNum = badgeNumberText.trim().toIntOrNull()?.takeIf { it in 1..20 }
-                        onConfirm(displayName.trim(), badgeNum, kws)
+                        onConfirm(displayName.trim(), previewBadgeNum, kws)
                     },
                     shape = AppleCorners.InnerCardShape
                 ) {
                     Text("添加", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResetStationRulesConfirmDialog(
+    onDismiss: () -> Unit,
+    onConfirmReset: () -> Unit
+) {
+    val isDark = isSystemInDarkTheme()
+    val deleteRed = if (isDark) AppleRedDark else AppleRedLight
+
+    SpringGlassDialog(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "恢复默认识别规则？",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                softWrap = false,
+                maxLines = 1
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "将恢复为默认 1～8 号快递房规则\n当前自定义名称与关键词将被覆盖",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("取消", softWrap = false, maxLines = 1)
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Button(
+                    onClick = onConfirmReset,
+                    colors = ButtonDefaults.buttonColors(containerColor = deleteRed),
+                    shape = AppleCorners.InnerCardShape
+                ) {
+                    Text(
+                        text = "确认重置",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        softWrap = false,
+                        maxLines = 1
+                    )
                 }
             }
         }
@@ -1648,6 +1733,7 @@ private fun PickedUpHistoryDialog(
 
                         Column(
                             modifier = Modifier
+                                .animateItem()
                                 .fillMaxWidth()
                                 .liquidGlassInnerCard(
                                     cornerRadius = AppleCorners.InnerCard,

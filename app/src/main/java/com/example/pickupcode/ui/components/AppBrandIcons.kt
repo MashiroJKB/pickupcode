@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.pickupcode.R
 import com.example.pickupcode.ui.theme.addAppleContinuousRectPath
+import com.example.pickupcode.ui.theme.buildAndroidAppleContinuousRectPath
 
 /**
  * 严格的 Apple iOS App Icon 连续圆角（Squircle G2 三段三次贝塞尔曲线）：
@@ -35,46 +36,13 @@ val AppleIconSquircleShape: Shape = GenericShape { size, _ ->
 }
 
 private fun buildAndroidAppleSquirclePath(sizePx: Float): AndroidPath {
-    val r = sizePx * 0.2237f
-    val p = 1.52866483f * r
-    val a = 1.08849323f * r
-    val b = 0.86840689f * r
-    val c = 0.63149399f * r
-    val d = 0.07491176f * r
-    val e = 0.37282392f * r
-    val f = 0.16906013f * r
-    return AndroidPath().apply {
-        moveTo(p, 0f)
-        lineTo(sizePx - p, 0f)
-
-        // 右上角
-        cubicTo(sizePx - a, 0f, sizePx - b, 0f, sizePx - c, d)
-        cubicTo(sizePx - e, f, sizePx - f, e, sizePx - d, c)
-        cubicTo(sizePx, b, sizePx, a, sizePx, p)
-
-        lineTo(sizePx, sizePx - p)
-
-        // 右下角
-        cubicTo(sizePx, sizePx - a, sizePx, sizePx - b, sizePx - d, sizePx - c)
-        cubicTo(sizePx - f, sizePx - e, sizePx - e, sizePx - f, sizePx - c, sizePx - d)
-        cubicTo(sizePx - b, sizePx, sizePx - a, sizePx, sizePx - p, sizePx)
-
-        lineTo(p, sizePx)
-
-        // 左下角
-        cubicTo(a, sizePx, b, sizePx, c, sizePx - d)
-        cubicTo(e, sizePx - f, f, sizePx - e, d, sizePx - c)
-        cubicTo(0f, sizePx - b, 0f, sizePx - a, 0f, sizePx - p)
-
-        lineTo(0f, p)
-
-        // 左上角
-        cubicTo(0f, a, 0f, b, d, c)
-        cubicTo(f, e, e, f, c, d)
-        cubicTo(b, 0f, a, 0f, p, 0f)
-
-        close()
-    }
+    return buildAndroidAppleContinuousRectPath(
+        left = 0f,
+        top = 0f,
+        right = sizePx,
+        bottom = sizePx,
+        cornerRadiusPx = sizePx * 0.2237f
+    )
 }
 
 private fun brandDrawableRes(type: IdentityCodeType): Int = when (type) {

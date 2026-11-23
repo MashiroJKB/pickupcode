@@ -3,6 +3,7 @@ package com.example.pickupcode.ui.components
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -123,6 +125,14 @@ fun HomeBottomFloatingBar(
     val displayedShareCount = if (shareSelectedCount > 0) shareSelectedCount else lastState.shareCount
     val isDisplayingSharePill = displayedActionMode == CenterActionMode.SHARE_EMPTY ||
         displayedActionMode == CenterActionMode.SHARE_READY
+    val centerHorizontalPadding by animateDpAsState(
+        targetValue = if (isDisplayingSharePill) 16.dp else 72.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "center_pill_horizontal_padding"
+    )
 
     Box(
         modifier = modifier
@@ -163,7 +173,7 @@ fun HomeBottomFloatingBar(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .align(Alignment.Center)
-                .padding(horizontal = if (isDisplayingSharePill) 16.dp else 72.dp)
+                .padding(horizontal = centerHorizontalPadding)
         ) {
             AnimatedVisibility(
                 visible = actionMode != CenterActionMode.NONE,
