@@ -12,6 +12,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -201,7 +203,11 @@ fun RawMessageDetailDialog(
     val stationRowState = rememberLazyListState()
 
     LaunchedEffect(item.id, item.stationNumber, stationRules) {
-        val targetIndex = stationRules.indexOfFirst { it.stationNumber == item.stationNumber }
+        val targetIndex = if (item.stationNumber == 0) {
+            stationRules.size
+        } else {
+            stationRules.indexOfFirst { it.stationNumber == item.stationNumber }
+        }
         if (targetIndex >= 0) {
             stationRowState.scrollToItem(targetIndex)
         }
@@ -266,10 +272,16 @@ fun RawMessageDetailDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 220.dp)
-                    .clip(AppleCorners.InnerCardShape)
                     .background(
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f),
+                        shape = AppleCorners.InnerCardShape
                     )
+                    .border(
+                        width = 0.7.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.10f else 0.06f),
+                        shape = AppleCorners.InnerCardShape
+                    )
+                    .clip(AppleCorners.InnerCardShape)
                     .verticalScroll(rememberScrollState())
                     .padding(14.dp)
             ) {
@@ -280,56 +292,86 @@ fun RawMessageDetailDialog(
                 )
             }
 
-            if (stationRules.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(14.dp))
-                Text(
-                    text = "归属快递房",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    softWrap = false,
-                    maxLines = 1
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                LazyRow(
-                    state = stationRowState,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(
-                        items = stationRules,
-                        key = { "detail_station_${it.stationNumber}" }
-                    ) { rule ->
-                        val num = rule.stationNumber
-                        val selected = item.stationNumber == num
-                        val numAccent = stationAccentColor(rule.badgeNumber ?: num, isDark)
-                        val chipBg by animateColorAsState(
-                            targetValue = if (selected) numAccent else numAccent.copy(alpha = 0.12f),
-                            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-                            label = "detail_station_chip_bg"
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "归属快递房",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                softWrap = false,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LazyRow(
+                state = stationRowState,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(
+                    items = stationRules,
+                    key = { "detail_station_${it.stationNumber}" }
+                ) { rule ->
+                    val num = rule.stationNumber
+                    val selected = item.stationNumber == num
+                    val numAccent = stationAccentColor(rule.badgeNumber ?: num, isDark)
+                    val chipBg by animateColorAsState(
+                        targetValue = if (selected) numAccent else numAccent.copy(alpha = 0.12f),
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "detail_station_chip_bg"
+                    )
+                    val chipTextColor by animateColorAsState(
+                        targetValue = if (selected) Color.White else numAccent,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "detail_station_chip_fg"
+                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .background(color = chipBg, shape = AppleCorners.SmallElementShape)
+                            .clip(AppleCorners.SmallElementShape)
+                            .clickable { onChangeStation(num) }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "${rule.circleSymbol} ${rule.displayName}",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = chipTextColor,
+                            softWrap = false,
+                            maxLines = 1
                         )
-                        val chipTextColor by animateColorAsState(
-                            targetValue = if (selected) Color.White else numAccent,
-                            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-                            label = "detail_station_chip_fg"
+                    }
+                }
+                item(key = "detail_station_0") {
+                    val selected = item.stationNumber == 0
+                    val unclassifiedAccent = stationAccentColor(0, isDark)
+                    val chipBg by animateColorAsState(
+                        targetValue = if (selected) unclassifiedAccent else unclassifiedAccent.copy(alpha = 0.12f),
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "detail_station_0_bg"
+                    )
+                    val chipTextColor by animateColorAsState(
+                        targetValue = if (selected) Color.White else unclassifiedAccent,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "detail_station_0_fg"
+                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .background(color = chipBg, shape = AppleCorners.SmallElementShape)
+                            .clip(AppleCorners.SmallElementShape)
+                            .clickable { onChangeStation(0) }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "？ 待分类快递房",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = chipTextColor,
+                            softWrap = false,
+                            maxLines = 1
                         )
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .clip(AppleCorners.SmallElementShape)
-                                .background(chipBg)
-                                .clickable { onChangeStation(num) }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = "${rule.circleSymbol} ${rule.displayName}",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = chipTextColor,
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                        }
                     }
                 }
             }
@@ -345,7 +387,8 @@ fun RawMessageDetailDialog(
                     onClick = {
                         onDelete(item)
                         onDismiss()
-                    }
+                    },
+                    shape = AppleCorners.InnerCardShape
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.DeleteOutline,
@@ -368,7 +411,8 @@ fun RawMessageDetailDialog(
                         onClick = {
                             onDismiss()
                             onEditProduct(item)
-                        }
+                        },
+                        shape = AppleCorners.InnerCardShape
                     ) {
                         Text(
                             text = "备注商品",
@@ -446,7 +490,8 @@ fun EditProductRemarkDialog(
                         onClick = {
                             onConfirm("")
                             onDismiss()
-                        }
+                        },
+                        shape = AppleCorners.InnerCardShape
                     ) {
                         Text(
                             text = "清空备注",
@@ -456,7 +501,10 @@ fun EditProductRemarkDialog(
                         )
                     }
                 }
-                TextButton(onClick = onDismiss) {
+                TextButton(
+                    onClick = onDismiss,
+                    shape = AppleCorners.InnerCardShape
+                ) {
                     Text("取消", softWrap = false, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
@@ -518,13 +566,13 @@ fun AddOrPastePickupDialog(
 
     LaunchedEffect(initialStationNumber, stationRules) {
         val target = initialStationNumber ?: return@LaunchedEffect
-        if (target == 0) {
-            stationListState.scrollToItem(0)
+        val targetIndex = if (target == 0) {
+            stationRules.size
         } else {
-            val targetIndex = stationRules.indexOfFirst { it.stationNumber == target }
-            if (targetIndex >= 0) {
-                stationListState.scrollToItem(targetIndex)
-            }
+            stationRules.indexOfFirst { it.stationNumber == target }
+        }
+        if (targetIndex >= 0) {
+            stationListState.scrollToItem(targetIndex)
         }
     }
 
@@ -567,8 +615,10 @@ fun AddOrPastePickupDialog(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(AppleCorners.InnerCardShape)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                    .background(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                        shape = AppleCorners.InnerCardShape
+                    )
                     .padding(4.dp)
             ) {
                 listOf("手动输入取件码", "粘贴短信解析").forEachIndexed { idx, title ->
@@ -587,8 +637,8 @@ fun AddOrPastePickupDialog(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .weight(1f)
+                            .background(color = tabBg, shape = AppleCorners.SmallElementShape)
                             .clip(AppleCorners.SmallElementShape)
-                            .background(tabBg)
                             .clickable { tabIndex = idx }
                             .padding(vertical = 8.dp)
                     ) {
@@ -632,90 +682,86 @@ fun AddOrPastePickupDialog(
                                 shape = RoundedCornerShape(AppleCorners.InnerCard),
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            if (stationRules.isNotEmpty() || initialStationNumber == 0) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = "选择快递房：",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    softWrap = false,
-                                    maxLines = 1
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                LazyRow(
-                                    state = stationListState,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    if (initialStationNumber == 0) {
-                                        item(key = "station_chip_0") {
-                                            val selected = manualStation == 0
-                                            val accent = stationAccentColor(0, isDark)
-                                            val chipBg by animateColorAsState(
-                                                targetValue = if (selected) accent else accent.copy(alpha = 0.14f),
-                                                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-                                                label = "manual_station_0_bg"
-                                            )
-                                            val chipFg by animateColorAsState(
-                                                targetValue = if (selected) Color.White else accent,
-                                                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-                                                label = "manual_station_0_fg"
-                                            )
-                                            Box(
-                                                contentAlignment = Alignment.Center,
-                                                modifier = Modifier
-                                                    .clip(AppleCorners.SmallElementShape)
-                                                    .background(chipBg)
-                                                    .clickable { manualStation = 0 }
-                                                    .padding(horizontal = 10.dp, vertical = 7.dp)
-                                            ) {
-                                                Text(
-                                                    text = "？ 待分类",
-                                                    style = MaterialTheme.typography.labelMedium.copy(
-                                                        fontWeight = FontWeight.Bold
-                                                    ),
-                                                    color = chipFg,
-                                                    softWrap = false,
-                                                    maxLines = 1
-                                                )
-                                            }
-                                        }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "选择快递房：",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                softWrap = false,
+                                maxLines = 1
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            LazyRow(
+                                state = stationListState,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(
+                                    items = stationRules,
+                                    key = { "station_chip_${it.stationNumber}" }
+                                ) { rule ->
+                                    val num = rule.stationNumber
+                                    val selected = manualStation == num
+                                    val accent = stationAccentColor(rule.badgeNumber ?: num, isDark)
+                                    val chipBg by animateColorAsState(
+                                        targetValue = if (selected) accent else accent.copy(alpha = 0.14f),
+                                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                                        label = "manual_station_chip_bg"
+                                    )
+                                    val chipFg by animateColorAsState(
+                                        targetValue = if (selected) Color.White else accent,
+                                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                                        label = "manual_station_chip_fg"
+                                    )
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .background(color = chipBg, shape = AppleCorners.SmallElementShape)
+                                            .clip(AppleCorners.SmallElementShape)
+                                            .clickable { manualStation = num }
+                                            .padding(horizontal = 10.dp, vertical = 7.dp)
+                                    ) {
+                                        Text(
+                                            text = "${rule.circleSymbol} ${rule.displayName}",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = chipFg,
+                                            softWrap = false,
+                                            maxLines = 1
+                                        )
                                     }
-                                    items(
-                                        items = stationRules,
-                                        key = { "station_chip_${it.stationNumber}" }
-                                    ) { rule ->
-                                        val num = rule.stationNumber
-                                        val selected = manualStation == num
-                                        val accent = stationAccentColor(rule.badgeNumber ?: num, isDark)
-                                        val chipBg by animateColorAsState(
-                                            targetValue = if (selected) accent else accent.copy(alpha = 0.14f),
-                                            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-                                            label = "manual_station_chip_bg"
+                                }
+                                item(key = "station_chip_0") {
+                                    val selected = manualStation == 0
+                                    val accent = stationAccentColor(0, isDark)
+                                    val chipBg by animateColorAsState(
+                                        targetValue = if (selected) accent else accent.copy(alpha = 0.14f),
+                                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                                        label = "manual_station_0_bg"
+                                    )
+                                    val chipFg by animateColorAsState(
+                                        targetValue = if (selected) Color.White else accent,
+                                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                                        label = "manual_station_0_fg"
+                                    )
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .background(color = chipBg, shape = AppleCorners.SmallElementShape)
+                                            .clip(AppleCorners.SmallElementShape)
+                                            .clickable { manualStation = 0 }
+                                            .padding(horizontal = 10.dp, vertical = 7.dp)
+                                    ) {
+                                        Text(
+                                            text = "？ 待分类快递房",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = chipFg,
+                                            softWrap = false,
+                                            maxLines = 1
                                         )
-                                        val chipFg by animateColorAsState(
-                                            targetValue = if (selected) Color.White else accent,
-                                            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-                                            label = "manual_station_chip_fg"
-                                        )
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .clip(AppleCorners.SmallElementShape)
-                                                .background(chipBg)
-                                                .clickable { manualStation = num }
-                                                .padding(horizontal = 10.dp, vertical = 7.dp)
-                                        ) {
-                                            Text(
-                                                text = "${rule.circleSymbol} ${rule.displayName}",
-                                                style = MaterialTheme.typography.labelMedium.copy(
-                                                    fontWeight = FontWeight.Bold
-                                                ),
-                                                color = chipFg,
-                                                softWrap = false,
-                                                maxLines = 1
-                                            )
-                                        }
                                     }
                                 }
                             }
@@ -736,7 +782,10 @@ fun AddOrPastePickupDialog(
                                 .fillMaxWidth()
                                 .padding(top = 14.dp)
                         ) {
-                            TextButton(onClick = onDismiss) {
+                            TextButton(
+                                onClick = onDismiss,
+                                shape = AppleCorners.InnerCardShape
+                            ) {
                                 Text("取消", softWrap = false, maxLines = 1)
                             }
                             Spacer(modifier = Modifier.width(6.dp))
@@ -784,7 +833,10 @@ fun AddOrPastePickupDialog(
                                 .fillMaxWidth()
                                 .padding(top = 14.dp)
                         ) {
-                            TextButton(onClick = onDismiss) {
+                            TextButton(
+                                onClick = onDismiss,
+                                shape = AppleCorners.InnerCardShape
+                            ) {
                                 Text("取消", softWrap = false, maxLines = 1)
                             }
                             Spacer(modifier = Modifier.width(6.dp))
@@ -1114,8 +1166,10 @@ fun SmsOnboardingPermissionDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(top = 10.dp)
-                                        .clip(AppleCorners.SmallElementShape)
-                                        .background(statusAmber.copy(alpha = 0.12f))
+                                        .background(
+                                            color = statusAmber.copy(alpha = 0.12f),
+                                            shape = AppleCorners.SmallElementShape
+                                        )
                                         .border(
                                             width = 0.8.dp,
                                             color = statusAmber.copy(alpha = 0.30f),
@@ -1147,7 +1201,8 @@ fun SmsOnboardingPermissionDialog(
                                         onClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onRequestSmsPermission()
-                                        }
+                                        },
+                                        shape = AppleCorners.InnerCardShape
                                     ) {
                                         Text(
                                             text = "直接授权",
@@ -1156,7 +1211,10 @@ fun SmsOnboardingPermissionDialog(
                                         )
                                     }
                                 } else {
-                                    TextButton(onClick = onDismiss) {
+                                    TextButton(
+                                        onClick = onDismiss,
+                                        shape = AppleCorners.InnerCardShape
+                                    ) {
                                         Text(
                                             text = "暂不设置",
                                             softWrap = false,
@@ -1226,7 +1284,7 @@ fun SmsOnboardingPermissionDialog(
                                             text = if (justUnlockedRestricted) {
                                                 "已解除限制 · 开启后自动识别"
                                             } else {
-                                                "自动整理近 7 天快递取件短信"
+                                                "自动扫描最近 7 天取件短信"
                                             },
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = if (justUnlockedRestricted) {
@@ -1260,7 +1318,7 @@ fun SmsOnboardingPermissionDialog(
                                 OnboardingFeatureRow(
                                     icon = Icons.Rounded.MarkEmailRead,
                                     title = "自动提取快递取件码",
-                                    subtitle = "扫描近 7 天短信，过滤验证码",
+                                    subtitle = "扫描最近 7 天短信，过滤验证码",
                                     accentColor = primaryColor
                                 )
                                 OnboardingFeatureRow(
@@ -1284,8 +1342,10 @@ fun SmsOnboardingPermissionDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(top = 10.dp)
-                                        .clip(AppleCorners.SmallElementShape)
-                                        .background(statusAmber.copy(alpha = 0.12f))
+                                        .background(
+                                            color = statusAmber.copy(alpha = 0.12f),
+                                            shape = AppleCorners.SmallElementShape
+                                        )
                                         .border(
                                             width = 0.8.dp,
                                             color = statusAmber.copy(alpha = 0.30f),
@@ -1308,7 +1368,10 @@ fun SmsOnboardingPermissionDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                TextButton(onClick = onDismiss) {
+                                TextButton(
+                                    onClick = onDismiss,
+                                    shape = AppleCorners.InnerCardShape
+                                ) {
                                     Text(
                                         text = "暂不设置",
                                         softWrap = false,
@@ -1328,7 +1391,7 @@ fun SmsOnboardingPermissionDialog(
                                     shape = AppleCorners.InnerCardShape
                                 ) {
                                     Text(
-                                        text = if (isSmsPermanentlyDenied) "前往应用信息" else "授予短信权限",
+                                        text = if (isSmsPermanentlyDenied) "前往应用信息" else "授权短信读取",
                                         fontWeight = FontWeight.Bold,
                                         softWrap = false,
                                         maxLines = 1
@@ -1522,8 +1585,10 @@ private fun OnboardingFeatureRow(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(34.dp)
-                .clip(AppleCorners.SmallElementShape)
-                .background(accentColor.copy(alpha = 0.15f))
+                .background(
+                    color = accentColor.copy(alpha = 0.15f),
+                    shape = AppleCorners.SmallElementShape
+                )
         ) {
             Icon(
                 imageVector = icon,
@@ -1645,24 +1710,41 @@ fun SharePickupMethodDialog(
                     }
                     .padding(horizontal = 14.dp, vertical = 12.dp)
             ) {
+                val remarkCheckFill by animateColorAsState(
+                    targetValue = if (includeRemarks) imageAccent else Color.Transparent,
+                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                    label = "remark_check_fill"
+                )
+                val remarkCheckBorder by animateColorAsState(
+                    targetValue = if (includeRemarks) imageAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                    label = "remark_check_border"
+                )
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(22.dp)
-                        .clip(CircleShape)
-                        .then(
-                            if (includeRemarks) {
-                                Modifier.background(imageAccent)
-                            } else {
-                                Modifier.border(
-                                    width = 1.6.dp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                    shape = CircleShape
-                                )
-                            }
+                        .background(color = remarkCheckFill, shape = CircleShape)
+                        .border(
+                            width = 1.6.dp,
+                            color = remarkCheckBorder,
+                            shape = CircleShape
                         )
                 ) {
-                    if (includeRemarks) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = includeRemarks,
+                        enter = scaleIn(
+                            initialScale = 0.55f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            )
+                        ) + fadeIn(animationSpec = tween(durationMillis = 120)),
+                        exit = scaleOut(
+                            targetScale = 0.55f,
+                            animationSpec = tween(durationMillis = 90)
+                        ) + fadeOut(animationSpec = tween(durationMillis = 90))
+                    ) {
                         Icon(
                             imageVector = Icons.Rounded.Check,
                             contentDescription = null,
@@ -1704,7 +1786,8 @@ fun SharePickupMethodDialog(
             ) {
                 TextButton(
                     enabled = !isGeneratingImage,
-                    onClick = onDismiss
+                    onClick = onDismiss,
+                    shape = AppleCorners.InnerCardShape
                 ) {
                     Text("取消", softWrap = false, maxLines = 1)
                 }
@@ -1736,8 +1819,10 @@ private fun ShareOptionCard(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(38.dp)
-                .clip(AppleCorners.SmallElementShape)
-                .background(accent.copy(alpha = 0.16f))
+                .background(
+                    color = accent.copy(alpha = 0.16f),
+                    shape = AppleCorners.SmallElementShape
+                )
         ) {
             Icon(
                 imageVector = icon,
@@ -1831,8 +1916,8 @@ fun StationCountSetupDialog(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .weight(1f)
+                            .background(color = presetBg, shape = AppleCorners.SmallElementShape)
                             .clip(AppleCorners.SmallElementShape)
-                            .background(presetBg)
                             .clickable { countText = preset.toString() }
                             .padding(vertical = 8.dp)
                     ) {
@@ -1870,7 +1955,10 @@ fun StationCountSetupDialog(
                 horizontalArrangement = Arrangement.End,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(onClick = onDismiss) {
+                TextButton(
+                    onClick = onDismiss,
+                    shape = AppleCorners.InnerCardShape
+                ) {
                     Text("暂不设置", softWrap = false, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(6.dp))

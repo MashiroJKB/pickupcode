@@ -2,7 +2,6 @@ package com.example.pickupcode.ui.theme
 
 import android.graphics.Path as AndroidPath
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -17,13 +16,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -290,9 +296,34 @@ fun Modifier.liquidGlass(
     }
 
     return this
+        .drawWithCache {
+            val w = size.width
+            val h = size.height
+            val rPx = cornerRadius.toPx().coerceIn(0f, minOf(w, h) * 0.5f)
+            val strokePx = 0.85.dp.toPx()
+            val halfStroke = strokePx * 0.5f
+            val fillPath = Path().apply {
+                addAppleContinuousRectPath(w = w, h = h, cornerRadiusPx = rPx)
+            }
+            val borderPath = Path().apply {
+                addAppleContinuousRectPath(
+                    w = (w - strokePx).coerceAtLeast(0f),
+                    h = (h - strokePx).coerceAtLeast(0f),
+                    cornerRadiusPx = (rPx - halfStroke).coerceAtLeast(0f)
+                )
+            }
+            onDrawBehind {
+                drawPath(path = fillPath, brush = surfaceBrush)
+                translate(left = halfStroke, top = halfStroke) {
+                    drawPath(
+                        path = borderPath,
+                        brush = borderBrush,
+                        style = Stroke(width = strokePx)
+                    )
+                }
+            }
+        }
         .clip(shape)
-        .background(brush = surfaceBrush, shape = shape)
-        .border(width = 0.85.dp, brush = borderBrush, shape = shape)
 }
 
 /**
@@ -339,10 +370,75 @@ fun Modifier.liquidGlassInnerCard(
     }
 
     return this
+        .drawWithCache {
+            val w = size.width
+            val h = size.height
+            val rPx = cornerRadius.toPx().coerceIn(0f, minOf(w, h) * 0.5f)
+            val strokePx = 0.75.dp.toPx()
+            val halfStroke = strokePx * 0.5f
+            val fillPath = Path().apply {
+                addAppleContinuousRectPath(w = w, h = h, cornerRadiusPx = rPx)
+            }
+            val borderPath = Path().apply {
+                addAppleContinuousRectPath(
+                    w = (w - strokePx).coerceAtLeast(0f),
+                    h = (h - strokePx).coerceAtLeast(0f),
+                    cornerRadiusPx = (rPx - halfStroke).coerceAtLeast(0f)
+                )
+            }
+            onDrawBehind {
+                drawPath(path = fillPath, brush = surfaceBrush)
+                translate(left = halfStroke, top = halfStroke) {
+                    drawPath(
+                        path = borderPath,
+                        color = borderColor,
+                        style = Stroke(width = strokePx)
+                    )
+                }
+            }
+        }
         .clip(shape)
-        .background(brush = surfaceBrush, shape = shape)
-        .border(width = 0.75.dp, color = borderColor, shape = shape)
 }
+
+/**
+ * 位图/海报专用硬件抗锯齿 Apple 连续圆角裁剪修饰符（避免部分 GPU 上 clipPath 模板裁剪产生 1px 锯齿）
+ */
+fun Modifier.clipAppleContinuous(cornerRadius: Dp): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithCache {
+        val w = size.width
+        val h = size.height
+        val rPx = cornerRadius.toPx().coerceIn(0f, minOf(w, h) * 0.5f)
+        val inverseMask = Path().apply {
+            fillType = PathFillType.EvenOdd
+            addRect(Rect(-4f, -4f, w + 4f, h + 4f))
+            addAppleContinuousRectPath(w = w, h = h, cornerRadiusPx = rPx)
+        }
+        onDrawWithContent {
+            drawContent()
+            drawPath(path = inverseMask, color = Color.Black, blendMode = BlendMode.Clear)
+        }
+    }
+
+/**
+ * 应用图标专用硬件抗锯齿 iOS App Icon Squircle（r = 0.2237 * min(w, h)）裁剪修饰符
+ */
+fun Modifier.clipAppleIconSquircle(): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithCache {
+        val w = size.width
+        val h = size.height
+        val rPx = minOf(w, h) * 0.2237f
+        val inverseMask = Path().apply {
+            fillType = PathFillType.EvenOdd
+            addRect(Rect(-4f, -4f, w + 4f, h + 4f))
+            addAppleContinuousRectPath(w = w, h = h, cornerRadiusPx = rPx)
+        }
+        onDrawWithContent {
+            drawContent()
+            drawPath(path = inverseMask, color = Color.Black, blendMode = BlendMode.Clear)
+        }
+    }
 
 /**
  * 全局液态光影背景容器（使用 drawWithCache 缓存径向渐变 Brush，零帧率损耗，满帧 120Hz）

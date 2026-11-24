@@ -251,4 +251,32 @@ class PickupMessageParserTest {
         assertEquals(2, r2.single().stationNumber)
         assertEquals(listOf("889900"), r3.map { it.code })
     }
+
+    @Test
+    fun `extracts multi-bracketed, semicolon-separated, locker-password, and full-width codes`() {
+        val multiBracketSms = "【丰巢】您的2件包裹已入柜，请凭取件码【682914】、【682915】到1号丰巢领取。"
+        val semicolonSms = "【菜鸟驿站】凭取件码 520314；520315 到3号快递房领取。"
+        val lockerPwdSms = "【丰巢】您的快件已存入2号丰巢快递柜，请凭密码839204取件。"
+        val fullWidthSms = "【菜鸟驿站】您的包裹已到4号房，请凭取件码 Ａ１－３０４８ 领取。"
+        val adjacentUnitSms = "【菜鸟驿站】凭取件码1-2-3045件已到5号快递房，请及时取件（1001室）。"
+        val bankPwdSms = "【银行通知】您的交易密码已重置，凭新支付密码839204办理业务。"
+
+        val rMultiBracket = PickupMessageParser.parse(multiBracketSms, defaultRules)
+        val rSemicolon = PickupMessageParser.parse(semicolonSms, defaultRules)
+        val rLockerPwd = PickupMessageParser.parse(lockerPwdSms, defaultRules)
+        val rFullWidth = PickupMessageParser.parse(fullWidthSms, defaultRules)
+        val rAdjacent = PickupMessageParser.parse(adjacentUnitSms, defaultRules)
+
+        assertEquals(listOf("682914", "682915"), rMultiBracket.map { it.code })
+        assertEquals(1, rMultiBracket.first().stationNumber)
+        assertEquals(listOf("520314", "520315"), rSemicolon.map { it.code })
+        assertEquals(3, rSemicolon.first().stationNumber)
+        assertEquals(listOf("839204"), rLockerPwd.map { it.code })
+        assertEquals(2, rLockerPwd.single().stationNumber)
+        assertEquals(listOf("A1-3048"), rFullWidth.map { it.code })
+        assertEquals(4, rFullWidth.single().stationNumber)
+        assertEquals(listOf("1-2-3045"), rAdjacent.map { it.code })
+        assertEquals(5, rAdjacent.single().stationNumber)
+        assertTrue(PickupMessageParser.parse(bankPwdSms, defaultRules).isEmpty())
+    }
 }

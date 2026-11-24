@@ -13,8 +13,11 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -125,6 +128,7 @@ import com.example.pickupcode.ui.theme.AppleOrangeLight
 import com.example.pickupcode.ui.theme.AppleRedDark
 import com.example.pickupcode.ui.theme.AppleRedLight
 import com.example.pickupcode.ui.theme.PickupCodeMonospaceStyle
+import com.example.pickupcode.ui.theme.clipAppleContinuous
 import com.example.pickupcode.ui.theme.liquidGlass
 import com.example.pickupcode.ui.theme.liquidGlassInnerCard
 import com.example.pickupcode.ui.theme.stationAccentColor
@@ -188,9 +192,9 @@ fun SettingsScreen(
                 @Suppress("DEPRECATION")
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
-            info.versionName.orEmpty().ifBlank { "2.5.9" }
+            info.versionName.orEmpty().ifBlank { "2.6.0" }
         } catch (_: Exception) {
-            "2.5.9"
+            "2.6.0"
         }
     }
 
@@ -372,7 +376,7 @@ fun SettingsScreen(
             item(key = "sms_permission_card") {
                 PermissionStatusCard(
                     title = "短信读取权限未开启",
-                    subtitle = "授权后自动扫描近 7 天取件短信",
+                    subtitle = "开启后自动扫描最近 7 天短信",
                     accentColor = statusAmber,
                     buttonText = "开启权限",
                     onClick = onRequestSmsPermission,
@@ -476,8 +480,11 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier
                             .weight(1f)
+                            .background(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                shape = AppleCorners.SmallElementShape
+                            )
                             .clip(AppleCorners.SmallElementShape)
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onExportStationRules()
@@ -507,8 +514,11 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier
                             .weight(1f)
+                            .background(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                shape = AppleCorners.SmallElementShape
+                            )
                             .clip(AppleCorners.SmallElementShape)
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 showImportRulesDialog = true
@@ -691,6 +701,8 @@ fun SettingsScreen(
                                             .background(deleteRed.copy(alpha = 0.12f))
                                             .clickable {
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                draggingStationNumber = null
+                                                dragOffsetY = 0f
                                                 onDeleteStation(rule.stationNumber)
                                             }
                                     ) {
@@ -936,7 +948,8 @@ fun SettingsScreen(
             onImport = { tokenText ->
                 onImportStationRules(tokenText)
                 showImportRulesDialog = false
-            }
+            },
+            onFeedbackMessage = onFeedbackMessage
         )
     }
 
@@ -1294,7 +1307,8 @@ private fun EditStationRuleDialog(
                             onClick = {
                                 onAddKeyword(newKeyword.trim())
                                 newKeyword = ""
-                            }
+                            },
+                            shape = AppleCorners.SmallElementShape
                         ) {
                             Text("添加", fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
@@ -1319,10 +1333,16 @@ private fun EditStationRuleDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 56.dp, max = 160.dp)
-                    .clip(AppleCorners.InnerCardShape)
                     .background(
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.08f else 0.05f),
+                        shape = AppleCorners.InnerCardShape
                     )
+                    .border(
+                        width = 0.7.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.10f else 0.06f),
+                        shape = AppleCorners.InnerCardShape
+                    )
+                    .clip(AppleCorners.InnerCardShape)
                     .padding(12.dp)
                     .verticalScroll(rememberScrollState())
             ) {
@@ -1377,7 +1397,10 @@ private fun EditStationRuleDialog(
                 horizontalArrangement = Arrangement.End,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(onClick = onDismiss) {
+                TextButton(
+                    onClick = onDismiss,
+                    shape = AppleCorners.InnerCardShape
+                ) {
                     Text("取消", softWrap = false, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
@@ -1470,7 +1493,10 @@ private fun AddNewStationDialog(
                 horizontalArrangement = Arrangement.End,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(onClick = onDismiss) {
+                TextButton(
+                    onClick = onDismiss,
+                    shape = AppleCorners.InnerCardShape
+                ) {
                     Text("取消", softWrap = false, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
@@ -1524,7 +1550,10 @@ private fun ResetStationRulesConfirmDialog(
                 horizontalArrangement = Arrangement.End,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(onClick = onDismiss) {
+                TextButton(
+                    onClick = onDismiss,
+                    shape = AppleCorners.InnerCardShape
+                ) {
                     Text("取消", softWrap = false, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
@@ -1549,7 +1578,8 @@ private fun ResetStationRulesConfirmDialog(
 @Composable
 private fun ImportStationRulesDialog(
     onDismiss: () -> Unit,
-    onImport: (String) -> Unit
+    onImport: (String) -> Unit,
+    onFeedbackMessage: (String) -> Unit
 ) {
     val context = LocalContext.current
     var inputToken by remember { mutableStateOf("") }
@@ -1580,8 +1610,11 @@ private fun ImportStationRulesDialog(
                         }
                         if (clipText.isNotBlank()) {
                             inputToken = clipText
+                        } else {
+                            onFeedbackMessage("剪贴板暂无内容")
                         }
-                    }
+                    },
+                    shape = AppleCorners.SmallElementShape
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.ContentPaste,
@@ -1611,7 +1644,10 @@ private fun ImportStationRulesDialog(
                 horizontalArrangement = Arrangement.End,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(onClick = onDismiss) {
+                TextButton(
+                    onClick = onDismiss,
+                    shape = AppleCorners.InnerCardShape
+                ) {
                     Text("取消", softWrap = false, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(6.dp))
@@ -1939,25 +1975,34 @@ private fun SupportPosterDialog(
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .aspectRatio(705f / 1024f)
-                        .clip(AppleCorners.InnerCardShape)
+                        .clipAppleContinuous(AppleCorners.InnerCard)
                 )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
+
+            val saveBtnBg by animateColorAsState(
+                targetValue = if (saveSucceeded) {
+                    statusGreen.copy(alpha = 0.16f)
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                label = "support_save_btn_bg"
+            )
+            val saveBtnFg by animateColorAsState(
+                targetValue = if (saveSucceeded) statusGreen else Color.White,
+                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                label = "support_save_btn_fg"
+            )
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(color = saveBtnBg, shape = AppleCorners.InnerCardShape)
                     .clip(AppleCorners.InnerCardShape)
-                    .background(
-                        if (saveSucceeded) {
-                            statusGreen.copy(alpha = 0.16f)
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        }
-                    )
                     .clickable(enabled = !isSaving) {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         isSaving = true
@@ -1975,18 +2020,18 @@ private fun SupportPosterDialog(
                 Icon(
                     imageVector = if (saveSucceeded) Icons.Rounded.Check else Icons.Rounded.Download,
                     contentDescription = null,
-                    tint = if (saveSucceeded) statusGreen else Color.White,
+                    tint = saveBtnFg,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = when {
                         isSaving -> "正在保存..."
-                        saveSucceeded -> "已保存到相册 · 打开支付宝扫一扫"
+                        saveSucceeded -> "已保存 · 可打开支付宝扫码"
                         else -> "保存图片到相册"
                     },
                     style = MaterialTheme.typography.titleSmall,
-                    color = if (saveSucceeded) statusGreen else Color.White,
+                    color = saveBtnFg,
                     softWrap = false,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

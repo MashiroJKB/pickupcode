@@ -92,53 +92,68 @@ class PickupWidgetProvider : AppWidgetProvider() {
         super.onReceive(context, intent)
         when (intent.action) {
             ACTION_LAUNCH_CAINIAO_APP -> {
+                var hadFallbackToast = false
                 TaobaoDeepLinkLauncher.launchIdentityCode(
                     context = context,
                     type = IdentityCodeType.CAINIAO_APP,
                     onFeedbackMessage = { msg ->
+                        hadFallbackToast = true
                         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                     }
                 )
+                if (!hadFallbackToast) notifyWidgetDataChanged(context)
             }
 
             ACTION_LAUNCH_CAINIAO -> {
+                var hadFallbackToast = false
                 TaobaoDeepLinkLauncher.launchIdentityCode(
                     context = context,
                     type = IdentityCodeType.CAINIAO,
                     onFeedbackMessage = { msg ->
+                        hadFallbackToast = true
                         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                     }
                 )
+                if (!hadFallbackToast) notifyWidgetDataChanged(context)
             }
 
             ACTION_LAUNCH_TAOBAO -> {
+                var hadFallbackToast = false
                 TaobaoDeepLinkLauncher.launchIdentityCode(
                     context = context,
                     type = IdentityCodeType.TAOBAO,
                     onFeedbackMessage = { msg ->
+                        hadFallbackToast = true
                         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                     }
                 )
+                if (!hadFallbackToast) notifyWidgetDataChanged(context)
             }
 
             ACTION_LAUNCH_PINDUODUO -> {
+                var hadFallbackToast = false
                 TaobaoDeepLinkLauncher.launchIdentityCode(
                     context = context,
                     type = IdentityCodeType.PINDUODUO,
                     onFeedbackMessage = { msg ->
+                        hadFallbackToast = true
                         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                     }
                 )
+                if (!hadFallbackToast) notifyWidgetDataChanged(context)
             }
 
             ACTION_LAUNCH_JD -> {
+                var hadFallbackToast = false
                 TaobaoDeepLinkLauncher.launchIdentityCode(
                     context = context,
                     type = IdentityCodeType.JD,
                     onFeedbackMessage = { msg ->
+                        hadFallbackToast = true
                         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                     }
                 )
+                if (!hadFallbackToast) notifyWidgetDataChanged(context)
             }
 
             ACTION_ITEM_CLICK -> {
@@ -254,9 +269,26 @@ class PickupWidgetProvider : AppWidgetProvider() {
             val rows = snapshot.rows
             val views = RemoteViews(context.packageName, R.layout.widget_pickup_code)
 
+            // 按当前已开启数量自适应图标尺寸与间距：1~3 枚放大至 36dp + 12dp 宽间距防误触；4 枚 32dp + 9dp；5 枚 28dp + 6dp
+            val enabledShortcutCount =
+                (if (snapshot.showCainiaoApp) 1 else 0) +
+                    (if (snapshot.showCainiao) 1 else 0) +
+                    (if (snapshot.showTaobao) 1 else 0) +
+                    (if (snapshot.showPinduoduo) 1 else 0) +
+                    (if (snapshot.showJd) 1 else 0)
+
             views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_DIP, 17f)
-            views.setTextViewText(R.id.widget_pending_count, "待取 $pendingCount 件")
+            val pendingLabel = if (enabledShortcutCount >= 4) "$pendingCount 件" else "待取 $pendingCount 件"
+            views.setTextViewText(R.id.widget_pending_count, pendingLabel)
             views.setTextViewTextSize(R.id.widget_pending_count, TypedValue.COMPLEX_UNIT_DIP, 12f)
+            views.setViewVisibility(
+                R.id.widget_pending_count,
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && enabledShortcutCount >= 4) {
+                    View.GONE
+                } else {
+                    View.VISIBLE
+                }
+            )
             views.setTextViewTextSize(R.id.widget_empty_view, TypedValue.COMPLEX_UNIT_DIP, 13f)
 
             // 点击左侧标题打开主应用
@@ -270,13 +302,6 @@ class PickupWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_header_title_area, openAppPendingIntent)
             views.setOnClickPendingIntent(R.id.widget_empty_view, openAppPendingIntent)
 
-            // 按当前已开启数量自适应图标尺寸与间距：1~3 枚放大至 36dp + 12dp 宽间距防误触；4 枚 32dp + 9dp；5 枚 28dp + 6dp
-            val enabledShortcutCount =
-                (if (snapshot.showCainiaoApp) 1 else 0) +
-                    (if (snapshot.showCainiao) 1 else 0) +
-                    (if (snapshot.showTaobao) 1 else 0) +
-                    (if (snapshot.showPinduoduo) 1 else 0) +
-                    (if (snapshot.showJd) 1 else 0)
             val (iconSizeDp, iconGapDp, firstGapDp) = resolveWidgetShortcutLayout(enabledShortcutCount)
             var isFirstVisibleShortcut = true
 

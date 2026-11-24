@@ -1,7 +1,9 @@
 package com.example.pickupcode.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -53,6 +55,14 @@ private val LightColorScheme = lightColorScheme(
     onError = Color.White
 )
 
+private val AppShapes = Shapes(
+    extraSmall = RoundedCornerShape(AppleCorners.MicroElement),
+    small = RoundedCornerShape(AppleCorners.SmallElement),
+    medium = RoundedCornerShape(AppleCorners.InnerCard),
+    large = RoundedCornerShape(AppleCorners.OuterCard),
+    extraLarge = RoundedCornerShape(AppleCorners.OuterCard)
+)
+
 @Composable
 fun PickupCodeTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -63,6 +73,7 @@ fun PickupCodeTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = AppTypography,
+        shapes = AppShapes,
         content = content
     )
 }

@@ -356,7 +356,9 @@ object PickupShareHelper {
                         rowRight - rowLeft,
                         TextUtils.TruncateAt.END
                     ).toString()
-                    canvas.drawText(ellipsizedRemark, rowLeft, rowRect.top + 92f, remarkPaint)
+                    val remarkCenterY = rowRect.top + 84f
+                    val remarkBaseY = remarkCenterY - (remarkPaint.descent() + remarkPaint.ascent()) / 2f
+                    canvas.drawText(ellipsizedRemark, rowLeft, remarkBaseY, remarkPaint)
                 }
 
                 rowY += rh + itemRowSpacing

@@ -15,9 +15,18 @@ val AppleOrangeDark = Color(0xFFFF9F0A)
 val AppleRedLight = Color(0xFFFF3B30)
 val AppleRedDark = Color(0xFFFF453A)
 
-// 淘宝身份码品牌渐变强调色
+// 身份码跳转链路品牌渐变色
+val CainiaoBlueStart = Color(0xFF006EFF)
+val CainiaoBlueEnd = Color(0xFF0055D4)
+
 val TaobaoOrangeStart = Color(0xFFFF6A00)
 val TaobaoOrangeEnd = Color(0xFFFF2E00)
+
+val PinduoduoRedStart = Color(0xFFE12A1F)
+val PinduoduoRedEnd = Color(0xFFC8161D)
+
+val JdRedStart = Color(0xFFFF301A)
+val JdRedEnd = Color(0xFFE01F14)
 
 // 快递房专属高辨识度 Apple 色彩（支持任意编号循环映射）
 fun stationAccentColor(stationNumber: Int, isDark: Boolean): Color {

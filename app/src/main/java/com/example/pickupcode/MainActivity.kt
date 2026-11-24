@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -410,6 +411,23 @@ fun PickupMainApp(viewModel: PickupViewModel) {
 
     val dialogShareItems = if (isShareSelectionMode) activeShareSelectedItems else activeSelectedItems
 
+    LaunchedEffect(items) {
+        val pendingIdSet = items.asSequence().filter { !it.isPickedUp }.map { it.id }.toSet()
+        val allIdSet = items.asSequence().map { it.id }.toSet()
+        if (shareSelectedIds.any { it !in pendingIdSet }) {
+            shareSelectedIds = shareSelectedIds.intersect(pendingIdSet)
+        }
+        activeDetailItem?.let { current ->
+            if (current.id !in pendingIdSet) activeDetailItem = null
+        }
+        activeLongPressItem?.let { current ->
+            if (current.id !in pendingIdSet) activeLongPressItem = null
+        }
+        activeEditProductItem?.let { current ->
+            if (current.id !in allIdSet) activeEditProductItem = null
+        }
+    }
+
     LaunchedEffect(pendingItems, isShareSelectionMode, dialogShareItems) {
         if (isShareSelectionMode && pendingItems.isEmpty()) {
             isShareSelectionMode = false
@@ -441,6 +459,20 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                             alpha = (1f - settingsProgress).coerceIn(0f, 1f)
                             translationX = -settingsProgress * 24.dp.toPx()
                         }
+                        .then(
+                            if (showSettingsScreen) {
+                                Modifier.pointerInput(Unit) {
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            event.changes.forEach { it.consume() }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Modifier
+                            }
+                        )
                 ) {
                     HomeScreen(
                         items = items,
@@ -539,6 +571,20 @@ fun PickupMainApp(viewModel: PickupViewModel) {
                             alpha = settingsProgress.coerceIn(0f, 1f)
                             translationX = (1f - settingsProgress) * 32.dp.toPx()
                         }
+                        .then(
+                            if (!showSettingsScreen) {
+                                Modifier.pointerInput(Unit) {
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            event.changes.forEach { it.consume() }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Modifier
+                            }
+                        )
                 ) {
                     SettingsScreen(
                         items = items,

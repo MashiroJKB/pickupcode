@@ -27,7 +27,8 @@ object PickupMessageParser {
 
     // 1. 排除干扰信息关键词（验证码类 + 已完成/营销提醒类）
     private val EXCLUDE_VERIFICATION_KEYWORDS = listOf(
-        "验证码", "动态码", "校验码", "请勿泄露", "登录密码", "修改密码", "安全码", "身份验证"
+        "验证码", "动态码", "校验码", "请勿泄露", "登录密码", "修改密码",
+        "支付密码", "交易密码", "初始密码", "重置密码", "服务密码", "安全码", "身份验证"
     )
 
     private val EXCLUDE_MARKETING_OR_DONE_KEYWORDS = listOf(
@@ -36,19 +37,19 @@ object PickupMessageParser {
 
     // 2. 取件强特征词
     private val STRONG_PICKUP_KEYWORDS = listOf(
-        "取件码", "提货码", "取货码", "自提码", "提取码", "取件密码", "取件编号", "取件号",
-        "包裹码", "开箱码", "货架", "凭", "取件", "自提", "入库", "已放至", "已存放", "已到达",
+        "取件码", "提货码", "取货码", "自提码", "提取码", "取件密码", "开箱密码", "提货密码", "取货密码", "自提密码",
+        "取件编号", "取件号", "包裹码", "开箱码", "货架", "凭", "取件", "自提", "入库", "已放至", "已存放", "已到达",
         "快递", "驿站", "号房", "菜鸟", "丰巢", "兔喜", "妈妈驿站",
         "近邻宝", "熊猫快收", "速递易", "快递柜", "快递点", "快递超市", "快递中心",
         "到站", "待取", "代收点", "服务点"
     )
 
     // 干扰数字掩码正则（时间、日期、手机号、座机、客服热线、尾号、计件/金额）
-    private val TIME_RANGE_REGEX = Regex("""(?<!\d)\d{1,2}:\d{2}(?:\s*[-~至到]\s*\d{1,2}:\d{2})?(?!\d)""")
-    private val DATE_REGEX = Regex("""(?<!\d)(?:20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?|\d{1,2}月\d{1,2}日)(?!\d)""")
-    private val PHONE_REGEX = Regex("""(?<!\d)(?:1[3-9]\d{9}|0\d{2,3}-?\d{7,8}|95\d{3,5}|400-?\d{3}-?\d{4}|100\d{2})(?!\d)""")
+    private val TIME_RANGE_REGEX = Regex("""(?<![A-Za-z0-9-])\d{1,2}:\d{2}(?:\s*[-~至到]\s*\d{1,2}:\d{2})?(?!\d)""")
+    private val DATE_REGEX = Regex("""(?<![A-Za-z0-9-])(?:20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?|\d{1,2}月\d{1,2}日)(?!\d)""")
+    private val PHONE_REGEX = Regex("""(?<![A-Za-z0-9-])(?:1[3-9]\d{9}|0\d{2,3}-?\d{7,8}|95\d{3,5}|400-?\d{3}-?\d{4}|100\d{2})(?![A-Za-z0-9-])""")
     private val TAIL_NUMBER_REGEX = Regex("""(?:手机尾号|尾号|后四位)\s*[:：为是]?\s*\d{4}""")
-    private val QUANTITY_REGEX = Regex("""(?<!\d)\d+(?:\.\d+)?\s*(?:元|kg(?![A-Za-z])|克|件|个|袋|箱|小时|天|折|号快递房|号快递点|号快递站|号快递超市|号快递中心|号菜鸟驿站|号菜鸟|号代收点|号服务点|号站点|号房|号驿站|号站|号柜|号窗口|号门|号店|号库|号楼|栋|层)""")
+    private val QUANTITY_REGEX = Regex("""(?<![A-Za-z0-9-])\d+(?:\.\d+)?\s*(?:元|kg(?![A-Za-z])|克|件|个|袋|箱|小时|天|折|号快递房|号快递点|号快递站|号快递超市|号快递中心|号菜鸟驿站|号菜鸟|号代收点|号服务点|号站点|号房|号驿站|号站|号柜|号窗口|号门|号店|号库|号楼|栋|层|室|单元)""")
     private val ISO_DATE_TOKEN_REGEX = Regex("""^20[2-3]\d-\d{1,2}-\d{1,2}$""")
 
     // 货架-层-号 横杠格式取件码（如 1-2-3045, 102-2-5, J8-5-3012, A1-2048）
@@ -56,13 +57,13 @@ object PickupMessageParser {
         """(?<![A-Za-z0-9-])(?:[A-Za-z0-9]{1,5}-\d{1,4}-\d{1,6}|[A-Za-z]{1,3}\d{0,3}-\d{3,6}|\d{1,4}-\d{3,6})(?![A-Za-z0-9-])"""
     )
 
-    // 紧跟在取件码关键词后的单码或多码片段（允许可选括号/引号包围及换行后直接接取件码，并在非码字符或换行处自然结束）
+    // 紧跟在取件码/开箱密码关键词后的单码或多码片段（支持括号/引号包裹、分号/顿号多码并列及跨行排布）
     private val CONTEXTUAL_BLOCK_REGEX = Regex(
-        """(?:取件码|提货码|取货码|自提码|提取码|取件编号|取件号|货架号|包裹码|开箱码|取件密码|凭码|凭)\s*(?:为|是)?\s*[:：]?\s*[【「"“（(\[]?\s*([A-Za-z0-9\-、,，/或及和与 \t]{3,80})(?=[^A-Za-z0-9\-]|$)"""
+        """(?:取件码|提货码|取货码|自提码|提取码|取件编号|取件号|货架号|包裹码|开箱码|取件密码|开箱密码|提货密码|取货密码|自提密码|凭密码|密码|凭码|凭)\s*(?:为|是)?\s*[:：]?\s*[【「『"“（(\[]?\s*([A-Za-z0-9\-、,，;；/或及和与【】「」『』"“”\[\] \t]{3,96})(?=[^A-Za-z0-9\-]|$)"""
     )
 
-    // 拆分多码连接符
-    private val MULTI_CODE_SPLIT_REGEX = Regex("""(?:\s*[、,，/]\s*|\s+(?:或|及|和|与)\s+|\s+)""")
+    // 拆分多码连接符与成对括号/引号分隔符
+    private val MULTI_CODE_SPLIT_REGEX = Regex("""(?:\s*[、,，;；/【】「」『』"“”\[\]]\s*|\s+(?:或|及|和|与)\s+|\s+)""")
 
     // 单个候选取件码合法性校验
     private val SINGLE_CODE_TOKEN_REGEX = Regex(
@@ -132,10 +133,10 @@ object PickupMessageParser {
     }
 
     /**
-     * 全局提取短信中的所有取件码（支持横杠多段码、字母数字混合码、纯数字柜码及多码并列）
+     * 全局提取短信中的所有取件码（支持全角归一化、横杠多段码、字母数字混合码、纯数字柜码及多码并列）
      */
     fun extractPickupCodes(rawText: String): List<String> {
-        var sanitized = rawText
+        var sanitized = normalizeFullWidthCodeChars(rawText)
         sanitized = TIME_RANGE_REGEX.replace(sanitized, " ")
         sanitized = DATE_REGEX.replace(sanitized, " ")
         sanitized = PHONE_REGEX.replace(sanitized, " ")
@@ -149,7 +150,10 @@ object PickupMessageParser {
             val blockText = blockMatch.groupValues[1].trim()
             val candidateTokens = blockText.split(MULTI_CODE_SPLIT_REGEX)
             for (rawToken in candidateTokens) {
-                val cleaned = rawToken.trim().trim(':', '：', '.', '。', ',', '，', '、', '[', ']', '【', '】', '"', '“', '”')
+                val cleaned = rawToken.trim().trim(
+                    ':', '：', '.', '。', ',', '，', '、', ';', '；',
+                    '[', ']', '【', '】', '「', '」', '『', '』', '(', ')', '（', '）', '"', '“', '”'
+                )
                 if (isValidPickupCodeToken(cleaned)) {
                     extractedCodes.add(cleaned.uppercase())
                 }
@@ -165,6 +169,21 @@ object PickupMessageParser {
         }
 
         return extractedCodes.toList()
+    }
+
+    private fun normalizeFullWidthCodeChars(input: String): String {
+        val sb = StringBuilder(input.length)
+        for (ch in input) {
+            val mapped = when (ch) {
+                in '０'..'９' -> ('0'.code + (ch.code - '０'.code)).toChar()
+                in 'Ａ'..'Ｚ' -> ('A'.code + (ch.code - 'Ａ'.code)).toChar()
+                in 'ａ'..'ｚ' -> ('a'.code + (ch.code - 'ａ'.code)).toChar()
+                '－' -> '-'
+                else -> ch
+            }
+            sb.append(mapped)
+        }
+        return sb.toString()
     }
 
     private fun isValidPickupCodeToken(token: String): Boolean {

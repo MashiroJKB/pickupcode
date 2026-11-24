@@ -53,23 +53,20 @@ class PickupRepository(
         )
         if (parsedList.isEmpty()) return@withContext 0
 
-        val preferredRuleName = preferredStationNumber?.let { targetNum ->
-            if (targetNum > 0) {
-                stationRules.firstOrNull { it.stationNumber == targetNum }?.displayName
-                    ?: "${targetNum}号快递房"
-            } else {
-                ""
-            }
-        }
         val effectiveParsedList = if (preferredStationNumber != null) {
             parsedList.map { parsed ->
                 parsed.copy(
-                    stationNumber = preferredStationNumber,
-                    stationRawName = preferredRuleName ?: parsed.stationRawName
+                    stationNumber = preferredStationNumber.coerceIn(0, 100),
+                    stationRawName = PickupItemEntity.STATION_MANUAL_LOCK_TAG
                 )
             }
         } else {
             parsedList
+        }
+        val effectiveSender = if (preferredStationNumber != null && source == PickupItemEntity.SOURCE_MANUAL) {
+            "user"
+        } else {
+            senderOrPackage
         }
 
         ingestMutex.withLock {
@@ -101,7 +98,8 @@ class PickupRepository(
                         parsedStationNumber = parsed.stationNumber,
                         parsedStationRawName = parsed.stationRawName,
                         parsedProductName = parsed.productName,
-                        parsedRawMessage = parsed.rawMessage
+                        parsedRawMessage = parsed.rawMessage,
+                        forcePreferredStation = preferredStationNumber != null
                     )
                     if (merged != matchedExisting) {
                         pickupDao.update(merged)
@@ -118,7 +116,7 @@ class PickupRepository(
                             isCustomRemark = false,
                             rawMessage = parsed.rawMessage,
                             source = source,
-                            senderOrPackage = senderOrPackage,
+                            senderOrPackage = effectiveSender,
                             isPickedUp = false,
                             pickedUpAt = null,
                             createdAt = messageTimestamp,
@@ -137,15 +135,25 @@ class PickupRepository(
         parsedStationNumber: Int,
         parsedStationRawName: String,
         parsedProductName: String,
-        parsedRawMessage: String
+        parsedRawMessage: String,
+        forcePreferredStation: Boolean = false
     ): PickupItemEntity {
+        val isManualStationLocked = existing.stationRawName == PickupItemEntity.STATION_MANUAL_LOCK_TAG ||
+            (existing.source == PickupItemEntity.SOURCE_MANUAL && existing.senderOrPackage == "user")
+
         val finalStationNumber = when {
+            forcePreferredStation -> parsedStationNumber
+            isManualStationLocked -> existing.stationNumber
             existing.stationNumber > 0 -> existing.stationNumber
             parsedStationNumber > 0 -> parsedStationNumber
             else -> 0
         }
 
-        val finalStationRawName = existing.stationRawName.ifBlank { parsedStationRawName }
+        val finalStationRawName = when {
+            forcePreferredStation -> PickupItemEntity.STATION_MANUAL_LOCK_TAG
+            isManualStationLocked -> existing.stationRawName
+            else -> existing.stationRawName.ifBlank { parsedStationRawName }
+        }
 
         val finalProductName = when {
             existing.isCustomRemark && existing.productName.isNotBlank() -> existing.productName
@@ -255,8 +263,10 @@ class PickupRepository(
             val allItems = pickupDao.observeAllItems().first()
             for (item in allItems) {
                 if (item.isPickedUp) continue
-                // 用户手动录入并明确指定过快递房的记录：仅在该快递房被删除时才归入待分类
-                if (item.source == PickupItemEntity.SOURCE_MANUAL && item.senderOrPackage == "user") {
+                val isManualStationLocked = item.stationRawName == PickupItemEntity.STATION_MANUAL_LOCK_TAG ||
+                    (item.source == PickupItemEntity.SOURCE_MANUAL && item.senderOrPackage == "user")
+                // 用户手动指定过快递房的记录：仅在该快递房规则本身被删除时才重置回待分类
+                if (isManualStationLocked) {
                     if (item.stationNumber > 0 && item.stationNumber !in activeNumbers) {
                         pickupDao.update(
                             item.copy(
@@ -387,7 +397,7 @@ class PickupRepository(
                 PickupItemEntity(
                     code = cleanCode,
                     stationNumber = safeStation,
-                    stationRawName = if (safeStation > 0) stationLabel else "",
+                    stationRawName = PickupItemEntity.STATION_MANUAL_LOCK_TAG,
                     expressCompany = "",
                     productName = cleanProduct,
                     isCustomRemark = cleanProduct.isNotEmpty(),
@@ -415,7 +425,7 @@ class PickupRepository(
     }
 
     companion object {
-        // 已取件记录与扫描去重统一保留 7 天，并预留 24 小时边界缓冲防止临界时间戳重复复活
+        // 扫描去重窗口覆盖最近 7 天（并预留 24 小时边界缓冲），历史已取记录永久保存在本地数据库
         const val RETENTION_SEVEN_DAYS_MILLIS = 7L * 24L * 60L * 60L * 1000L
         private const val DEDUPE_BUFFER_MILLIS = 24L * 60L * 60L * 1000L
     }

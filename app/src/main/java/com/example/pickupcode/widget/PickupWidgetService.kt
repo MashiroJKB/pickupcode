@@ -60,7 +60,7 @@ internal suspend fun loadWidgetSnapshot(context: Context): WidgetSnapshot =
                     val name = rule?.displayName ?: "${stationNum}号快递房"
                     "$symbol $name"
                 } else {
-                    "？ 待分类"
+                    "？ 待分类快递房"
                 }
 
                 val sortedItems = groupItems.sortedWith(PickupItemEntity.NaturalCodeComparator)

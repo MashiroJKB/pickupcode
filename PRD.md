@@ -1,6 +1,6 @@
 # 「取件码」（`PickupCode`）Android 原生应用完整产品与技术规范文档（PRD）
 
-> **目标版本**：`2.5.9`（`versionCode = 35`）  
+> **目标版本**：`2.6.0`（`versionCode = 36`）  
 > **文档定位**：本文档为面向 AI 编码引擎与原生 Android 工程师的**1:1 复现级完整工程规格说明书**，完整沉淀了产品定位、视觉规范、交互细节、动画参数、解析引擎、桌面生态及全部已知避坑约束，阅读本文档即可从零完整重构出一模一样的应用程序。
 
 ---
@@ -32,13 +32,13 @@
 
 ### 2.1 SDK 与核心依赖版本
 - **包名（`applicationId` / `namespace`）**：`com.example.pickupcode`
-- **版本配置**：`versionCode = 35`，`versionName = "2.5.9"`
+- **版本配置**：`versionCode = 36`，`versionName = "2.6.0"`
 - **SDK 配置**：`minSdk = 29`（Android 10）、`targetSdk = 35`、`compileSdk = 37`、`buildToolsVersion = "36.0.0"`、`JavaVersion.VERSION_17`
 - **Gradle 与插件版本**（`gradle/libs.versions.toml`）：
   - AGP：`9.5.1`（`com.android.application`）
   - Kotlin：`2.3.20`（`kotlin-compose`）
   - KSP：`2.3.6`
-  - Compose BOM：`2024.11.00`（`ui`, `ui-graphics`, `ui-tooling-preview`, `material3`, `material-icons-extended`）
+  - Compose BOM：`2024.11.00`（`ui`, `ui-graphics`, `material3`, `material-icons-extended`）
   - AndroidX Core KTX：`1.15.0`
   - Activity Compose：`1.9.3`
   - Lifecycle Runtime KTX / Runtime Compose / ViewModel Compose：`2.8.7`
@@ -157,10 +157,10 @@ app/src/main/
   - `InnerCard = 16.dp`（取件码内卡片、输入框、普通按钮、紧凑格内嵌卡）
   - `SmallElement = 12.dp`（标签、Tab 选中滑块、小元素）
   - `Pill = 999.dp`（悬浮胶囊按钮、计数角标、状态标签）
-- **应用图标与卡片的严格 Apple 连续圆角（`AppleIconSquircleShape` & `AppleContinuousCornerShape`）**：
-  - **严禁**在菜鸟/淘宝/拼多多/京东应用图标外围叠加任何额外白框、圆环、投影底衬或背景边框，直接保持原生全出血正方形图标并按 **iOS `CALayerCornerCurve.continuous` 三段三次贝塞尔连续曲率**（`r = 0.2237 * s`、`p = 1.52866483 * r`、与真机 App Store 图标误差 `< 0.001`）裁剪（`ContentScale.Crop`）。
-  - 全局卡片（`OuterCardShape`）、内嵌子卡（`InnerCardShape`）、按钮与标签（`SmallElementShape` / `MicroElementShape`）以及分享清单长图卡片均统一采用三段 `AppleContinuousCornerShape` / `buildAndroidAppleContinuousRectPath`（`OutlinedTextField` 保留 `RoundedCornerShape` 以确保 Material 3 标签缺口描边无异常）。
-  - 桌面小组件同样调用 `loadAppleRoundedIconBitmapForWidget` 对 `ic_brand_cainiao.png`、`ic_brand_taobao.png`、`ic_brand_pinduoduo.png`、`ic_brand_jd.png` 按 `inSampleSize` 降采样后使用同一套三段 Apple Squircle 路径裁成高清 `Bitmap`（`112px`）。
+- **应用图标与卡片的严格抗锯齿 Apple 连续圆角（`AppleIconSquircleShape` & `AppleContinuousCornerShape`）**：
+  - **严禁**在菜鸟APP/菜鸟/淘宝/拼多多/京东应用图标外围叠加任何额外白框、圆环、投影底衬或背景边框，直接保持原生全出血正方形图标并按 **iOS `CALayerCornerCurve.continuous` 三段三次贝塞尔连续曲率**（`r = 0.2237 * s`、`p = 1.52866483 * r`、与真机 App Store 图标误差 `< 0.001`）通过 `CompositingStrategy.Offscreen` + `EvenOdd` 矢量抗锯齿遮罩（`clipAppleIconSquircle`）裁剪，杜绝移动端 GPU `clipPath` 模板锯齿。
+  - 全局卡片（`OuterCardShape`）、内嵌子卡（`InnerCardShape`）、按钮与标签（`SmallElementShape` / `MicroElementShape`）以及分享清单长图卡片均统一采用三段 `AppleContinuousCornerShape` / `buildAndroidAppleContinuousRectPath`，且 `liquidGlass` 与 `liquidGlassInnerCard` 在 `drawWithCache` `onDrawBehind` 中直接绘制抗锯齿填充与内缩全宽同心折射描边，再执行内容 `.clip(shape)`（`OutlinedTextField` 保留 `RoundedCornerShape` 以确保 Material 3 标签缺口描边无异常）。
+  - 桌面小组件同样调用 `loadAppleRoundedIconBitmapForWidget` 对五枚全出血品牌图标按 `inSampleSize` 降采样后使用 `BitmapShader` + `ANTI_ALIAS_FLAG` 三段 Apple Squircle 路径渲染为高清无锯齿 `Bitmap`（`144px`）。
 
 ### 3.2.1 自适应矢量桌面图标与自定义 Canvas 矢量精确规范
 1. **自适应矢量图标（`ic_launcher.xml` & `ic_launcher_round.xml`）**：均使用 `<adaptive-icon>` 同时配置 `<background android:drawable="@color/launcher_icon_bg" />`、`<foreground android:drawable="@drawable/ic_launcher_foreground" />` 与 `<monochrome android:drawable="@drawable/ic_launcher_foreground" />`。
@@ -230,22 +230,13 @@ app/src/main/
     - 「手动输入取件码」页签水平条用 `LazyRow` 自动滚动定位并高亮选中该快递房；
     - 切换至「粘贴短信解析」页签粘贴短信并入库时，通过 `preferredStationNumber` 强制将该次解析出的记录直接归入当前快递房。
 
-### 4.4 取件码卡片与优雅左滑手势（`SwipeablePickupItemCard`）
+### 4.4 取件码卡片与多选/长按交互（`PickupItemCard`）
 - **组内排序**：使用 `PickupItemEntity.NaturalCodeComparator` 将取件码内全部连续数字提取为 `Long` 逐段比对（例如 `1-4-10` < `2-1-5` < `30-3-2` < `100-1-1`），确保货架顺序符合线下实际取货路线。
-- **左滑快捷操作物理动效**：
-  - 前景卡通过 GPU `graphicsLayer { translationX = offsetX.value }` 横向滑动（120Hz 零重排），最大揭露宽度 `140.dp`；超出 `140.dp` 后进入橡皮筋阻尼（位移乘以 `0.25f`，最远 `1.25 * openRevealPx`）。
-  - 底层右侧隐藏两枚与前景等高、`AppleCorners.InnerCard` 圆角的对称大按钮：`62.dp` 绿色「已取」与 `62.dp` 红色「删除」（间距 `8.dp`）。随左滑进度 `progress = revealPx / openRevealPx` 动态呈现：
-    - 透明度 `actionAlpha = ((progress - 0.06f) / 0.48f).coerceIn(0f, 1f)`
-    - 缩放 `buttonScale = 0.78f + 0.22f * progress`
-    - 错位视差位移：「已取」`translationX = remainPx * 0.58f`，「删除」`translationX = remainPx * 0.26f`。
-  - 撒手判定：若滑动速度 `velocity < -420f` 或位移过 `0.44x` 则惯性弹簧展开；反之回弹闭合（`spring(dampingRatio = 0.84f, stiffness = 460f, initialVelocity = velocity)`）。
-  - 单互斥展开管理：`HomeScreen` 仅记录一个 `activeSwipedItemId`，滑动另一卡片、列表开始滚动、点击顶栏、进入分享模式或点击卡片自身空白处时平滑收起。
-  - **注意**：仅在 `!isShareSelectionMode` 时启用左滑；在分享模式下点击卡片任意非菜单区域即可直接切换勾选状态。
 - **卡片内部元素（从左到右，无「已到 N 天」角标）**：
-  1. 左侧 `28.dp` 圆形勾选框（普通选中填充绿色 + `checkScale = 1.08f` 弹簧缩放；分享模式填充主题蓝；点击即切换选中状态）。
-  2. 中部纵向 `Column`：上方为等宽特粗单行 `item.code`；下方 `4.dp` 为可点击商品备注栏（未备注显示主题色「点击备注商品 + 编辑图标」，已备注显示黑色/深色商品名称 + 编辑图标）。
-  3. 右侧 `36.dp` 圆形 `⋮` 竖点按钮（点击弹出 `RawMessageDetailDialog` 查看完整短信与修改归属快递房）。
-  - 长按卡片（`onLongClick`）弹出 `LongPressQuickActionDialog` 快捷选择「已取」或「删除」。
+  1. 左侧 `28.dp` 圆形勾选框（普通选中平滑过渡绿色 + `checkScale = 1.08f` 弹簧缩放与对勾弹性显隐；分享模式填充主题蓝；点击即切换选中状态）。
+  2. 中部纵向 `Column`：上方为等宽特粗单行 `item.code`；下方 `4.dp` 为 `MicroElementShape` 可点击商品备注栏（未备注显示主题色「点击备注商品 + 编辑图标」，已备注显示商品名称 + 编辑图标）。
+  3. 右侧 `36.dp` 圆形 `⋮` 竖点按钮（点击弹出 `RawMessageDetailDialog` 查看完整短信与修改归属快递房，手动指定的快递房通过 `[MANUAL_STATION]` 标记锁定，后续修改规则或重扫短信绝不误覆盖）。
+  - 长按卡片（`onLongClick`）弹出 `LongPressQuickActionDialog` 快捷选择「已取」或「删除」；在分享模式下点击卡片任意非菜单区域即可直接切换勾选状态。
 
 ### 4.5 底部悬浮交互栏（`HomeBottomFloatingBar`）
 悬浮于主页底端（距底导航栏 `16.dp`），左右内边距 `20.dp`，圆形按钮统一 `60.dp`，带 `12.dp` 同色投影与 `1.dp` 半透明白边：
@@ -280,16 +271,15 @@ app/src/main/
 从主页向右滑动/渐显打开设置页（`tween(180ms, FastOutSlowInEasing)`：主页透明渐隐并左移 `24.dp`，设置页渐显并从右 `32.dp` 归位）。
 
 1. **顶部栏**：左侧 `36.dp` 圆形浅灰底返回按钮（内部以 `Canvas` 在圆心严格对称绘制 `<` 符号），右侧静态展示「设置」标题。
-2. **统计与本地隐私卡片**：
-   - 顶部绿色锁头图标 + `100% 纯本地离线存储 · 零联网权限`。
-   - 下方 3 格统计卡：**待取包裹**、**7天内已取**（可点击弹出 `PickedUpHistoryDialog` 列表，按取件时间倒序展示，每条支持「恢复」回待取列表或彻底「删除」）、**覆盖快递房**。
+2. **历史包裹卡片**：点击弹出 `PickedUpHistoryDialog` 列表，永久保存全部已取包裹记录，按取件时间倒序展示，每条支持「恢复」回待取列表或彻底「删除」。
 3. **权限卡片**：未开短信读取权限时展示「短信读取权限未开启 -> 开启权限」（已授权后自动隐藏；无通知与桌面角标权限卡片）。
 4. **识别规则卡片（支持默认 1～8 号、长按拖动排序与口令分享）**：
    - 标题栏右侧提供 `添加快递房` 蓝胶囊与 `重置` 灰胶囊（点击「重置」先弹出 `ResetStationRulesConfirmDialog` 二次确认防误触，确认后清除 DataStore 恢复默认 1～8 号）。
    - 下方提供并排 `导出规则口令` / `导入规则口令`（导出格式为 `【取件码识别规则】` + JSON 数组并自动写入系统剪贴板；导入支持识别并校验任意含 JSON 数组的口令文本）。
    - 规则列表支持 **`detectDragGesturesAfterLongPress`** 长按整行平滑拖拽重排（`scale = 1.03f` + 跨越行高 `0.55f` 时交换并触发轻震动反馈，松手即持久化排序并自动重算首页分组顺序与重分类待取件）。
    - 每行右侧配置圆形笔按钮（编辑弹窗内可修改显示名称、数字序号 `1~20` 或留空为实心圆、新增或点击 `×` 删除匹配关键词，点击「保存」即使文本框有未点添加的关键词也会一并自动收纳保存，并立即调用 `reapplyStationRules`）及圆形删除按钮（删除后原先属于该号房的待取件按新规则重分类或进入待分类）。
-5. **身份码跳转链路卡片**：独立控制「淘宝身份码」、「菜鸟身份码」、「拼多多取件码」三大开关，每个开关行左侧均使用原生苹果圆角 `AppBrandIcon(40.dp)`。
+5. **身份码跳转链路卡片**：按 **菜鸟APP → 菜鸟身份码 → 淘宝身份码 → 拼多多取件码 → 京东身份码** 固定顺序独立控制五大开关，每个开关行左侧均使用原生抗锯齿 Apple 连续圆角 `AppBrandIcon(32.dp)`，同时与桌面 4×4 小组件顶栏快捷图标实时联动。
+6. **关于 / 检查更新 / 支持**：展示当前版本号与 GitHub 开源主页入口，提供 GitHub Release 与蓝奏云（自动复制密码 `43tf`）双更新渠道，以及支付宝扫码支持海报（支持一键保存至系统相册）。
 
 ---
 
@@ -321,12 +311,12 @@ app/src/main/
    - 未命中关键词则走内置号房兜底正则（支持 `(\d{1,2}|[一-十]) 号 快递房/房/驿站/快递站/菜鸟/快递柜/丰巢/点/门` 及反向写法），且**仅匹配当前规则中已启用（存在于 `stationRules` 列表内）的编号（按 `badgeNumber` 或 `stationNumber` 查表）**——若用户删除了某号房，该号房即归为 `0`（待分类）而非误归类。
 5. **商品备注提取（`extractProductName`）**：仅提取明确如 `您购买的【...】`、`订单商品「...」`、`商品名称：...` 的商品描述，绝不提取快递品牌或站点名。
 
-### 6.3 仓储去重、7 天生命周期与并发安全（`PickupRepository.kt`）
-- **历史扫描与定时清理**：每次冷/热启动主页 `ON_RESUME` 时，若有短信权限即查询 `Telephony.Sms.Inbox.CONTENT_URI` 最近 7 天短信（`DEFAULT_SMS_SCAN_DAYS = 7`），同时清理早期遗留示例数据（`deleteLegacyDemoItems`）并物理删除 `pickedUpAt`（兜底 `updatedAt`/`createdAt`）早于 **7 天（`7 * 24h`）** 的已取记录（`deleteExpiredPickedUp`）。
-- **并发与幂等去重**：`ingestRawMessage` 全程包裹在 `Mutex`（`ingestMutex.withLock`）中执行，以 `code` 不区分大小写查询近 7 天已有记录：
+### 6.3 仓储去重、永久历史包裹与并发安全（`PickupRepository.kt`）
+- **历史扫描与永久归档**：每次冷/热启动主页 `ON_RESUME` 时，若有短信权限即查询 `Telephony.Sms.Inbox.CONTENT_URI` 最近 7 天短信（`DEFAULT_SMS_SCAN_DAYS = 7`），同时清理早期遗留示例数据（`deleteLegacyDemoItems`）；所有确认已取的包裹永久保存在本地历史包裹中供随时查阅或恢复。
+- **并发与幂等去重**：`ingestRawMessage` 全程包裹在 `Mutex`（`ingestMutex.withLock`）中执行，以 `code` 不区分大小写查询近 7 天（加 24 小时边界缓冲）已有记录：
   - 若已有同号房记录、或任一方为待分类 `0` 号：
-    - 若已有记录 **已被标记为已取（`isPickedUp == true`）**，则**直接跳过绝不重新恢复为待取**（避免滑走/确认已取的快递再次因扫描 7 天短信复活）。
-    - 若未取，则合并补全更确定的站房号（仅当旧站房为 `0` 时升格）、商品备注与更完整原文。
+    - 若已有记录 **已被标记为已取（`isPickedUp == true`）**，则**直接跳过绝不重新恢复为待取**（避免确认已取的快递再次因扫描 7 天短信复活）。
+    - 若未取，则合并补全更确定的站房号（若用户曾手动指定过快递房 `[MANUAL_STATION]` 则严格保留用户选择）、商品备注与更完整原文。
   - 若外部传入 `preferredStationNumber != null`（例如用户从首页某个快递房卡片右上角 `+` 粘贴短信），则直接将本次全部解析结果的站房覆写为 `preferredStationNumber`。
 
 ---

@@ -3,6 +3,7 @@ package com.example.pickupcode.ui.home
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -48,6 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -213,7 +215,7 @@ fun HomeScreen(
             )
         }
 
-        // 身份码入口：开启 1 个时显示完整 Banner；开启 2~3 个时自动切换为紧凑并排方块模式
+        // 身份码入口：开启 1 个时显示完整 Banner；开启 2～5 个时平滑切换为对称图标模式
         if (enabledIdentityTypes.isNotEmpty()) {
             item(key = "identity_code_section", contentType = "banner") {
                 IdentityCodeBannersSection(
@@ -338,15 +340,22 @@ private fun HomeTopHeader(
                 modifier = Modifier.weight(1f, fill = false)
             ) { inSelectAllMode ->
                 if (inSelectAllMode) {
+                    val selectAllBg by animateColorAsState(
+                        targetValue = if (displayedAllSelected) primaryColor else primaryColor.copy(alpha = 0.14f),
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "select_all_pill_bg"
+                    )
+                    val selectAllFg by animateColorAsState(
+                        targetValue = if (displayedAllSelected) Color.White else primaryColor,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "select_all_pill_fg"
+                    )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .height(36.dp)
                             .clip(AppleCorners.PillShape)
-                            .background(
-                                if (displayedAllSelected) primaryColor
-                                else primaryColor.copy(alpha = 0.14f)
-                            )
+                            .background(selectAllBg)
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 if (headerMode == HomeHeaderMode.SHARE_SELECT) {
@@ -360,7 +369,7 @@ private fun HomeTopHeader(
                         Icon(
                             imageVector = Icons.Rounded.DoneAll,
                             contentDescription = "全选",
-                            tint = if (displayedAllSelected) Color.White else primaryColor,
+                            tint = selectAllFg,
                             modifier = Modifier.size(17.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -370,7 +379,7 @@ private fun HomeTopHeader(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             ),
-                            color = if (displayedAllSelected) Color.White else primaryColor,
+                            color = selectAllFg,
                             softWrap = false,
                             maxLines = 1
                         )
@@ -670,7 +679,7 @@ private fun EmptyPickupStateCard(
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = if (hasSmsPermission) "添加取件码" else "授权短信读取权限",
+                text = if (hasSmsPermission) "添加取件码" else "授权短信读取",
                 fontWeight = FontWeight.Bold,
                 softWrap = false,
                 maxLines = 1

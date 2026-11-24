@@ -4,9 +4,16 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -47,20 +54,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pickupcode.ui.theme.AppleCorners
+import com.example.pickupcode.ui.theme.CainiaoBlueEnd
+import com.example.pickupcode.ui.theme.CainiaoBlueStart
+import com.example.pickupcode.ui.theme.JdRedEnd
+import com.example.pickupcode.ui.theme.JdRedStart
+import com.example.pickupcode.ui.theme.PinduoduoRedEnd
+import com.example.pickupcode.ui.theme.PinduoduoRedStart
 import com.example.pickupcode.ui.theme.TaobaoOrangeEnd
 import com.example.pickupcode.ui.theme.TaobaoOrangeStart
 import com.example.pickupcode.ui.theme.liquidGlass
-
-val CainiaoBlueStart = Color(0xFF006EFF)
-val CainiaoBlueEnd = Color(0xFF0055D4)
-
-// 拼多多品牌图标红
-val PinduoduoRedStart = Color(0xFFE12A1F)
-val PinduoduoRedEnd = Color(0xFFC8161D)
-
-// 京东品牌图标红
-val JdRedStart = Color(0xFFFF301A)
-val JdRedEnd = Color(0xFFE01F14)
 
 enum class IdentityCodeType(
     val title: String,
@@ -207,7 +209,7 @@ object TaobaoDeepLinkLauncher {
 /**
  * 首页顶部身份码/取件码入口容器：
  * - 当仅开启 1 个开关时，展示完整单栏液态玻璃 Banner
- * - 当同时开启 2～4 个开关时，自动切换为标题为「身份码/取件码」的对称无框图标模式（均匀排布原生 Apple 连续圆角应用图标）
+ * - 当同时开启 2～5 个开关时，平滑切换为标题为「身份码/取件码」的对称无框图标模式（均匀排布原生 Apple 连续圆角应用图标）
  */
 @Composable
 fun IdentityCodeBannersSection(
@@ -217,18 +219,32 @@ fun IdentityCodeBannersSection(
 ) {
     if (enabledTypes.isEmpty()) return
 
-    if (enabledTypes.size == 1) {
-        IdentityCodeBanner(
-            type = enabledTypes.first(),
-            onFeedbackMessage = onFeedbackMessage,
-            modifier = modifier
-        )
-    } else {
-        CompactIdentityCodeBar(
-            enabledTypes = enabledTypes,
-            onFeedbackMessage = onFeedbackMessage,
-            modifier = modifier
-        )
+    AnimatedContent(
+        targetState = enabledTypes.size == 1,
+        transitionSpec = {
+            fadeIn(animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)) togetherWith
+                fadeOut(animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing)) using
+                SizeTransform(clip = false) { _, _ ->
+                    spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                }
+        },
+        label = "identity_banner_mode_transition",
+        modifier = modifier
+    ) { isSingleBanner ->
+        if (isSingleBanner) {
+            IdentityCodeBanner(
+                type = enabledTypes.first(),
+                onFeedbackMessage = onFeedbackMessage
+            )
+        } else {
+            CompactIdentityCodeBar(
+                enabledTypes = enabledTypes,
+                onFeedbackMessage = onFeedbackMessage
+            )
+        }
     }
 }
 
@@ -439,8 +455,8 @@ fun IdentityCodeBanner(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
+                    .background(brush = brandGradient, shape = AppleCorners.SmallElementShape)
                     .clip(AppleCorners.SmallElementShape)
-                    .background(brush = brandGradient)
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         TaobaoDeepLinkLauncher.launchIdentityCode(

@@ -1,6 +1,7 @@
 package com.example.pickupcode.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -10,6 +11,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -339,24 +342,47 @@ fun PickupItemCard(
             .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
     ) {
         // 左侧多选圆形勾选框
+        val checkFillColor by animateColorAsState(
+            targetValue = if (isSelected) activeCheckColor else Color.Transparent,
+            animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+            label = "check_circle_fill"
+        )
+        val checkBorderColor by animateColorAsState(
+            targetValue = if (isSelected) activeCheckColor else accentColor.copy(alpha = 0.65f),
+            animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+            label = "check_circle_border"
+        )
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .scale(checkScale)
                 .size(28.dp)
-                .clip(CircleShape)
-                .background(if (isSelected) activeCheckColor else Color.Transparent)
+                .background(color = checkFillColor, shape = CircleShape)
                 .border(
                     width = 2.dp,
-                    color = if (isSelected) activeCheckColor else accentColor.copy(alpha = 0.65f),
+                    color = checkBorderColor,
                     shape = CircleShape
                 )
+                .clip(CircleShape)
                 .clickable {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onToggleSelect()
                 }
         ) {
-            if (isSelected) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isSelected,
+                enter = scaleIn(
+                    initialScale = 0.55f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                ) + fadeIn(animationSpec = tween(durationMillis = 120)),
+                exit = scaleOut(
+                    targetScale = 0.55f,
+                    animationSpec = tween(durationMillis = 90)
+                ) + fadeOut(animationSpec = tween(durationMillis = 90))
+            ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = "已勾选",

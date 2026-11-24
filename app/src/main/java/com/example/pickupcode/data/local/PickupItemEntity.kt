@@ -73,6 +73,7 @@ data class PickupItemEntity(
     companion object {
         const val SOURCE_SMS = "SMS"
         const val SOURCE_MANUAL = "MANUAL"
+        const val STATION_MANUAL_LOCK_TAG = "[MANUAL_STATION]"
 
         private val NUMBER_TOKEN_REGEX = Regex("""\d+""")
 

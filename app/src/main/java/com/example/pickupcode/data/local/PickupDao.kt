@@ -70,6 +70,7 @@ interface PickupDao {
         """
         UPDATE pickup_items
         SET station_number = :stationNumber,
+            station_raw_name = :stationRawName,
             updated_at = :updatedAt
         WHERE id = :id
         """
@@ -77,6 +78,7 @@ interface PickupDao {
     suspend fun updateStationNumber(
         id: Long,
         stationNumber: Int,
+        stationRawName: String = PickupItemEntity.STATION_MANUAL_LOCK_TAG,
         updatedAt: Long = System.currentTimeMillis()
     )
 
