@@ -1,5 +1,6 @@
 package com.example.pickupcode
 
+import android.content.Intent
 import com.example.pickupcode.ui.components.IdentityCodeType
 import com.example.pickupcode.ui.components.TaobaoDeepLinkLauncher
 import com.example.pickupcode.widget.PickupWidgetProvider
@@ -46,5 +47,14 @@ class IdentityCodeConfigTest {
         assertEquals(Triple(36f, 12f, 8f), PickupWidgetProvider.resolveWidgetShortcutLayout(3))
         assertEquals(Triple(32f, 9f, 8f), PickupWidgetProvider.resolveWidgetShortcutLayout(4))
         assertEquals(Triple(28f, 6f, 6f), PickupWidgetProvider.resolveWidgetShortcutLayout(5))
+    }
+
+    @Test
+    fun `includes clear-top flag on deeplink intents so warm background apps route to target screen`() {
+        val flags = TaobaoDeepLinkLauncher.DEEPLINK_INTENT_FLAGS
+        assertTrue(flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertTrue(flags and Intent.FLAG_ACTIVITY_CLEAR_TOP != 0)
+        assertEquals(0, flags and Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        assertEquals(0, flags and Intent.FLAG_ACTIVITY_CLEAR_TASK)
     }
 }

@@ -1,6 +1,6 @@
 # 「取件码」（`PickupCode`）Android 原生应用完整产品与技术规范文档（PRD）
 
-> **目标版本**：`2.6.0`（`versionCode = 36`）  
+> **目标版本**：`2.6.1`（`versionCode = 37`）  
 > **文档定位**：本文档为面向 AI 编码引擎与原生 Android 工程师的**1:1 复现级完整工程规格说明书**，完整沉淀了产品定位、视觉规范、交互细节、动画参数、解析引擎、桌面生态及全部已知避坑约束，阅读本文档即可从零完整重构出一模一样的应用程序。
 
 ---
@@ -32,7 +32,7 @@
 
 ### 2.1 SDK 与核心依赖版本
 - **包名（`applicationId` / `namespace`）**：`com.example.pickupcode`
-- **版本配置**：`versionCode = 36`，`versionName = "2.6.0"`
+- **版本配置**：`versionCode = 37`，`versionName = "2.6.1"`
 - **SDK 配置**：`minSdk = 29`（Android 10）、`targetSdk = 35`、`compileSdk = 37`、`buildToolsVersion = "36.0.0"`、`JavaVersion.VERSION_17`
 - **Gradle 与插件版本**（`gradle/libs.versions.toml`）：
   - AGP：`9.5.1`（`com.android.application`）
@@ -214,6 +214,7 @@ app/src/main/
    - 整个外框 `liquidGlass(OuterCard)`，左上角统一显示小标题 **`身份码/取件码`**（`titleMedium`）。
    - 下方直接以 `Arrangement.SpaceEvenly` 等距对称排布 2～5 枚无外框的原生 Apple 连续圆角 `AppBrandIcon`（2～3 枚 `54.dp`、4 枚 `50.dp`、5 枚 `46.dp` 保持 360dp 屏幕宽敞留白），按压缩放 `0.91f`。
 4. **Exact 启动 / DeepLink 跳转与容错逻辑**：
+   - 全部 DeepLink 跳转（应用内与桌面小组件共用 `TaobaoDeepLinkLauncher.buildDeepLinkIntent`）统一附加 `Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP`，确保淘宝 / 拼多多 / 京东已在后台运行时仍能正常触发路由页直达对应身份码/取件码界面（杜绝仅带 `NEW_TASK` 时系统 `START_TASK_TO_FRONT` 吞掉路由 Intent）。
    - 菜鸟APP：通过 `PackageManager.getLaunchIntentForPackage("com.cainiao.wireless")` 直接唤起菜鸟客户端；未安装时提示 `"未检测到菜鸟客户端，请先安装后再试"`。
    - 菜鸟身份码：优先 `tbopen://m.taobao.com/tbopen/index.html?h5Url=https://market.m.taobao.com/app/cn-yz/multi-activity/authCode.html`，失败尝试淘宝地址，指定包名 `com.taobao.taobao`。
    - 淘宝身份码：优先 `taobao://m.taobao.com/tbopen/index.html?h5Url=https://pages-fast.m.taobao.com/wow/z/uniapp/1011717/last-mile-fe/end-collect-platform/identity-code`，失败尝试菜鸟地址，指定包名 `com.taobao.taobao`。未安装时提示 `"未检测到淘宝客户端，请先安装后再试"`。

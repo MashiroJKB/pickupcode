@@ -354,7 +354,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
                         targetPackage = TaobaoDeepLinkLauncher.TAOBAO_PACKAGE,
                         allowImplicitFallback = false,
                         fallbackBroadcastAction = ACTION_LAUNCH_CAINIAO,
-                        requestCode = 101
+                        requestCode = 301
                     )
                 )
             } else {
@@ -372,7 +372,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
                         targetPackage = TaobaoDeepLinkLauncher.TAOBAO_PACKAGE,
                         allowImplicitFallback = false,
                         fallbackBroadcastAction = ACTION_LAUNCH_TAOBAO,
-                        requestCode = 102
+                        requestCode = 302
                     )
                 )
             } else {
@@ -390,7 +390,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
                         targetPackage = TaobaoDeepLinkLauncher.PINDUODUO_PACKAGE,
                         allowImplicitFallback = true,
                         fallbackBroadcastAction = ACTION_LAUNCH_PINDUODUO,
-                        requestCode = 103
+                        requestCode = 303
                     )
                 )
             } else {
@@ -408,7 +408,7 @@ class PickupWidgetProvider : AppWidgetProvider() {
                         targetPackage = TaobaoDeepLinkLauncher.JD_PACKAGE,
                         allowImplicitFallback = true,
                         fallbackBroadcastAction = ACTION_LAUNCH_JD,
-                        requestCode = 104
+                        requestCode = 304
                     )
                 )
             } else {
@@ -512,10 +512,10 @@ class PickupWidgetProvider : AppWidgetProvider() {
             val pm = context.packageManager
             val candidates = listOfNotNull(primaryUri, fallbackUri)
             for (uri in candidates) {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
-                    setPackage(targetPackage)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+                val intent = TaobaoDeepLinkLauncher.buildDeepLinkIntent(
+                    uriString = uri,
+                    targetPackage = targetPackage
+                )
                 if (intent.resolveActivity(pm) != null) {
                     return PendingIntent.getActivity(
                         context,
@@ -526,9 +526,10 @@ class PickupWidgetProvider : AppWidgetProvider() {
                 }
             }
             if (allowImplicitFallback) {
-                val implicitIntent = Intent(Intent.ACTION_VIEW, Uri.parse(primaryUri)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+                val implicitIntent = TaobaoDeepLinkLauncher.buildDeepLinkIntent(
+                    uriString = primaryUri,
+                    targetPackage = null
+                )
                 if (implicitIntent.resolveActivity(pm) != null) {
                     return PendingIntent.getActivity(
                         context,

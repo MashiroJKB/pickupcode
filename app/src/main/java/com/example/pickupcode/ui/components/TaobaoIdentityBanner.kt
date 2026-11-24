@@ -130,6 +130,25 @@ object TaobaoDeepLinkLauncher {
     const val JD_IDENTITY_DEEPLINK =
         "openapp.jdmobile://virtual?params=%7B%22category%22%3A%22jump%22%2C%22des%22%3A%22m%22%2C%22url%22%3A%22https%3A%2F%2Fconvenient-h5.jd.com%2FidentityCode%3Fchannel%3Dxueshengjirukou%22%7D"
 
+    /**
+     * DeepLink 跨应用跳转标准 Flag：
+     * - FLAG_ACTIVITY_NEW_TASK：跨任务栈 / 桌面小组件 PendingIntent 拉起必需；
+     * - FLAG_ACTIVITY_CLEAR_TOP：当淘宝/拼多多/京东已在后台存在任务栈时，强制将 DeepLink 路由页压栈或重新派发，
+     *   避免 AOSP ActivityStarter 仅把旧任务栈切回前台（START_TASK_TO_FRONT）而丢弃目标身份码/取件码路由。
+     */
+    const val DEEPLINK_INTENT_FLAGS: Int =
+        Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+
+    fun buildDeepLinkIntent(
+        uriString: String,
+        targetPackage: String?
+    ): Intent = Intent(Intent.ACTION_VIEW, Uri.parse(uriString)).apply {
+        if (!targetPackage.isNullOrBlank()) {
+            setPackage(targetPackage)
+        }
+        addFlags(DEEPLINK_INTENT_FLAGS)
+    }
+
     fun launchIdentityCode(
         context: Context,
         type: IdentityCodeType,
@@ -190,12 +209,10 @@ object TaobaoDeepLinkLauncher {
         targetPackage: String?
     ): Boolean {
         return try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uriString)).apply {
-                if (!targetPackage.isNullOrBlank()) {
-                    setPackage(targetPackage)
-                }
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            val intent = buildDeepLinkIntent(
+                uriString = uriString,
+                targetPackage = targetPackage
+            )
             context.startActivity(intent)
             true
         } catch (_: ActivityNotFoundException) {
