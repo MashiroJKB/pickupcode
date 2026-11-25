@@ -91,17 +91,21 @@ class SmsContentObserver(
 
     fun register() {
         if (isRegistered) return
-        try {
-            context.contentResolver.registerContentObserver(
-                Uri.parse("content://sms"),
-                true,
-                this
-            )
-            isRegistered = true
-        } catch (_: SecurityException) {
-            // 尚未授予 READ_SMS 时静默忽略，授权后会再次触发扫描
-        } catch (_: Exception) {
+        var anyRegistered = false
+        for (uriString in listOf("content://sms", "content://mms-sms/")) {
+            try {
+                context.contentResolver.registerContentObserver(
+                    Uri.parse(uriString),
+                    true,
+                    this
+                )
+                anyRegistered = true
+            } catch (_: SecurityException) {
+                // 尚未授予 READ_SMS 时静默忽略，授权后会再次触发扫描
+            } catch (_: Exception) {
+            }
         }
+        isRegistered = anyRegistered
     }
 
     override fun onChange(selfChange: Boolean) {

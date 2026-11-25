@@ -3,6 +3,7 @@ package com.example.pickupcode.data.repository
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.Telephony
 import androidx.core.content.ContextCompat
 import com.example.pickupcode.data.local.AppSettings
@@ -82,13 +83,18 @@ class PickupRepository(
                 )
 
                 val matchedExisting = recentCandidates.firstOrNull { existing ->
-                    existing.stationNumber == parsed.stationNumber ||
+                    val stationMatches = existing.stationNumber == parsed.stationNumber ||
                         existing.stationNumber == 0 ||
                         parsed.stationNumber == 0
+                    if (!stationMatches) return@firstOrNull false
+                    if (existing.isPickedUp && !shouldSkipPickedUpDuplicate(messageTimestamp, existing.pickedUpAt)) {
+                        return@firstOrNull false
+                    }
+                    true
                 }
 
                 if (matchedExisting != null) {
-                    // 核心规则：若该取件码已被标记为「已取件」，自动跳过排除，绝不重新恢复为待取
+                    // 核心规则：若该取件码已被标记为「已取件」且本次短信并非取件后的新包裹，自动跳过排除，绝不重新恢复为待取
                     if (matchedExisting.isPickedUp) {
                         continue
                     }
@@ -208,32 +214,77 @@ class PickupRepository(
         val stationRules = settingsDataStore.settingsFlow.first().stationRules
 
         var totalAffected = 0
+        totalAffected += scanSmsProvider(
+            context = context,
+            sinceTimestamp = sinceTimestamp,
+            now = now,
+            stationRules = stationRules
+        )
+        totalAffected += scanMmsProvider(
+            context = context,
+            sinceTimestamp = sinceTimestamp,
+            now = now,
+            stationRules = stationRules
+        )
+
+        totalAffected
+    }
+
+    /**
+     * 扫描系统 SMS 表：优先扫描 content://sms 中所有非发件/草稿类型（兼容部分 ROM 将服务/增强短信归入自定义接收类型），
+     * 失败时自动回退至标准 content://sms/inbox。
+     */
+    private suspend fun scanSmsProvider(
+        context: Context,
+        sinceTimestamp: Long,
+        now: Long,
+        stationRules: List<StationRule>
+    ): Int {
         val projection = arrayOf(
             Telephony.Sms._ID,
             Telephony.Sms.ADDRESS,
             Telephony.Sms.BODY,
             Telephony.Sms.DATE
         )
-        val selection = "${Telephony.Sms.DATE} >= ?"
-        val selectionArgs = arrayOf(sinceTimestamp.toString())
         val sortOrder = "${Telephony.Sms.DATE} ASC"
+        val nonOutgoingSelection = "${Telephony.Sms.DATE} >= ? AND ${Telephony.Sms.TYPE} NOT IN (2, 3, 4, 5, 6)"
+        val inboxSelection = "${Telephony.Sms.DATE} >= ?"
+        val selectionArgs = arrayOf(sinceTimestamp.toString())
 
-        try {
+        val cursor = try {
+            context.contentResolver.query(
+                Telephony.Sms.CONTENT_URI,
+                projection,
+                nonOutgoingSelection,
+                selectionArgs,
+                sortOrder
+            )
+        } catch (_: Exception) {
+            null
+        } ?: try {
             context.contentResolver.query(
                 Telephony.Sms.Inbox.CONTENT_URI,
                 projection,
-                selection,
+                inboxSelection,
                 selectionArgs,
                 sortOrder
-            )?.use { cursor ->
-                val addressIdx = cursor.getColumnIndex(Telephony.Sms.ADDRESS)
-                val bodyIdx = cursor.getColumnIndex(Telephony.Sms.BODY)
-                val dateIdx = cursor.getColumnIndex(Telephony.Sms.DATE)
+            )
+        } catch (_: Exception) {
+            null
+        } ?: return 0
 
-                while (cursor.moveToNext()) {
-                    val address = if (addressIdx >= 0) cursor.getString(addressIdx).orEmpty() else ""
-                    val body = if (bodyIdx >= 0) cursor.getString(bodyIdx).orEmpty() else ""
-                    val date = if (dateIdx >= 0) cursor.getLong(dateIdx) else now
+        var totalAffected = 0
+        try {
+            cursor.use { c ->
+                val addressIdx = c.getColumnIndex(Telephony.Sms.ADDRESS)
+                val bodyIdx = c.getColumnIndex(Telephony.Sms.BODY)
+                val dateIdx = c.getColumnIndex(Telephony.Sms.DATE)
+
+                while (c.moveToNext()) {
+                    val address = if (addressIdx >= 0) c.getString(addressIdx).orEmpty() else ""
+                    val body = if (bodyIdx >= 0) c.getString(bodyIdx).orEmpty() else ""
+                    val rawDate = if (dateIdx >= 0) c.getLong(dateIdx) else now
+                    val date = normalizeProviderTimestampMillis(rawDate, now)
 
                     if (body.isNotBlank()) {
                         totalAffected += ingestRawMessage(
@@ -249,8 +300,119 @@ class PickupRepository(
         } catch (_: Exception) {
             // 忽略特定定制 ROM ContentProvider 异常
         }
+        return totalAffected
+    }
 
-        totalAffected
+    /**
+     * 补充扫描系统 MMS 收件箱（content://mms/inbox + content://mms/part）：
+     * 兼容部分运营商/ROM 将 5G消息 / 增强信息 / 富媒体取件通知回落存储至 MMS 表的场景（复用 READ_SMS 权限）。
+     */
+    private suspend fun scanMmsProvider(
+        context: Context,
+        sinceTimestamp: Long,
+        now: Long,
+        stationRules: List<StationRule>
+    ): Int {
+        var totalAffected = 0
+        val sinceSeconds = sinceTimestamp / 1000L
+        val mmsProjection = arrayOf(
+            Telephony.Mms._ID,
+            Telephony.Mms.DATE,
+            Telephony.Mms.SUBJECT
+        )
+        val mmsSelection = "${Telephony.Mms.DATE} >= ?"
+        val mmsSelectionArgs = arrayOf(sinceSeconds.toString())
+        val mmsSortOrder = "${Telephony.Mms.DATE} ASC"
+
+        try {
+            context.contentResolver.query(
+                Telephony.Mms.Inbox.CONTENT_URI,
+                mmsProjection,
+                mmsSelection,
+                mmsSelectionArgs,
+                mmsSortOrder
+            )?.use { cursor ->
+                val idIdx = cursor.getColumnIndex(Telephony.Mms._ID)
+                val dateIdx = cursor.getColumnIndex(Telephony.Mms.DATE)
+                val subjectIdx = cursor.getColumnIndex(Telephony.Mms.SUBJECT)
+
+                while (cursor.moveToNext()) {
+                    if (idIdx < 0) continue
+                    val mmsId = cursor.getLong(idIdx)
+                    val rawDate = if (dateIdx >= 0) cursor.getLong(dateIdx) else now
+                    val timestampMs = normalizeProviderTimestampMillis(rawDate, now)
+                    val subject = if (subjectIdx >= 0) cursor.getString(subjectIdx).orEmpty().trim() else ""
+                    val bodyText = readMmsPlainTextParts(context, mmsId)
+                    val combined = listOf(subject, bodyText)
+                        .filter { it.isNotBlank() }
+                        .joinToString("\n")
+                    if (combined.isNotBlank()) {
+                        totalAffected += ingestRawMessage(
+                            rawText = combined,
+                            source = PickupItemEntity.SOURCE_SMS,
+                            senderOrPackage = "MMS",
+                            messageTimestamp = timestampMs,
+                            preloadedStationRules = stationRules
+                        )
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // 忽略特定定制 ROM 不支持 MMS 查询的异常
+        }
+        return totalAffected
+    }
+
+    private fun readMmsPlainTextParts(context: Context, mmsId: Long): String {
+        val parts = mutableListOf<String>()
+        val partUri = Uri.parse("content://mms/part")
+        val projection = arrayOf("_id", "ct", "text", "_data")
+        try {
+            context.contentResolver.query(
+                partUri,
+                projection,
+                "mid = ?",
+                arrayOf(mmsId.toString()),
+                null
+            )?.use { cursor ->
+                val idIdx = cursor.getColumnIndex("_id")
+                val ctIdx = cursor.getColumnIndex("ct")
+                val textIdx = cursor.getColumnIndex("text")
+                val dataIdx = cursor.getColumnIndex("_data")
+
+                while (cursor.moveToNext()) {
+                    val contentType = if (ctIdx >= 0) cursor.getString(ctIdx).orEmpty().lowercase() else ""
+                    if (contentType != "text/plain" && !contentType.startsWith("text/plain;")) {
+                        continue
+                    }
+                    val inlineText = if (textIdx >= 0) cursor.getString(textIdx).orEmpty().trim() else ""
+                    if (inlineText.isNotEmpty()) {
+                        parts.add(inlineText)
+                    } else if (idIdx >= 0 && dataIdx >= 0 && !cursor.getString(dataIdx).isNullOrBlank()) {
+                        val partId = cursor.getLong(idIdx)
+                        val streamText = readMmsPartStreamUtf8(context, partId)
+                        if (streamText.isNotEmpty()) {
+                            parts.add(streamText)
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        return parts.joinToString("\n")
+    }
+
+    private fun readMmsPartStreamUtf8(context: Context, partId: Long): String {
+        return try {
+            val uri = Uri.parse("content://mms/part/$partId")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val buffer = ByteArray(MAX_MMS_TEXT_PART_BYTES)
+                val read = input.read(buffer)
+                if (read > 0) String(buffer, 0, read, Charsets.UTF_8).trim() else ""
+            }.orEmpty()
+        } catch (_: Exception) {
+            ""
+        }
     }
 
     /**
@@ -428,5 +590,34 @@ class PickupRepository(
         // 扫描去重窗口覆盖最近 7 天（并预留 24 小时边界缓冲），历史已取记录永久保存在本地数据库
         const val RETENTION_SEVEN_DAYS_MILLIS = 7L * 24L * 60L * 60L * 1000L
         private const val DEDUPE_BUFFER_MILLIS = 24L * 60L * 60L * 1000L
+        private const val PICKED_UP_REUSE_GRACE_MILLIS = 60_000L
+        private const val MAX_MMS_TEXT_PART_BYTES = 8 * 1024
+
+        /**
+         * 判断已取件记录是否应拦截本次入库：
+         * - 重扫旧短信（时间戳早于或等于取件时间 + 1 分钟容差）必须跳过，防止已取包裹复活；
+         * - 若新短信到达时间严格晚于上次确认已取时间 + 1 分钟，视为驿站复用了同一货架取件码的新包裹，允许正常入库。
+         */
+        internal fun shouldSkipPickedUpDuplicate(
+            messageTimestamp: Long,
+            pickedUpAt: Long?
+        ): Boolean {
+            if (pickedUpAt == null) return true
+            return messageTimestamp <= pickedUpAt + PICKED_UP_REUSE_GRACE_MILLIS
+        }
+
+        /**
+         * 统一 SMS（毫秒）与 MMS（秒）ContentProvider 的时间戳为毫秒
+         */
+        internal fun normalizeProviderTimestampMillis(
+            rawTimestamp: Long,
+            fallbackNowMillis: Long
+        ): Long {
+            return when {
+                rawTimestamp <= 0L -> fallbackNowMillis
+                rawTimestamp < 10_000_000_000L -> rawTimestamp * 1000L
+                else -> rawTimestamp
+            }
+        }
     }
 }

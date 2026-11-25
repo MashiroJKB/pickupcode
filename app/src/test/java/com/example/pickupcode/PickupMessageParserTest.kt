@@ -279,4 +279,27 @@ class PickupMessageParserTest {
         assertEquals(5, rAdjacent.single().stationNumber)
         assertTrue(PickupMessageParser.parse(bankPwdSms, defaultRules).isEmpty())
     }
+
+    @Test
+    fun `parses duoduo pickup sms with qr mention and normalizes mms timestamps and reused picked-up codes`() {
+        val duoduoSms =
+            "【多多代收点】包裹已到家属区快递服务点2号房，取货码39-3-3028。到店扫“取货二维码”，线上查询更方便！地址：师大家属区2号房快递服务中心"
+        val results = PickupMessageParser.parse(duoduoSms, defaultRules)
+
+        assertEquals(1, results.size)
+        assertEquals("39-3-3028", results[0].code)
+        assertEquals(2, results[0].stationNumber)
+
+        // MMS 秒级时间戳归一化为毫秒，毫秒级保持不变
+        val fallbackNow = 1_764_000_000_000L
+        assertEquals(1_764_000_000_000L, com.example.pickupcode.data.repository.PickupRepository.normalizeProviderTimestampMillis(1_764_000_000L, fallbackNow))
+        assertEquals(1_764_000_000_123L, com.example.pickupcode.data.repository.PickupRepository.normalizeProviderTimestampMillis(1_764_000_000_123L, fallbackNow))
+        assertEquals(fallbackNow, com.example.pickupcode.data.repository.PickupRepository.normalizeProviderTimestampMillis(0L, fallbackNow))
+
+        // 重扫旧已取短信必须跳过，取件之后到达的新同码短信允许重新入库
+        val pickedUpAt = 1_764_000_000_000L
+        assertTrue(com.example.pickupcode.data.repository.PickupRepository.shouldSkipPickedUpDuplicate(pickedUpAt - 3_600_000L, pickedUpAt))
+        assertTrue(com.example.pickupcode.data.repository.PickupRepository.shouldSkipPickedUpDuplicate(pickedUpAt + 30_000L, pickedUpAt))
+        assertEquals(false, com.example.pickupcode.data.repository.PickupRepository.shouldSkipPickedUpDuplicate(pickedUpAt + 120_000L, pickedUpAt))
+    }
 }
