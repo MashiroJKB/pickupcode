@@ -291,15 +291,20 @@ class PickupWidgetProvider : AppWidgetProvider() {
             )
             views.setTextViewTextSize(R.id.widget_empty_view, TypedValue.COMPLEX_UNIT_DIP, 13f)
 
-            // 点击左侧标题打开主应用
-            val openAppIntent = Intent(context, MainActivity::class.java)
+            // 点击小组件空白区域（外边距、顶栏空隙、列表下方留白及空态）或左侧标题均可打开主应用
+            val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
             val openAppPendingIntent = PendingIntent.getActivity(
                 context,
                 0,
                 openAppIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+            views.setOnClickPendingIntent(android.R.id.background, openAppPendingIntent)
+            views.setOnClickPendingIntent(R.id.widget_header_bar, openAppPendingIntent)
             views.setOnClickPendingIntent(R.id.widget_header_title_area, openAppPendingIntent)
+            views.setOnClickPendingIntent(R.id.widget_list_container, openAppPendingIntent)
             views.setOnClickPendingIntent(R.id.widget_empty_view, openAppPendingIntent)
 
             val (iconSizeDp, iconGapDp, firstGapDp) = resolveWidgetShortcutLayout(enabledShortcutCount)
